@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_theme.dart';
 import 'auth/auth_gate.dart';
 
 // Provide these at build/run time, e.g.:
@@ -38,16 +39,7 @@ class SilverLifeApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-        // Larger baseline text sizes for readability by senior users.
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(fontSize: 18),
-          bodyMedium: TextStyle(fontSize: 16),
-          titleLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-      ),
+      theme: seniorFriendlyTheme,
       home: _supabaseConfigured
           ? const AuthGate()
           : const _SupabaseNotConfiguredPage(),
@@ -75,23 +67,3 @@ class _SupabaseNotConfiguredPage extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('실버라이프'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: '로그아웃',
-            onPressed: () => Supabase.instance.client.auth.signOut(),
-          ),
-        ],
-      ),
-      body: const Center(child: Text('주변 시설 찾기 · 실버 커뮤니티')),
-    );
-  }
-}

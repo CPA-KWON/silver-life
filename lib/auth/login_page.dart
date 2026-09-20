@@ -112,16 +112,13 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _isLoading ? null : _login,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
                     child: _isLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('로그인', style: TextStyle(fontSize: 18)),
+                        : const Text('로그인'),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
@@ -132,10 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                                 builder: (_) => const SignupPage(),
                               ),
                             ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('회원가입', style: TextStyle(fontSize: 18)),
+                    child: const Text('회원가입'),
                   ),
                 ],
               ),

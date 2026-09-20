@@ -217,16 +217,13 @@ class _SignupPageState extends State<SignupPage> {
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _isLoading ? null : _signup,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
                     child: _isLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('가입하기', style: TextStyle(fontSize: 18)),
+                        : const Text('가입하기'),
                   ),
                 ],
               ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../main.dart';
+import '../home/main_shell.dart';
 import 'login_page.dart';
 
 class AuthGate extends StatelessWidget {
@@ -16,7 +16,7 @@ class AuthGate extends StatelessWidget {
       initialData: AuthState(AuthChangeEvent.initialSession, auth.currentSession),
       builder: (context, snapshot) {
         final session = snapshot.data?.session ?? auth.currentSession;
-        return session == null ? const LoginPage() : const HomePage();
+        return session == null ? const LoginPage() : const MainShell();
       },
     );
   }
