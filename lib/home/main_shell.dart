@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../community/community_page.dart';
 import '../facility/facility_search_page.dart';
+import 'home_tab.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -17,7 +18,7 @@ class _MainShellState extends State<MainShell> {
   static const _titles = ['홈', '시설찾기', '커뮤니티'];
 
   static const _pages = [
-    _PlaceholderTab(message: '환영합니다, 실버라이프입니다.'),
+    HomeTab(),
     FacilitySearchPage(),
     CommunityPage(),
   ];
@@ -46,26 +47,6 @@ class _MainShellState extends State<MainShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: _destinations,
-      ),
-    );
-  }
-}
-
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          message,
-          style: Theme.of(context).textTheme.bodyLarge,
-          textAlign: TextAlign.center,
-        ),
       ),
     );
   }
