@@ -244,8 +244,8 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
         if (_showSearchHereButton)
           Positioned(
             bottom: 24,
-            left: 0,
-            right: 0,
+            left: 50,
+            right: 50,
             child: Center(
               child: FilledButton.icon(
                 onPressed: _isSearching ? null : _searchHere,

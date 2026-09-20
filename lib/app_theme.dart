@@ -1,34 +1,40 @@
 import 'package:flutter/material.dart';
 
-/// Brand palette: a navy structural color (app bar, nav bar, headings) reads
-/// as trustworthy/professional, while orange is reserved for call-to-action
-/// buttons only — keeping the warmth senior users respond to without
-/// tinting the whole app orange.
-const _navy = Color(0xFF16264D);
-const _accentOrange = Color(0xFFE8630A);
-const _pageBackground = Color(0xFFF5F6F8);
+/// Brand palette. Unlike the earlier pastel palettes, [_primary] is dark
+/// enough (~5.2:1 contrast) for white text/icons to sit directly on it, so
+/// it drives both structural chrome (app bar) and CTAs (buttons). [_accent]
+/// and [_highlight] are lighter and still need dark ink text on top of them.
+const _primary = Color(0xFF2563EB);
+const _dark = Color(0xFF0B1220);
+const _surface = Color(0xFFF5F8FF);
+const _accent = Color(0xFF60A5FA);
+const _highlight = Color(0xFFE0EAFF);
+
 const _divider = Color(0xFFE2E5EA);
-const _textPrimary = Color(0xFF1A1A1A);
+const _textPrimary = _dark;
 const _textMuted = Color(0xFF6B7280);
+// The bottom nav bar is dark, so its own muted/inactive tone needs to read
+// on _dark instead of on white like _textMuted does.
+const _textMutedOnDark = Color(0xFF9AA9C4);
 
 const _fontFamily = 'Pretendard';
 
 /// High-contrast, large-touch-target theme for senior users, with a
-/// deliberate navy/orange brand palette instead of an auto-generated
-/// Material seed color: bigger text, taller buttons, and a bottom
-/// navigation bar instead of a drawer so screens stay simple to navigate.
+/// deliberate blue brand palette instead of an auto-generated Material seed
+/// color: bigger text, taller buttons, and a bottom navigation bar instead
+/// of a drawer so screens stay simple to navigate.
 final ThemeData seniorFriendlyTheme = ThemeData(
   useMaterial3: true,
   fontFamily: _fontFamily,
-  scaffoldBackgroundColor: _pageBackground,
+  scaffoldBackgroundColor: _surface,
   colorScheme: ColorScheme.fromSeed(
-    seedColor: _navy,
+    seedColor: _primary,
     brightness: Brightness.light,
   ).copyWith(
-    primary: _navy,
+    primary: _primary,
     onPrimary: Colors.white,
-    secondary: _accentOrange,
-    onSecondary: Colors.white,
+    secondary: _accent,
+    onSecondary: _textPrimary,
     surface: Colors.white,
     onSurface: _textPrimary,
     outline: _divider,
@@ -43,7 +49,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
   ),
 
   appBarTheme: const AppBarTheme(
-    backgroundColor: _navy,
+    backgroundColor: _dark,
     foregroundColor: Colors.white,
     elevation: 0,
     centerTitle: false,
@@ -57,25 +63,25 @@ final ThemeData seniorFriendlyTheme = ThemeData(
 
   navigationBarTheme: NavigationBarThemeData(
     height: 72,
-    backgroundColor: Colors.white,
-    indicatorColor: _navy.withValues(alpha: 0.1),
+    backgroundColor: _dark,
+    indicatorColor: _accent.withValues(alpha: 0.2),
     labelTextStyle: WidgetStateProperty.resolveWith((states) {
       final selected = states.contains(WidgetState.selected);
       return TextStyle(
         fontSize: 13,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-        color: selected ? _navy : _textMuted,
+        color: selected ? _accent : _textMutedOnDark,
       );
     }),
     iconTheme: WidgetStateProperty.resolveWith((states) {
       final selected = states.contains(WidgetState.selected);
-      return IconThemeData(color: selected ? _navy : _textMuted);
+      return IconThemeData(color: selected ? _accent : _textMutedOnDark);
     }),
   ),
 
   filledButtonTheme: FilledButtonThemeData(
     style: FilledButton.styleFrom(
-      backgroundColor: _accentOrange,
+      backgroundColor: _primary,
       foregroundColor: Colors.white,
       minimumSize: const Size.fromHeight(56),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -90,8 +96,8 @@ final ThemeData seniorFriendlyTheme = ThemeData(
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
-      foregroundColor: _navy,
-      side: const BorderSide(color: _navy, width: 1.5),
+      foregroundColor: _primary,
+      side: const BorderSide(color: _primary, width: 1.5),
       minimumSize: const Size.fromHeight(56),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
@@ -109,8 +115,8 @@ final ThemeData seniorFriendlyTheme = ThemeData(
   ),
 
   chipTheme: ChipThemeData(
-    backgroundColor: Colors.white,
-    selectedColor: _navy,
+    backgroundColor: _highlight,
+    selectedColor: _primary,
     shape: const StadiumBorder(side: BorderSide(color: _divider)),
     labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: _textPrimary),
     secondaryLabelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
@@ -131,7 +137,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: _navy, width: 2),
+      borderSide: const BorderSide(color: _primary, width: 2),
     ),
   ),
 

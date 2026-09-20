@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/comment_count.dart';
 import '../core/region_scope.dart';
 import '../core/meetup_category.dart';
 import 'new_post_page.dart';
@@ -54,7 +55,8 @@ class _CommunityPageState extends State<CommunityPage> {
     var builder = client
         .from('posts')
         .select(
-          'id, title, category, created_at, profiles!inner(nickname, region_sido, region_sigungu)',
+          'id, title, category, created_at, comments(count), '
+          'profiles!inner(nickname, region_sido, region_sigungu)',
         )
         .neq('category', kMeetupCategory)
         .eq('profiles.region_sido', _mySido!);
@@ -142,6 +144,7 @@ class _CommunityPageState extends State<CommunityPage> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          trailing: CommentCountBadge(commentCountOf(post)),
                           onTap: () async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(
@@ -185,7 +188,6 @@ class _CategoryFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 56,
-      color: Colors.white,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

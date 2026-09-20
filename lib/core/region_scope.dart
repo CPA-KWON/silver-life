@@ -24,7 +24,6 @@ class RegionScopeBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Wrap(
         spacing: 8,

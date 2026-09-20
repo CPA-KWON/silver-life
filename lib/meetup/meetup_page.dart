@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../community/post_detail_page.dart';
+import '../core/comment_count.dart';
 import '../core/meetup_category.dart';
 import '../core/region_scope.dart';
 import 'new_meetup_page.dart';
@@ -50,7 +51,7 @@ class _MeetupPageState extends State<MeetupPage> {
     var builder = Supabase.instance.client
         .from('posts')
         .select(
-          'id, title, event_at, '
+          'id, title, event_at, comments(count), '
           'facilities!inner(name, region_sido, region_sigungu), '
           'profiles(nickname)',
         )
@@ -253,7 +254,18 @@ class _MeetupCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(formatEventAt(meetup['event_at'] as String)),
-                      Text('$facilityName · $nickname'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$facilityName · $nickname',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          CommentCountBadge(commentCountOf(meetup)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
