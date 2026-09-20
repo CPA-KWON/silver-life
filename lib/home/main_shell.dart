@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../facility/facility_search_page.dart';
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -11,22 +13,25 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
 
-  static const _tabs = [
-    _Tab(label: '홈', icon: Icons.home, message: '환영합니다, 실버라이프입니다.'),
-    _Tab(
-      label: '시설찾기',
-      icon: Icons.map_outlined,
-      message: '주변 병원·약국·경로당·복지관을 찾아보세요.',
-    ),
-    _Tab(label: '커뮤니티', icon: Icons.groups_outlined, message: '이웃과 소식을 나눠보세요.'),
+  static const _titles = ['홈', '시설찾기', '커뮤니티'];
+
+  static const _pages = [
+    _PlaceholderTab(message: '환영합니다, 실버라이프입니다.'),
+    FacilitySearchPage(),
+    _PlaceholderTab(message: '이웃과 소식을 나눠보세요.'),
+  ];
+
+  static const _destinations = [
+    NavigationDestination(icon: Icon(Icons.home), label: '홈'),
+    NavigationDestination(icon: Icon(Icons.map_outlined), label: '시설찾기'),
+    NavigationDestination(icon: Icon(Icons.groups_outlined), label: '커뮤니티'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final tab = _tabs[_index];
     return Scaffold(
       appBar: AppBar(
-        title: Text(tab.label),
+        title: Text(_titles[_index]),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -35,32 +40,32 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            tab.message,
-            style: Theme.of(context).textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
+      body: _pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (final t in _tabs)
-            NavigationDestination(icon: Icon(t.icon), label: t.label),
-        ],
+        destinations: _destinations,
       ),
     );
   }
 }
 
-class _Tab {
-  const _Tab({required this.label, required this.icon, required this.message});
+class _PlaceholderTab extends StatelessWidget {
+  const _PlaceholderTab({required this.message});
 
-  final String label;
-  final IconData icon;
   final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          message,
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
 }

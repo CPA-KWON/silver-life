@@ -40,6 +40,7 @@ dependencies:
 
   flutter_localizations:
     sdk: flutter
+  flutter_naver_map: ^1.4.4
 
 dev_dependencies:
   flutter_test:

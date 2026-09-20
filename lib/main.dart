@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_theme.dart';
@@ -11,6 +12,10 @@ const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 final _supabaseConfigured = _supabaseUrl.isNotEmpty && _supabaseAnonKey.isNotEmpty;
 
+// From NAVER Cloud Platform console (Services > Maps). Facility search will
+// not work until this is provided, but the rest of the app doesn't need it.
+const _naverMapClientId = String.fromEnvironment('NAVER_MAP_CLIENT_ID');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -18,6 +23,13 @@ Future<void> main() async {
     await Supabase.initialize(
       url: _supabaseUrl,
       publishableKey: _supabaseAnonKey,
+    );
+  }
+
+  if (_naverMapClientId.isNotEmpty) {
+    await FlutterNaverMap().init(
+      clientId: _naverMapClientId,
+      onAuthFailed: (ex) => debugPrint('Naver Map auth failed: $ex'),
     );
   }
 
