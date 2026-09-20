@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/korea_regions.dart';
+import '../core/region_picker.dart';
+
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
 
@@ -15,8 +18,9 @@ class _SignupPageState extends State<SignupPage> {
   final _passwordConfirmController = TextEditingController();
   final _nameController = TextEditingController();
   final _nicknameController = TextEditingController();
-  final _regionController = TextEditingController();
   final _birthYearController = TextEditingController();
+  String _sido = kKoreaRegions.keys.first;
+  String _sigungu = kKoreaRegions.values.first.first;
   bool _isLoading = false;
 
   @override
@@ -26,7 +30,6 @@ class _SignupPageState extends State<SignupPage> {
     _passwordConfirmController.dispose();
     _nameController.dispose();
     _nicknameController.dispose();
-    _regionController.dispose();
     _birthYearController.dispose();
     super.dispose();
   }
@@ -42,7 +45,8 @@ class _SignupPageState extends State<SignupPage> {
         data: {
           'name': _nameController.text.trim(),
           'nickname': _nicknameController.text.trim(),
-          'region': _regionController.text.trim(),
+          'region_sido': _sido,
+          'region_sigungu': _sigungu,
           'birth_year': int.parse(_birthYearController.text.trim()),
         },
       );
@@ -179,16 +183,12 @@ class _SignupPageState extends State<SignupPage> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _regionController,
-                    decoration: const InputDecoration(
-                      labelText: '지역구 (예: 강남구)',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '지역구를 입력해주세요';
-                      }
-                      return null;
+                  RegionPicker(
+                    initialSido: _sido,
+                    initialSigungu: _sigungu,
+                    onChanged: (sido, sigungu) {
+                      _sido = sido;
+                      _sigungu = sigungu;
                     },
                   ),
                   const SizedBox(height: 16),

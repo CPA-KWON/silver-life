@@ -4,7 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'community_page.dart' show kPostCategories;
 
 class NewPostPage extends StatefulWidget {
-  const NewPostPage({super.key});
+  const NewPostPage({super.key, this.existingPost});
+
+  /// When set (id, category, title, content), the page edits that post
+  /// (UPDATE) instead of creating a new one (INSERT).
+  final Map<String, dynamic>? existingPost;
 
   @override
   State<NewPostPage> createState() => _NewPostPageState();
@@ -12,10 +16,17 @@ class NewPostPage extends StatefulWidget {
 
 class _NewPostPageState extends State<NewPostPage> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
-  String _category = kPostCategories.first;
+  late final _titleController = TextEditingController(
+    text: widget.existingPost?['title'] as String?,
+  );
+  late final _contentController = TextEditingController(
+    text: widget.existingPost?['content'] as String?,
+  );
+  late String _category =
+      widget.existingPost?['category'] as String? ?? kPostCategories.first;
   bool _isSaving = false;
+
+  bool get _isEditing => widget.existingPost != null;
 
   @override
   void dispose() {
@@ -29,19 +40,26 @@ class _NewPostPageState extends State<NewPostPage> {
 
     setState(() => _isSaving = true);
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      await Supabase.instance.client.from('posts').insert({
-        'author_id': userId,
+      final client = Supabase.instance.client;
+      final data = {
         'category': _category,
         'title': _titleController.text.trim(),
         'content': _contentController.text.trim(),
-      });
+      };
+
+      if (_isEditing) {
+        await client.from('posts').update(data).eq('id', widget.existingPost!['id'] as String);
+      } else {
+        final userId = client.auth.currentUser!.id;
+        await client.from('posts').insert({...data, 'author_id': userId});
+      }
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
+        final action = _isEditing ? '수정' : '등록';
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text('글 등록에 실패했습니다: $e')));
+          ..showSnackBar(SnackBar(content: Text('글 $action에 실패했습니다: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -51,7 +69,7 @@ class _NewPostPageState extends State<NewPostPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('글쓰기')),
+      appBar: AppBar(title: Text(_isEditing ? '글 수정' : '글쓰기')),
       // Scrollable so the form doesn't overflow when the keyboard opens
       // and shrinks the available height (title/content have multiple
       // fields plus an 8-line content box).
@@ -101,7 +119,7 @@ class _NewPostPageState extends State<NewPostPage> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('등록하기'),
+                    : Text(_isEditing ? '수정하기' : '등록하기'),
               ),
             ],
           ),

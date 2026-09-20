@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/region_scope.dart';
+import '../core/meetup_category.dart';
 import 'new_post_page.dart';
 import 'post_detail_page.dart';
 
-const kPostCategories = ['자유게시판', '동네모임', '건강정보', '나눔·도움요청'];
+// 동네모임 lives in its own tab (see lib/meetup) with its own date/place
+// fields, not in the general board.
+const kPostCategories = ['자유게시판', '건강정보', '나눔·도움요청'];
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -15,27 +19,64 @@ class CommunityPage extends StatefulWidget {
 
 class _CommunityPageState extends State<CommunityPage> {
   String? _categoryFilter;
-  late Future<List<Map<String, dynamic>>> _postsFuture;
+  // Defaults to 시도 (the broader of the two remaining scopes) rather than
+  // the viewer's exact 시군구, so a brand-new user's district being empty
+  // doesn't mean an empty feed on first open.
+  RegionScope _regionScope = RegionScope.sido;
+  String? _mySido;
+  String? _mySigungu;
+  Future<List<Map<String, dynamic>>>? _postsFuture;
 
   @override
   void initState() {
     super.initState();
-    _postsFuture = _fetchPosts();
+    _loadMyRegion();
+  }
+
+  Future<void> _loadMyRegion() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final profile = await Supabase.instance.client
+        .from('profiles')
+        .select('region_sido, region_sigungu')
+        .eq('id', userId)
+        .single();
+    if (mounted) {
+      setState(() {
+        _mySido = profile['region_sido'] as String;
+        _mySigungu = profile['region_sigungu'] as String;
+        _postsFuture = _fetchPosts();
+      });
+    }
   }
 
   Future<List<Map<String, dynamic>>> _fetchPosts() async {
     final client = Supabase.instance.client;
-    final builder = client
+    var builder = client
         .from('posts')
-        .select('id, title, category, created_at, profiles(nickname)');
-    final filtered = _categoryFilter == null
-        ? builder
-        : builder.eq('category', _categoryFilter!);
-    final result = await filtered.order('created_at', ascending: false);
+        .select(
+          'id, title, category, created_at, profiles!inner(nickname, region_sido, region_sigungu)',
+        )
+        .neq('category', kMeetupCategory)
+        .eq('profiles.region_sido', _mySido!);
+    if (_categoryFilter != null) {
+      builder = builder.eq('category', _categoryFilter!);
+    }
+    if (_regionScope == RegionScope.sigungu) {
+      builder = builder.eq('profiles.region_sigungu', _mySigungu!);
+    }
+    final result = await builder.order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(result);
   }
 
+  void _setRegionScope(RegionScope scope) {
+    setState(() {
+      _regionScope = scope;
+      _postsFuture = _fetchPosts();
+    });
+  }
+
   void _refresh() {
+    if (_mySido == null) return;
     // Must be a block body: an arrow body's value would be the Future
     // that _fetchPosts() returns, and setState() rejects a callback that
     // returns a Future instead of void.
@@ -45,6 +86,7 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   void _setCategory(String? category) {
+    if (_mySido == null) return;
     setState(() {
       _categoryFilter = category;
       _postsFuture = _fetchPosts();
@@ -56,6 +98,12 @@ class _CommunityPageState extends State<CommunityPage> {
     return Scaffold(
       body: Column(
         children: [
+          RegionScopeBar(
+            scope: _regionScope,
+            mySido: _mySido,
+            mySigungu: _mySigungu,
+            onChanged: _mySido == null ? null : _setRegionScope,
+          ),
           _CategoryFilterBar(selected: _categoryFilter, onSelected: _setCategory),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
@@ -81,6 +129,7 @@ class _CommunityPageState extends State<CommunityPage> {
                       final post = posts[i];
                       final nickname =
                           (post['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
+                      final subtitle = '[${post['category']}] $nickname';
                       return Card(
                         child: ListTile(
                           title: Text(
@@ -89,7 +138,7 @@ class _CommunityPageState extends State<CommunityPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            '[${post['category']}] $nickname',
+                            subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

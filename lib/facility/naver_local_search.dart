@@ -25,6 +25,7 @@ const _cacheTtl = Duration(minutes: 5);
 
 class FacilityResult {
   const FacilityResult({
+    this.id,
     required this.name,
     required this.category,
     required this.address,
@@ -34,6 +35,11 @@ class FacilityResult {
     required this.distanceMeters,
   });
 
+  /// Set only when this result came from our own `facilities` table
+  /// (see [searchOwnFacilities]) rather than a live NAVER search — a
+  /// stable id that meetup posts (`posts.facility_id`) can reliably
+  /// reference, unlike NAVER results which have no persistent identity.
+  final String? id;
   final String name;
   final String category;
   final String address;

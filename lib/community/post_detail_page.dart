@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/meetup_category.dart';
+import '../meetup/new_meetup_page.dart';
+import 'new_post_page.dart';
+
 class PostDetailPage extends StatefulWidget {
   const PostDetailPage({super.key, required this.postId});
 
@@ -32,9 +36,76 @@ class _PostDetailPageState extends State<PostDetailPage> {
   Future<Map<String, dynamic>> _fetchPost() {
     return Supabase.instance.client
         .from('posts')
-        .select('id, title, content, category, created_at, profiles(nickname)')
+        .select(
+          'id, title, content, category, created_at, event_at, author_id, '
+          'facilities(id, name, address, lat, lng, category, telephone), '
+          'profiles(nickname)',
+        )
         .eq('id', widget.postId)
         .single();
+  }
+
+  Future<void> _editPost(Map<String, dynamic> post) async {
+    final isMeetup = post['category'] == kMeetupCategory;
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => isMeetup
+            ? NewMeetupPage(
+                existingPost: {
+                  'id': post['id'],
+                  'title': post['title'],
+                  'content': post['content'],
+                  'event_at': post['event_at'],
+                  'facility': post['facilities'],
+                },
+              )
+            : NewPostPage(
+                existingPost: {
+                  'id': post['id'],
+                  'category': post['category'],
+                  'title': post['title'],
+                  'content': post['content'],
+                },
+              ),
+      ),
+    );
+    if (changed == true && mounted) {
+      setState(() {
+        _postFuture = _fetchPost();
+      });
+    }
+  }
+
+  Future<void> _deletePost() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('삭제하시겠어요?'),
+        content: const Text('삭제한 글은 되돌릴 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await Supabase.instance.client.from('posts').delete().eq('id', widget.postId);
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('삭제에 실패했습니다: $e')));
+      }
+    }
   }
 
   Future<List<Map<String, dynamic>>> _fetchComments() async {
@@ -83,11 +154,41 @@ class _PostDetailPageState extends State<PostDetailPage> {
   String _nicknameOf(Map<String, dynamic> row) =>
       (row['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
 
+  String _formatEventAt(String iso) {
+    final dt = DateTime.parse(iso).toLocal();
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '${dt.year}.${dt.month}.${dt.day} ${dt.hour}:$minute';
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('게시글')),
+      appBar: AppBar(
+        title: const Text('게시글'),
+        actions: [
+          FutureBuilder<Map<String, dynamic>>(
+            future: _postFuture,
+            builder: (context, snapshot) {
+              final post = snapshot.data;
+              if (post == null) return const SizedBox.shrink();
+              final isAuthor =
+                  post['author_id'] == Supabase.instance.client.auth.currentUser!.id;
+              if (!isAuthor) return const SizedBox.shrink();
+              return PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') _editPost(post);
+                  if (value == 'delete') _deletePost();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'edit', child: Text('수정')),
+                  PopupMenuItem(value: 'delete', child: Text('삭제')),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -112,6 +213,38 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         Text(post['title'] as String, style: textTheme.titleLarge),
                         const SizedBox(height: 4),
                         Text(_nicknameOf(post), style: textTheme.bodyMedium),
+                        if (post['event_at'] != null) ...[
+                          const SizedBox(height: 12),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.event, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(_formatEventAt(post['event_at'] as String)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.place_outlined, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          (post['facilities'] as Map?)?['name'] as String? ?? '',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                         const Divider(height: 32),
                         Text(post['content'] as String, style: textTheme.bodyLarge),
                       ],
