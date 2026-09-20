@@ -160,7 +160,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       controller: _commentController,
                       decoration: const InputDecoration(
                         hintText: '댓글을 입력하세요',
-                        border: OutlineInputBorder(),
                       ),
                     ),
                   ),

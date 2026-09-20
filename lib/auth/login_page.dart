@@ -85,7 +85,6 @@ class _LoginPageState extends State<LoginPage> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       labelText: '이메일 (아이디)',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -100,7 +99,6 @@ class _LoginPageState extends State<LoginPage> {
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: '비밀번호',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {

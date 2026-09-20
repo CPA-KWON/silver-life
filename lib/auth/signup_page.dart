@@ -116,7 +116,6 @@ class _SignupPageState extends State<SignupPage> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       labelText: '이메일 (아이디)',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || !value.contains('@')) {
@@ -131,7 +130,6 @@ class _SignupPageState extends State<SignupPage> {
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: '비밀번호 (6자 이상)',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.length < 6) {
@@ -146,7 +144,6 @@ class _SignupPageState extends State<SignupPage> {
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: '비밀번호 확인',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value != _passwordController.text) {
@@ -160,7 +157,6 @@ class _SignupPageState extends State<SignupPage> {
                     controller: _nameController,
                     decoration: const InputDecoration(
                       labelText: '이름',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -174,7 +170,6 @@ class _SignupPageState extends State<SignupPage> {
                     controller: _nicknameController,
                     decoration: const InputDecoration(
                       labelText: '닉네임',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -188,7 +183,6 @@ class _SignupPageState extends State<SignupPage> {
                     controller: _regionController,
                     decoration: const InputDecoration(
                       labelText: '지역구 (예: 강남구)',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -203,7 +197,6 @@ class _SignupPageState extends State<SignupPage> {
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: '출생년도 (예: 1955)',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       final year = int.tryParse(value ?? '');

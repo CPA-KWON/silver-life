@@ -66,7 +66,6 @@ class _NewPostPageState extends State<NewPostPage> {
                 initialValue: _category,
                 decoration: const InputDecoration(
                   labelText: '카테고리',
-                  border: OutlineInputBorder(),
                 ),
                 items: [
                   for (final category in kPostCategories)
@@ -79,7 +78,6 @@ class _NewPostPageState extends State<NewPostPage> {
                 controller: _titleController,
                 decoration: const InputDecoration(
                   labelText: '제목',
-                  border: OutlineInputBorder(),
                 ),
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? '제목을 입력해주세요' : null,
@@ -89,7 +87,6 @@ class _NewPostPageState extends State<NewPostPage> {
                 controller: _contentController,
                 decoration: const InputDecoration(
                   labelText: '내용',
-                  border: OutlineInputBorder(),
                 ),
                 maxLines: 8,
                 validator: (value) =>

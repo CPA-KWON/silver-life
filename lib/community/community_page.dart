@@ -74,31 +74,34 @@ class _CommunityPageState extends State<CommunityPage> {
                 return RefreshIndicator(
                   onRefresh: () async => _refresh(),
                   child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
                     itemCount: posts.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (context, i) {
                       final post = posts[i];
                       final nickname =
                           (post['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
-                      return ListTile(
-                        title: Text(
-                          post['title'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      return Card(
+                        child: ListTile(
+                          title: Text(
+                            post['title'] as String,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '[${post['category']}] $nickname',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PostDetailPage(postId: post['id'] as String),
+                              ),
+                            );
+                            _refresh();
+                          },
                         ),
-                        subtitle: Text(
-                          '[${post['category']}] $nickname',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => PostDetailPage(postId: post['id'] as String),
-                            ),
-                          );
-                          _refresh();
-                        },
                       );
                     },
                   ),
@@ -131,8 +134,9 @@ class _CategoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       height: 56,
+      color: Colors.white,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
