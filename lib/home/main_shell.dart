@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../community/community_page.dart';
 import '../facility/facility_search_page.dart';
 
 class MainShell extends StatefulWidget {
@@ -18,7 +19,7 @@ class _MainShellState extends State<MainShell> {
   static const _pages = [
     _PlaceholderTab(message: '환영합니다, 실버라이프입니다.'),
     FacilitySearchPage(),
-    _PlaceholderTab(message: '이웃과 소식을 나눠보세요.'),
+    CommunityPage(),
   ];
 
   static const _destinations = [

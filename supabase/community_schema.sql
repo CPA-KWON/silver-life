@@ -1,8 +1,11 @@
 -- Run this once in the Supabase project's SQL Editor, after schema.sql.
 
+-- author_id references profiles (not auth.users) so Supabase's PostgREST
+-- can embed the author's nickname directly, e.g.
+-- .from('posts').select('*, profiles(nickname)')
 create table public.posts (
   id uuid primary key default gen_random_uuid(),
-  author_id uuid not null references auth.users (id) on delete cascade,
+  author_id uuid not null references public.profiles (id) on delete cascade,
   category text not null check (
     category in ('자유게시판', '동네모임', '건강정보', '나눔·도움요청')
   ),
@@ -14,7 +17,7 @@ create table public.posts (
 create table public.comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts (id) on delete cascade,
-  author_id uuid not null references auth.users (id) on delete cascade,
+  author_id uuid not null references public.profiles (id) on delete cascade,
   content text not null,
   created_at timestamptz not null default now()
 );
