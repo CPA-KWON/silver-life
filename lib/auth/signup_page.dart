@@ -4,6 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/korea_regions.dart';
 import '../core/region_picker.dart';
 
+// Must be registered as an intent-filter on MainActivity (see
+// AndroidManifest.xml) and added to Supabase Dashboard > Authentication >
+// URL Configuration > Redirect URLs, or Supabase will refuse to redirect
+// here after the user confirms their email.
+const _emailConfirmRedirect = 'com.silverlife.app://login-callback';
+
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
 
@@ -42,6 +48,7 @@ class _SignupPageState extends State<SignupPage> {
       final response = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        emailRedirectTo: _emailConfirmRedirect,
         data: {
           'name': _nameController.text.trim(),
           'nickname': _nicknameController.text.trim(),

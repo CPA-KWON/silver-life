@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,8 +33,13 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   static const _seoulCityHall = NLatLng(37.5666, 126.979);
 
   NaverMapController? _controller;
+  final _searchController = TextEditingController();
   String? _category;
   String? _subcategory;
+  // Whatever the most recent search was for — a category, a hospital
+  // subcategory, or free text — regardless of which of those triggered it.
+  // Drives "이 위치에서 검색" and re-search after panning.
+  String? _activeSearchTerm;
   bool _isSearching = false;
   // Shown after the user manually pans/zooms the map (not after our own
   // post-search recenter), so they can re-search around wherever they
@@ -46,38 +50,57 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   // see _openFacilityDetail for why.
   late FacilityResult? _selectedFacility = widget.initialFacility;
 
-  Future<Position> _currentPosition() async {
-    final status = await Permission.location.request();
-    if (!status.isGranted) {
-      throw Exception('위치 권한이 필요합니다.');
-    }
-    return Geolocator.getCurrentPosition();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _selectCategory(String category) {
     // Picking a top-level category (e.g. re-tapping "병원") resets any
-    // hospital specialty filter and searches the broad category again.
+    // hospital specialty filter and searches the broad category again, and
+    // clears any typed keyword search so the two don't mix.
+    _searchController.clear();
     setState(() {
       _category = category;
       _subcategory = null;
     });
-    _searchNearMe(category);
+    _searchAtCamera(category);
   }
 
   void _selectSubcategory(String subcategory) {
+    _searchController.clear();
     setState(() => _subcategory = subcategory);
-    _searchNearMe(subcategory);
+    _searchAtCamera(subcategory);
   }
 
-  Future<void> _searchNearMe(String searchTerm) async {
-    final position = await _currentPosition();
-    await _search(searchTerm, position.latitude, position.longitude);
+  void _submitTextSearch() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    // A typed keyword isn't one of the category chips, so clear those to
+    // avoid showing a chip selected that no longer matches what's searched.
+    setState(() {
+      _category = null;
+      _subcategory = null;
+    });
+    _searchAtCamera(query);
   }
 
   Future<void> _searchHere() async {
+    final searchTerm = _activeSearchTerm;
+    if (searchTerm == null) return;
+    await _searchAtCamera(searchTerm);
+  }
+
+  // Every search — whether from tapping a category or the "이 위치에서 검색"
+  // button — is centered on wherever the map is currently showing, not the
+  // device's live GPS. Only the very first frame (native "follow" mode set
+  // in onMapReady) centers the map on the real current location; after
+  // that, panning the map is what decides where searches look.
+  Future<void> _searchAtCamera(String searchTerm) async {
     final controller = _controller;
-    final searchTerm = _subcategory ?? _category;
-    if (controller == null || searchTerm == null) return;
+    if (controller == null) return;
     final position = await controller.getCameraPosition();
     await _search(
       searchTerm,
@@ -93,6 +116,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
     setState(() {
       _isSearching = true;
       _showSearchHereButton = false;
+      _activeSearchTerm = searchTerm;
     });
 
     try {
@@ -199,9 +223,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
             final userMoved =
                 reason == NCameraUpdateReason.gesture ||
                 reason == NCameraUpdateReason.control;
-            if (userMoved &&
-                (_subcategory ?? _category) != null &&
-                !_showSearchHereButton) {
+            if (userMoved && _activeSearchTerm != null && !_showSearchHereButton) {
               setState(() => _showSearchHereButton = true);
             }
           },
@@ -213,6 +235,12 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _SearchField(
+                controller: _searchController,
+                isSearching: _isSearching,
+                onSubmitted: _submitTextSearch,
+              ),
+              const SizedBox(height: 8),
               _CategoryBar(
                 selected: _category,
                 isSearching: _isSearching,
@@ -589,6 +617,46 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                 ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    required this.controller,
+    required this.isSearching,
+    required this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final bool isSearching;
+  final VoidCallback onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 2,
+      borderRadius: BorderRadius.circular(12),
+      child: TextField(
+        controller: controller,
+        enabled: !isSearching,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => onSubmitted(),
+        decoration: InputDecoration(
+          hintText: '시설 이름으로 검색 (예: 서울대병원)',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.arrow_forward),
+            onPressed: isSearching ? null : onSubmitted,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
