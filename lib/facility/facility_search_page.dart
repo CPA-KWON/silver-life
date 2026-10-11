@@ -214,7 +214,13 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
           ),
           onMapReady: (controller) async {
             _controller = controller;
+            // Set before any tracking starts so the built-in location
+            // button goes through it too (see _SafeLocationTracker).
+            controller.setMyLocationTracker(_SafeLocationTracker());
             final status = await Permission.location.request();
+            // The page may have been left while the permission prompt was
+            // up, in which case the controller is already disposed.
+            if (!mounted) return;
             if (status.isGranted) {
               controller.setLocationTrackingMode(NLocationTrackingMode.follow);
             }
@@ -711,5 +717,32 @@ class _CategoryBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Works around a flutter_naver_map 1.4.4 race: if the map is disposed while
+/// the tracker is still waiting for the first GPS fix, the plugin starts the
+/// location/heading subscriptions *after* its own cleanup already ran. They
+/// then call into the dead map forever, flooding the log with
+/// `MissingPluginException ... lo"L"bearing` (upstream issue #359).
+///
+/// Returning null from [startLocationService] makes the plugin skip starting
+/// those subscriptions, so nothing is left behind.
+class _SafeLocationTracker extends NDefaultMyLocationTracker {
+  bool _stopped = false;
+
+  @override
+  Future<NLatLng?> startLocationService() async {
+    _stopped = false;
+    final location = await super.startLocationService();
+    return _stopped ? null : location;
+  }
+
+  // Called by the plugin when tracking stops — either the map is disposed
+  // or the location button cycles to "none".
+  @override
+  void disposeLocationService() {
+    _stopped = true;
+    super.disposeLocationService();
   }
 }
