@@ -53,3 +53,9 @@ android/key.properties
 *.keystore
 .env
 .env.*
+
+# App keys (Supabase URL/anon key, NAVER ids) — passed via --dart-define-from-file
+.env.json
+# Supabase CLI local secrets, if the Edge Function is ever set up via CLI
+supabase/.env
+supabase/functions/.env
