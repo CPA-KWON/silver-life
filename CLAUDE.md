@@ -46,7 +46,9 @@
 ### 실행·빌드 명령 (Claude가 직접 실행)
 - 실행: `flutter run --dart-define-from-file=.env.json`
 - APK 빌드: `flutter build apk --release --split-per-abi --dart-define-from-file=.env.json`
-  - 결과물: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (대부분의 폰·블루스택용)
+  - 결과물: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (폰용), `app-x86_64-release.apk` (블루스택용)
+  - 팀 공유용은 `배포/` 폴더에 `실버라이프_폰용_MMDD.apk`, `실버라이프_블루스택용_MMDD.apk`로 복사 (git 제외됨)
+  - 서명이 PC마다 달라서, 다른 PC에서 만든 예전 앱이 깔려 있으면 덮어 설치가 안 됨 → 예전 앱을 지우고 설치
 - ⚠️ 이 PC는 Windows 사용자 폴더 이름이 한글이라, 기본 설정으로는 안드로이드 빌드(jni 부품)와 `flutter test`가 실패합니다.
   - 명령 앞에 `PUB_CACHE=C:/src/pub-cache` 를 붙여 실행하세요. 테스트는 `TEMP=C:/src/tmp TMP=C:/src/tmp` 도 함께 붙이세요.
   - 팀이 사용자 환경 변수 `PUB_CACHE=C:\src\pub-cache`를 영구 등록하면 앞의 것은 생략해도 됩니다.
