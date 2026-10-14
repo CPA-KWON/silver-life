@@ -59,3 +59,7 @@ android/key.properties
 # Supabase CLI local secrets, if the Edge Function is ever set up via CLI
 supabase/.env
 supabase/functions/.env
+
+# Built APKs shared with the team (contain app keys) — never commit
+배포/
+*.apk
