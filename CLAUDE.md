@@ -64,7 +64,7 @@
 | `community/` | `community_page`, `new_post_page`, `post_detail_page` | 커뮤니티 목록, 글쓰기·수정, 글 상세·댓글 (모임 상세도 이 화면을 같이 씀) |
 | `meetup/` | `meetup_page`, `new_meetup_page` | 동네모임 목록(예정/지난), 모임 만들기·수정 |
 | `profile/` | `profile_page`, `account_settings_page`, `my_post_list_page`, `privacy_policy_page` | 내 정보 메뉴, 회원정보 수정·로그아웃, 내 글/내 모임 목록, 개인정보처리방침 |
-| `core/` | `korea_regions`, `region_picker`, `region_scope`, `address_region`, `comment_count`, `meetup_category` | 시/도·시/군/구 목록과 선택 상자, "시도 전체/시군구만" 버튼, 주소→지역 변환, 댓글 수 표시, '동네모임' 이름 상수 |
+| `core/` | `korea_regions`, `region_picker`, `region_scope`, `address_region`, `comment_count`, `meetup_category`, `report` | 시/도·시/군/구 목록과 선택 상자, "시도 전체/시군구만" 버튼, 주소→지역 변환, 댓글 수 표시, '동네모임' 이름 상수, 신고하기 창 |
 
 lib/ 밖의 중요한 파일
 - `supabase/*.sql` — 지금까지 SQL Editor에서 실행한 DB 설계 기록 (아래 6번 참고)
@@ -81,12 +81,14 @@ lib/ 밖의 중요한 파일
 | `facilities` | 시설 (공공데이터로 미리 넣은 것 + 사용자가 체크인·모임 장소로 고른 것) | id, name, address, lat, lng, category, telephone, region_sido, region_sigungu, created_at — (name, address) 조합은 중복 불가 |
 | `favorites` | 즐겨찾기 | id, user_id, name, address, telephone, lat, lng, category, created_at — ⚠️ `facility_id`가 **없고** 시설 정보를 통째로 복사해 저장 |
 | `checkins` | "나 여기 있음" 체크인 | id, user_id, facility_id, checked_in_at — 한 사람당 시설별 1개, 앱에서 3시간 지나면 안 셈 |
+| `reports` | 게시글·모임·댓글 신고 | id, reporter_id, post_id 또는 comment_id(둘 중 하나만), reason(욕설·비방/광고/사기 의심/기타), created_at — 같은 사람이 같은 대상 1번만 |
 
 - `posts.category` 값은 `자유게시판`, `건강정보`, `나눔·도움요청`, `동네모임` 4가지만 허용됩니다(DB에서 막음).
 - 동네모임은 별도 테이블이 아니라 `posts`에 `category = '동네모임'`으로 저장되고, `event_at`(모임 일시)과 `facility_id`(모임 장소)를 씁니다. 모임은 장소가 반드시 있어야 합니다(DB 규칙 `meetup_requires_facility`).
 - 커뮤니티 글은 **글쓴이의 사는 지역**(`profiles.region_*`)으로, 모임은 **모임 장소의 지역**(`facilities.region_*`)으로 걸러서 보여줍니다.
+- 신고 3건 이상인 글·댓글은 DB 읽기 권한(RLS)에서 숨겨집니다(글쓴이 본인에게만 보임). 팀은 대시보드 Table Editor의 `report_summary`(신고 모아보기)에서 확인합니다.
 - 기타 DB 기능: `email_exists(check_email)` 함수(회원가입 이메일 중복확인), `handle_new_user` 트리거(가입하면 `profiles` 줄을 자동 생성), `checkins` 실시간 알림(체크인 인원 자동 갱신).
-- DB 설계 기록은 `supabase/` 폴더의 SQL 파일에 있습니다. 실행 순서: `schema.sql` → `community_schema.sql` → `facilities_schema.sql` → `realtime_setup.sql` → `facilities_rls_fix.sql` → `region_split.sql` → `facility_region.sql` → `email_exists_function.sql` → (데이터) `delete_old_gyeongrodang.sql` → `import_gyeongrodang.sql`
+- DB 설계 기록은 `supabase/` 폴더의 SQL 파일에 있습니다. 실행 순서: `schema.sql` → `community_schema.sql` → `facilities_schema.sql` → `realtime_setup.sql` → `facilities_rls_fix.sql` → `region_split.sql` → `facility_region.sql` → `email_exists_function.sql` → `reports.sql` → (데이터) `delete_old_gyeongrodang.sql` → `import_gyeongrodang.sql`
 - ⚠️ 위 표는 2026-10-14에 코드와 `supabase/*.sql`을 읽고 정리한 것입니다. 대시보드에서 SQL 파일 없이 직접 바꾼 내용이 있다면 실제 DB와 다를 수 있습니다(특히 `profiles` 읽기 권한 — 8번 아래 "점검 메모" 참고).
 - DB 구조를 바꿔야 할 때는 Supabase 대시보드 **SQL Editor에 붙여넣을 SQL**을 만들어주고, 붙여넣는 방법을 단계별로 알려주세요. 우리가 실행한 뒤 "완료"라고 하면 이어서 진행하세요.
 
@@ -108,13 +110,14 @@ lib/ 밖의 중요한 파일
 - 지역 커뮤니티(글·수정·삭제·댓글·카테고리)
 - 동네모임 만들기·수정, 시설을 모임 장소로 지정, 예정/지난 모임
 - 홈(다가오는 모임, 최근 글), 내 정보, 내 글 관리, 개인정보처리방침
+- 게시글·모임·댓글 신고하기(사유 4가지, 중복 신고 불가, 3건 이상 숨김)
 
 ### 남은 할 일 (우선순위 순)
 1. [ ] 네이버 지역검색 비밀키를 Supabase Edge Function으로 옮기기 (보안)
 2. [ ] 모든 테이블 RLS 점검
 3. [ ] 동네모임 **참여하기 / 참여 취소 / 참여자 목록 / 최대 인원**
 4. [ ] 시연 지역 공공데이터(경로당·복지관·병원·약국)를 `facilities`에 미리 넣기
-5. [ ] 게시글·모임·댓글 **신고하기**
+5. [x] 게시글·모임·댓글 **신고하기** (3건 이상 숨김, 대시보드 `report_summary`에서 확인)
 6. [ ] 전체 화면 시니어 UI 원칙 점검
 7. [ ] (여유 있으면) 내 지역·관심 카테고리 기반 모임 먼저 보여주기
 
@@ -122,5 +125,5 @@ lib/ 밖의 중요한 파일
 
 ### 점검 메모 (2026-10-14 코드 전체 점검 결과)
 - 🔴 네이버 지역검색 비밀키가 `geocode_and_generate_sql.py`, `geocode_via_local_search.py`에 그대로 적혀 **공개 GitHub 저장소에 올라가 있음** → 키 재발급 후 스크립트가 키를 `.env.json`에서 읽도록 바꿔야 함. 앱에도 같은 비밀키가 들어감(할 일 1번).
-- `supabase/schema.sql` 기준 `profiles`는 "본인 것만 읽기"라서, 그대로라면 커뮤니티 글쓴이 닉네임이 "알 수 없음"으로 나오고 다른 사람 글이 목록에서 빠짐. 대시보드에서 바꿨는지 확인 필요(할 일 2번 때 같이).
+- `supabase/schema.sql` 기준 `profiles`는 "본인 것만 읽기"라서, 그대로라면 커뮤니티 글쓴이 닉네임이 "알 수 없음"으로 나오고 다른 사람 글이 목록에서 빠짐. → 2026-10-14 에뮬레이터에서 실제로 "알 수 없음"이 나오는 것 확인함. 할 일 2번 때 고칠 것.
 - `facilities`는 로그인한 누구나 수정 가능, `checkins`는 누가 어디 있는지(user_id) 누구나 읽기 가능 → RLS 점검 때 정리.
