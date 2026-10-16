@@ -8,7 +8,9 @@ import '../facility/facility_search_page.dart';
 import '../facility/naver_local_search.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  const HomeTab({super.key, this.onNavigate});
+
+  final ValueChanged<int>? onNavigate;
 
   @override
   State<HomeTab> createState() => _HomeTabState();

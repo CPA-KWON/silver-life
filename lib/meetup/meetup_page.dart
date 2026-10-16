@@ -5,6 +5,7 @@ import '../community/post_detail_page.dart';
 import '../core/comment_count.dart';
 import '../core/meetup_category.dart';
 import '../core/region_scope.dart';
+import '../ui/design_widgets.dart';
 import 'new_meetup_page.dart';
 
 class MeetupPage extends StatefulWidget {
@@ -90,6 +91,7 @@ class _MeetupPageState extends State<MeetupPage> {
     return Scaffold(
       body: Column(
         children: [
+          const PageTitle('모임'),
           RegionScopeBar(
             scope: _regionScope,
             mySido: _mySido,

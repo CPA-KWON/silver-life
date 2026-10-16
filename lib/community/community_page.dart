@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/comment_count.dart';
 import '../core/region_scope.dart';
 import '../core/meetup_category.dart';
+import '../ui/design_widgets.dart';
 import 'new_post_page.dart';
 import 'post_detail_page.dart';
 
@@ -100,6 +101,7 @@ class _CommunityPageState extends State<CommunityPage> {
     return Scaffold(
       body: Column(
         children: [
+          const PageTitle('커뮤니티'),
           RegionScopeBar(
             scope: _regionScope,
             mySido: _mySido,

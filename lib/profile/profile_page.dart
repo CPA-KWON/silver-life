@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'account_settings_page.dart';
 import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
+import '../ui/design_widgets.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return Column(
+      children: [
+        const PageTitle('내 정보'),
+        Expanded(
+          child: ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _MenuTile(
@@ -48,6 +53,9 @@ class ProfilePage extends StatelessWidget {
           title: '개인정보 처리방침',
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+          ),
+        ),
+      ],
           ),
         ),
       ],
