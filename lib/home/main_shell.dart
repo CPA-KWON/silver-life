@@ -6,6 +6,7 @@ import '../facility/facility_search_page.dart';
 import '../meetup/meetup_page.dart';
 import '../profile/profile_page.dart';
 import 'home_tab.dart';
+import 'retained_map_tab.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -24,7 +25,7 @@ class _MainShellState extends State<MainShell> {
           onNavigate: (int index) => setState(() => _index = index),
         );
       case 1:
-        return const FacilitySearchPage();
+        return const SizedBox.shrink();
       case 2:
         return const MeetupPage();
       case 3:
@@ -65,7 +66,14 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(bottom: false, child: _buildPage()),
+      body: SafeArea(
+        bottom: false,
+        child: RetainedMapTab(
+          selected: _index == 1,
+          mapBuilder: (_, active) => FacilitySearchPage(isActive: active),
+          child: _buildPage(),
+        ),
+      ),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.navBorder)),

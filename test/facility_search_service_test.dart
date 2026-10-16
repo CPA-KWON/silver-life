@@ -1,0 +1,246 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:silver_life/facility/naver_local_search.dart';
+
+http.Response results() => http.Response(
+  jsonEncode({
+    'items': [
+      for (final offset in [20000, 0])
+        {
+          'title': '<b>병원</b>',
+          'category': '병원',
+          'roadAddress': '',
+          'address': '서울특별시 중구',
+          'telephone': '02-000-0000',
+          'mapx': '${1269780000 + offset}',
+          'mapy': '375665000',
+        },
+    ],
+  }),
+  200,
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
+
+void main() {
+  Future<List<FacilityResult>> search(
+    FacilitySearchService service, [
+    String category = '병원',
+  ]) => service.search(category: category, lat: 37.5665, lng: 126.978);
+
+  test(
+    'same concurrent search shares one geocode and one HTTP request',
+    () async {
+      final area = Completer<String>();
+      var geocodes = 0;
+      var requests = 0;
+      final service = FacilitySearchService(
+        resolveArea: (_, _) {
+          geocodes++;
+          return area.future;
+        },
+        client: MockClient((request) async {
+          requests++;
+          expect(request.url.host, 'naverapihub.apigw.ntruss.com');
+          expect(request.url.path, '/search/v1/local');
+          expect(request.url.queryParameters, {
+            'query': '중구 병원',
+            'display': '5',
+          });
+          expect(request.headers, contains('X-NCP-APIGW-API-KEY-ID'));
+          return results();
+        }),
+      );
+      addTearDown(service.close);
+      final first = search(service);
+      final second = search(service);
+      area.complete('중구');
+      final lists = await Future.wait([first, second]);
+      expect(geocodes, 1);
+      expect(requests, 1);
+      expect(lists.first, same(lists.last));
+      expect(lists.first.first.name, '병원');
+      expect(lists.first.first.address, '서울특별시 중구');
+      expect(
+        lists.first.first.distanceMeters,
+        lessThan(lists.first.last.distanceMeters),
+      );
+      expect(await search(service), same(lists.first));
+      expect(requests, 1);
+    },
+  );
+
+  test(
+    'hospital and pharmacy share address lookup but retain distinct queries',
+    () async {
+      final area = Completer<String>();
+      var geocodes = 0;
+      final queries = <String>[];
+      final service = FacilitySearchService(
+        resolveArea: (_, _) {
+          geocodes++;
+          return area.future;
+        },
+        client: MockClient((request) async {
+          queries.add(request.url.queryParameters['query']!);
+          return results();
+        }),
+      );
+      addTearDown(service.close);
+      final pending = Future.wait([search(service), search(service, '약국')]);
+      area.complete('중구');
+      await pending;
+      expect(geocodes, 1);
+      expect(queries, unorderedEquals(['중구 병원', '중구 약국']));
+    },
+  );
+
+  test(
+    'cache expires after five minutes and does not merge distant positions',
+    () async {
+      var now = DateTime(2026, 10, 16);
+      var requests = 0;
+      var geocodes = 0;
+      final service = FacilitySearchService(
+        now: () => now,
+        resolveArea: (_, _) async {
+          geocodes++;
+          return '중구';
+        },
+        client: MockClient((_) async {
+          requests++;
+          return results();
+        }),
+      );
+      addTearDown(service.close);
+      await search(service);
+      now = now.add(const Duration(minutes: 4));
+      await search(service);
+      expect(requests, 1);
+      now = now.add(const Duration(minutes: 1));
+      await search(service);
+      expect(requests, 2);
+      expect(geocodes, 2);
+      await service.search(category: '병원', lat: 37.5, lng: 127.0);
+      expect(requests, 3);
+    },
+  );
+
+  test(
+    '429 stays distinguishable and a failed request can be retried',
+    () async {
+      var requests = 0;
+      final service = FacilitySearchService(
+        resolveArea: (_, _) async => '중구',
+        client: MockClient(
+          (_) async => ++requests == 1 ? http.Response('', 429) : results(),
+        ),
+      );
+      addTearDown(service.close);
+      await expectLater(
+        search(service),
+        throwsA(isA<FacilityRateLimitException>()),
+      );
+      expect(await search(service), hasLength(2));
+      expect(requests, 2);
+    },
+  );
+
+  test(
+    'a synchronous geocoder failure does not poison later local searches',
+    () async {
+      var calls = 0;
+      final queries = <String>[];
+      final service = FacilitySearchService(
+        resolveArea: (_, _) {
+          if (++calls == 1) throw StateError('temporary geocoder failure');
+          return Future.value('중구');
+        },
+        client: MockClient((request) async {
+          queries.add(request.url.queryParameters['query']!);
+          return results();
+        }),
+      );
+      addTearDown(service.close);
+      await search(service);
+      await search(service);
+      expect(queries, ['병원', '중구 병원']);
+    },
+  );
+
+  testWidgets('slow geocoder falls back after its deadline', (tester) async {
+    final area = Completer<String>();
+    final queries = <String>[];
+    final service = FacilitySearchService(
+      resolveArea: (_, _) => area.future,
+      client: MockClient((request) async {
+        queries.add(request.url.queryParameters['query']!);
+        return results();
+      }),
+    );
+    addTearDown(service.close);
+    final pending = search(service);
+    await tester.pump(const Duration(seconds: 3));
+    expect(await pending, hasLength(2));
+    expect(queries, ['병원']);
+    area.complete('중구');
+  });
+
+  testWidgets('HTTP deadline aborts a stalled request and releases retry', (
+    tester,
+  ) async {
+    final client = _StalledClient();
+    final service = FacilitySearchService(
+      client: client,
+      resolveArea: (_, _) async => '중구',
+    );
+    addTearDown(service.close);
+    final first = search(service);
+    final expectation = expectLater(first, throwsA(isA<TimeoutException>()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 10));
+    await expectation;
+    expect(client.aborted, isTrue);
+    client.respond = true;
+    expect(await search(service), hasLength(2));
+  });
+
+  test('raw error bodies are not displayed to users', () async {
+    final service = FacilitySearchService(
+      resolveArea: (_, _) async => '중구',
+      client: MockClient(
+        (_) async => http.Response('internal diagnostic data', 503),
+      ),
+    );
+    addTearDown(service.close);
+    try {
+      await search(service);
+      fail('503 should fail');
+    } catch (error) {
+      expect(error, isA<http.ClientException>());
+      expect(error.toString(), isNot(contains('internal diagnostic data')));
+    }
+  });
+}
+
+class _StalledClient extends http.BaseClient {
+  bool aborted = false;
+  bool respond = false;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (respond) {
+      final response = results();
+      return http.StreamedResponse(Stream.value(response.bodyBytes), 200);
+    }
+    final done = Completer<http.StreamedResponse>();
+    (request as http.Abortable).abortTrigger!.then((_) {
+      aborted = true;
+      done.completeError(http.RequestAbortedException(request.url));
+    });
+    return done.future;
+  }
+}

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,12 +12,21 @@ import '../core/address_region.dart';
 import '../ui/design_widgets.dart';
 import 'local_facility_search.dart';
 import 'naver_local_search.dart';
+import 'safe_map_location_tracker.dart';
 
 const kFacilityCategories = ['병원', '약국', '경로당', '복지관'];
 const kHospitalSubcategories = ['내과', '정형외과', '안과', '치과', '이비인후과', '피부과'];
 
 class FacilitySearchPage extends StatefulWidget {
-  const FacilitySearchPage({super.key, this.onPicked, this.initialFacility});
+  const FacilitySearchPage({
+    super.key,
+    this.onPicked,
+    this.initialFacility,
+    this.isActive = true,
+  });
+
+  /// The retained map pauses GPS and heading subscriptions on other tabs.
+  final bool isActive;
 
   /// When set, tapping a marker calls this with the picked facility instead
   /// of opening the detail sheet — used by the "장소 선택" flow for meetup
@@ -35,6 +46,17 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   static const _seoulCityHall = NLatLng(37.5666, 126.979);
 
   NaverMapController? _controller;
+  late final _locationTracker = SafeMapLocationTracker(
+    onLocationUnavailable: () {
+      if (!mounted || !widget.isActive) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('현재 위치를 확인하지 못했어요. 지도는 이동해서 검색할 수 있어요.')),
+      );
+    },
+  );
+  NLocationTrackingMode _resumeTrackingMode = NLocationTrackingMode.none;
+  bool _trackingConfigured = false;
+  bool _checkingPermission = false;
   final _searchController = TextEditingController();
   String? _category;
   String? _subcategory;
@@ -53,7 +75,52 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   late FacilityResult? _selectedFacility = widget.initialFacility;
 
   @override
+  void didUpdateWidget(covariant FacilitySearchPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    // The previous implementation closed details when leaving the tab. Keep
+    // that behavior and release its realtime subscription while retaining map.
+    if (!widget.isActive) _selectedFacility = null;
+    final controller = _controller;
+    _locationTracker.setActive(widget.isActive);
+    if (controller == null) return;
+    if (widget.isActive) {
+      if (_trackingConfigured) {
+        controller.setLocationTrackingMode(_resumeTrackingMode);
+      } else {
+        unawaited(_startInitialTracking());
+      }
+    } else {
+      _resumeTrackingMode = controller.locationTrackingMode;
+      controller.setLocationTrackingMode(NLocationTrackingMode.none);
+    }
+  }
+
+  Future<void> _startInitialTracking() async {
+    final controller = _controller;
+    if (controller == null || !widget.isActive || _checkingPermission) return;
+    _checkingPermission = true;
+    try {
+      final status = await Permission.location.request();
+      if (!mounted || !identical(controller, _controller)) return;
+      _trackingConfigured = true;
+      _resumeTrackingMode = status.isGranted
+          ? NLocationTrackingMode.follow
+          : NLocationTrackingMode.none;
+      if (widget.isActive) {
+        controller.setLocationTrackingMode(_resumeTrackingMode);
+      }
+    } catch (_) {
+      _locationTracker.onLocationUnavailable?.call();
+    } finally {
+      _checkingPermission = false;
+    }
+  }
+
+  @override
   void dispose() {
+    _locationTracker.setActive(false);
+    _controller = null;
     _searchController.dispose();
     super.dispose();
   }
@@ -102,18 +169,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   // that, panning the map is what decides where searches look.
   Future<void> _searchAtCamera(String searchTerm) async {
     final controller = _controller;
-    if (controller == null) return;
-    final position = await controller.getCameraPosition();
-    await _search(
-      searchTerm,
-      position.target.latitude,
-      position.target.longitude,
-    );
-  }
-
-  Future<void> _search(String searchTerm, double lat, double lng) async {
-    final controller = _controller;
-    if (controller == null || _isSearching) return;
+    if (controller == null || _isSearching || !widget.isActive) return;
 
     setState(() {
       _isSearching = true;
@@ -122,28 +178,51 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
     });
 
     try {
+      final position = await controller.getCameraPosition().timeout(
+        const Duration(seconds: 3),
+      );
+      if (!mounted || !identical(controller, _controller)) return;
+      final lat = position.target.latitude;
+      final lng = position.target.longitude;
       final results = kLocallySourcedCategories.contains(searchTerm)
-          ? await searchOwnFacilities(category: searchTerm, lat: lat, lng: lng)
+          ? await searchOwnFacilities(
+              category: searchTerm,
+              lat: lat,
+              lng: lng,
+            ).timeout(const Duration(seconds: 10))
           : await searchNearbyFacilities(
               category: searchTerm,
               lat: lat,
               lng: lng,
             );
 
-      await controller.clearOverlays(type: NOverlayType.marker);
+      if (!mounted || !identical(controller, _controller)) return;
+      final markers = <NMarker>{};
       for (final result in results) {
         final marker = NMarker(
           id: '${result.lat},${result.lng},${result.name}',
           position: NLatLng(result.lat, result.lng),
           caption: NOverlayCaption(text: result.name),
         );
-        marker.setOnTapListener(
-          (_) => widget.onPicked != null
-              ? widget.onPicked!(result)
-              : _openFacilityDetail(result),
-        );
-        await controller.addOverlay(marker);
+        marker.setOnTapListener((_) {
+          if (!mounted || !widget.isActive) return;
+          if (widget.onPicked != null) {
+            widget.onPicked!(result);
+          } else {
+            _openFacilityDetail(result);
+          }
+        });
+        markers.add(marker);
       }
+
+      await controller.clearOverlays(type: NOverlayType.marker).timeout(
+        const Duration(seconds: 3),
+      );
+      if (!mounted || !identical(controller, _controller)) return;
+      if (markers.isNotEmpty) {
+        await controller.addOverlayAll(markers).timeout(const Duration(seconds: 3));
+      }
+      if (!mounted || !identical(controller, _controller)) return;
 
       if (results.isNotEmpty && mounted) {
         await controller.updateCamera(
@@ -151,27 +230,35 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
             target: NLatLng(results.first.lat, results.first.lng),
             zoom: 15,
           ),
-        );
-      } else if (mounted) {
+        ).timeout(const Duration(seconds: 3));
+      } else if (mounted && widget.isActive) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(content: Text('주변에서 "$searchTerm"를 찾지 못했습니다.')),
           );
       }
+    } on TimeoutException {
+      if (mounted && widget.isActive) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('검색 응답이 늦어지고 있어요. 잠시 후 다시 시도해 주세요.')),
+        );
+      }
     } on FacilityRateLimitException {
-      if (mounted) {
+      if (mounted && widget.isActive) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
             const SnackBar(content: Text('오늘은 검색이 많아 잠시 후 다시 시도해주세요.')),
           );
       }
-    } catch (e) {
-      if (mounted) {
+    } catch (_) {
+      if (mounted && widget.isActive) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text('검색에 실패했습니다: $e')));
+          ..showSnackBar(const SnackBar(
+            content: Text('시설을 검색하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
+          ));
       }
     } finally {
       if (mounted) setState(() => _isSearching = false);
@@ -187,6 +274,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   // entirely). Keeping the NaverMap's page permanently mounted with no
   // route ever pushed around it removes the conflict at the source.
   void _openFacilityDetail(FacilityResult result) {
+    if (!mounted || !widget.isActive) return;
     setState(() => _selectedFacility = result);
   }
 
@@ -200,9 +288,11 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
     // is open so it closes the overlay instead of popping this whole page
     // (there is no separate route to pop back out of any more).
     return PopScope(
-      canPop: _selectedFacility == null,
+      canPop: !widget.isActive || _selectedFacility == null,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _selectedFacility != null) _closeFacilityDetail();
+        if (!didPop && widget.isActive && _selectedFacility != null) {
+          _closeFacilityDetail();
+        }
       },
       child: Stack(
       children: [
@@ -214,18 +304,13 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
             ),
             locationButtonEnable: true,
           ),
-          onMapReady: (controller) async {
-            _controller = controller;
-            // Set before any tracking starts so the built-in location
-            // button goes through it too (see _SafeLocationTracker).
-            controller.setMyLocationTracker(_SafeLocationTracker());
-            final status = await Permission.location.request();
-            // The page may have been left while the permission prompt was
-            // up, in which case the controller is already disposed.
+          onMapReady: (controller) {
             if (!mounted) return;
-            if (status.isGranted) {
-              controller.setLocationTrackingMode(NLocationTrackingMode.follow);
-            }
+            setState(() => _controller = controller);
+            // The built-in location button must also use the guarded tracker.
+            _locationTracker.setActive(widget.isActive);
+            controller.setMyLocationTracker(_locationTracker);
+            if (widget.isActive) unawaited(_startInitialTracking());
           },
           onCameraChange: (reason, animated) {
             final userMoved =
@@ -245,13 +330,13 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
             children: [
               _SearchField(
                 controller: _searchController,
-                isSearching: _isSearching,
+                isSearching: _isSearching || _controller == null,
                 onSubmitted: _submitTextSearch,
               ),
               const SizedBox(height: 10),
               _CategoryBar(
                 selected: _category,
-                isSearching: _isSearching,
+                isSearching: _isSearching || _controller == null,
                 onSelected: _selectCategory,
               ),
               if (_category == '병원') ...[
@@ -259,7 +344,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
                 _CategoryBar(
                   categories: kHospitalSubcategories,
                   selected: _subcategory,
-                  isSearching: _isSearching,
+                  isSearching: _isSearching || _controller == null,
                   onSelected: _selectSubcategory,
                 ),
               ],
@@ -324,7 +409,11 @@ class FacilityPickerPage extends StatelessWidget {
 }
 
 class FacilityDetailPage extends StatefulWidget {
-  const FacilityDetailPage({super.key, required this.result, required this.onClose});
+  const FacilityDetailPage({
+    super.key,
+    required this.result,
+    required this.onClose,
+  });
 
   final FacilityResult result;
 
@@ -349,22 +438,58 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   bool _isCheckingInOut = false;
   RealtimeChannel? _checkinChannel;
   List<Map<String, dynamic>>? _upcomingMeetups;
+  bool _loadingDetails = false;
+  bool _detailLoadFailed = false;
+  int _detailGeneration = 0;
+  int _checkinRefresh = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadFavoriteStatus();
-    _initCheckins();
+    _loadDetails();
   }
 
   @override
   void dispose() {
+    _detailGeneration++;
     final channel = _checkinChannel;
     if (channel != null) Supabase.instance.client.removeChannel(channel);
     super.dispose();
   }
 
-  Future<void> _initCheckins() async {
+  Future<void> _loadDetails() async {
+    if (_loadingDetails) return;
+    final generation = ++_detailGeneration;
+    setState(() {
+      _loadingDetails = true;
+      _detailLoadFailed = false;
+    });
+    final oldChannel = _checkinChannel;
+    _checkinChannel = null;
+    if (oldChannel != null) {
+      unawaited(Supabase.instance.client.removeChannel(oldChannel));
+    }
+    try {
+      await Future.wait([
+        _loadFavoriteStatus(generation),
+        _initCheckins(generation),
+      ]);
+    } catch (_) {
+      if (!mounted || generation != _detailGeneration) return;
+      // Invalidate late responses before allowing a retry.
+      _detailGeneration++;
+      final channel = _checkinChannel;
+      _checkinChannel = null;
+      if (channel != null) {
+        unawaited(Supabase.instance.client.removeChannel(channel));
+      }
+      setState(() => _detailLoadFailed = true);
+    } finally {
+      if (mounted) setState(() => _loadingDetails = false);
+    }
+  }
+
+  Future<void> _initCheckins(int generation) async {
     final client = Supabase.instance.client;
     final result = widget.result;
 
@@ -386,15 +511,15 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
             'region_sigungu': sigungu,
           }, onConflict: 'name,address')
           .select('id')
-          .single();
+          .single()
+          .timeout(const Duration(seconds: 10));
       facilityId = facility['id'] as String;
     }
-    if (!mounted) return;
+    if (!mounted || generation != _detailGeneration) return;
     setState(() => _facilityId = facilityId);
 
-    await _refreshCheckinState();
-    await _loadUpcomingMeetups(facilityId);
-
+    // Register before awaiting reads, so closing during a read cannot create
+    // an orphan subscription after dispose. The reads run independently.
     _checkinChannel = client
         .channel('checkins_$facilityId')
         .onPostgresChanges(
@@ -406,12 +531,25 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
             column: 'facility_id',
             value: facilityId,
           ),
-          callback: (_) => _refreshCheckinState(),
+          callback: (_) async {
+            if (!mounted || generation != _detailGeneration) return;
+            try {
+              await _refreshCheckinState();
+            } catch (_) {
+              if (mounted) setState(() => _detailLoadFailed = true);
+            }
+          },
         )
         .subscribe();
+    await Future.wait([
+      _refreshCheckinState(),
+      _loadUpcomingMeetups(facilityId),
+    ]);
   }
 
   Future<void> _refreshCheckinState() async {
+    final generation = _detailGeneration;
+    final refresh = ++_checkinRefresh;
     final facilityId = _facilityId;
     if (facilityId == null) return;
     final client = Supabase.instance.client;
@@ -425,8 +563,13 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
         .from('checkins')
         .select('user_id')
         .eq('facility_id', facilityId)
-        .gte('checked_in_at', since);
-    if (!mounted) return;
+        .gte('checked_in_at', since)
+        .timeout(const Duration(seconds: 10));
+    if (!mounted ||
+        generation != _detailGeneration ||
+        refresh != _checkinRefresh) {
+      return;
+    }
     setState(() {
       _checkinCount = rows.length;
       _checkedIn = rows.any((row) => row['user_id'] == userId);
@@ -434,13 +577,15 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   }
 
   Future<void> _loadUpcomingMeetups(String facilityId) async {
+    final generation = _detailGeneration;
     final result = await Supabase.instance.client
         .from('posts')
         .select('id, title, event_at')
         .eq('facility_id', facilityId)
         .gte('event_at', DateTime.now().toUtc().toIso8601String())
-        .order('event_at');
-    if (mounted) {
+        .order('event_at')
+        .timeout(const Duration(seconds: 10));
+    if (mounted && generation == _detailGeneration) {
       setState(
         () => _upcomingMeetups = List<Map<String, dynamic>>.from(result),
       );
@@ -486,15 +631,18 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     }
   }
 
-  Future<void> _loadFavoriteStatus() async {
+  Future<void> _loadFavoriteStatus(int generation) async {
     final userId = Supabase.instance.client.auth.currentUser!.id;
     final rows = await Supabase.instance.client
         .from('favorites')
         .select('id')
         .eq('user_id', userId)
         .eq('name', widget.result.name)
-        .eq('address', widget.result.address);
-    if (mounted) setState(() => _isFavorite = rows.isNotEmpty);
+        .eq('address', widget.result.address)
+        .timeout(const Duration(seconds: 10));
+    if (mounted && generation == _detailGeneration) {
+      setState(() => _isFavorite = rows.isNotEmpty);
+    }
   }
 
   Future<void> _toggleFavorite() async {
@@ -561,6 +709,23 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_detailLoadFailed) ...[
+              SectionCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('시설 정보를 불러오지 못했어요. 다시 시도해 주세요.'),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: _loadingDetails ? null : _loadDetails,
+                      child: const Text('다시 시도'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             SectionCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -571,10 +736,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  _InfoRow(
-                    icon: Icons.place_outlined,
-                    text: result.address,
-                  ),
+                  _InfoRow(icon: Icons.place_outlined, text: result.address),
                   const SizedBox(height: 10),
                   _InfoRow(
                     icon: Icons.directions_walk,
@@ -606,7 +768,9 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     // unbounded maxWidth, so an infinite minWidth survives
                     // BoxConstraints.enforce() unclamped and crashes layout
                     // ("BoxConstraints forces an infinite width").
-                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
                     onPressed: _facilityId == null || _isCheckingInOut
                         ? null
                         : _toggleCheckin,
@@ -885,32 +1049,5 @@ class _CategoryBar extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// Works around a flutter_naver_map 1.4.4 race: if the map is disposed while
-/// the tracker is still waiting for the first GPS fix, the plugin starts the
-/// location/heading subscriptions *after* its own cleanup already ran. They
-/// then call into the dead map forever, flooding the log with
-/// `MissingPluginException ... lo"L"bearing` (upstream issue #359).
-///
-/// Returning null from [startLocationService] makes the plugin skip starting
-/// those subscriptions, so nothing is left behind.
-class _SafeLocationTracker extends NDefaultMyLocationTracker {
-  bool _stopped = false;
-
-  @override
-  Future<NLatLng?> startLocationService() async {
-    _stopped = false;
-    final location = await super.startLocationService();
-    return _stopped ? null : location;
-  }
-
-  // Called by the plugin when tracking stops — either the map is disposed
-  // or the location button cycles to "none".
-  @override
-  void disposeLocationService() {
-    _stopped = true;
-    super.disposeLocationService();
   }
 }
