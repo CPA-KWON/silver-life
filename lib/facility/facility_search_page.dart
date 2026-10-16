@@ -4,8 +4,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app_theme.dart';
 import '../community/post_detail_page.dart';
 import '../core/address_region.dart';
+import '../ui/design_widgets.dart';
 import 'local_facility_search.dart';
 import 'naver_local_search.dart';
 
@@ -235,9 +237,9 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
           },
         ),
         Positioned(
-          top: 12,
-          left: 12,
-          right: 12,
+          top: 16,
+          left: 16,
+          right: 16,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -246,14 +248,14 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
                 isSearching: _isSearching,
                 onSubmitted: _submitTextSearch,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _CategoryBar(
                 selected: _category,
                 isSearching: _isSearching,
                 onSelected: _selectCategory,
               ),
               if (_category == '병원') ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _CategoryBar(
                   categories: kHospitalSubcategories,
                   selected: _subcategory,
@@ -262,32 +264,36 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
                 ),
               ],
               if (widget.onPicked != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Material(
-                  elevation: 2,
-                  borderRadius: BorderRadius.circular(12),
-                  child: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Text('검색 후 지도에서 장소를 선택해주세요.'),
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: _floatShadow,
+                    ),
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
+                      '검색 후 지도에서 장소를 선택해주세요.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ),
+              ],
+              if (_showSearchHereButton) ...[
+                const SizedBox(height: 10),
+                Center(
+                  child: _SearchHereButton(
+                    onPressed: _isSearching ? null : _searchHere,
                   ),
                 ),
               ],
             ],
           ),
         ),
-        if (_showSearchHereButton)
-          Positioned(
-            bottom: 24,
-            left: 50,
-            right: 50,
-            child: Center(
-              child: FilledButton.icon(
-                onPressed: _isSearching ? null : _searchHere,
-                icon: const Icon(Icons.search),
-                label: const Text('이 위치에서 검색'),
-              ),
-            ),
-          ),
         if (_selectedFacility != null)
           Positioned.fill(
             child: FacilityDetailPage(
@@ -530,6 +536,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   Widget build(BuildContext context) {
     final result = widget.result;
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -543,86 +550,203 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                 : _toggleFavorite,
             icon: Icon(
               _isFavorite == true ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite == true ? Colors.red : null,
+              color: _isFavorite == true ? AppColors.danger : null,
             ),
             tooltip: '즐겨찾기',
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(result.address, style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 4),
-            Text(
-              '약 ${(result.distanceMeters / 1000).toStringAsFixed(1)}km',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            if (result.telephone.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () =>
-                    launchUrl(Uri.parse('tel:${result.telephone}')),
-                icon: const Icon(Icons.call),
-                label: Text('${result.telephone} 전화 걸기'),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  // Overrides the app theme's OutlinedButton default of
-                  // minimumSize: Size.fromHeight(56) (full-width: infinite
-                  // minWidth). That's fine as the sole/stretched child of a
-                  // Column, but inside a Row a non-flex child is given an
-                  // unbounded maxWidth, so an infinite minWidth survives
-                  // BoxConstraints.enforce() unclamped and crashes layout
-                  // ("BoxConstraints forces an infinite width").
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                  onPressed: _facilityId == null || _isCheckingInOut
-                      ? null
-                      : _toggleCheckin,
-                  icon: Icon(
-                    _checkedIn == true
-                        ? Icons.check_circle
-                        : Icons.check_circle_outline,
-                  ),
-                  label: Text(_checkedIn == true ? '나 여기 있음 취소' : '나 여기 있음'),
-                ),
-                const SizedBox(width: 12),
-                if (_checkinCount != null)
+            SectionCard(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    '현재 $_checkinCount명 있음',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    result.name,
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-              ],
+                  const SizedBox(height: 16),
+                  _InfoRow(
+                    icon: Icons.place_outlined,
+                    text: result.address,
+                  ),
+                  const SizedBox(height: 10),
+                  _InfoRow(
+                    icon: Icons.directions_walk,
+                    text:
+                        '약 ${(result.distanceMeters / 1000).toStringAsFixed(1)}km',
+                  ),
+                  if (result.telephone.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () =>
+                          launchUrl(Uri.parse('tel:${result.telephone}')),
+                      icon: const Icon(Icons.call),
+                      label: Text('${result.telephone} 전화 걸기'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SectionCard(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  OutlinedButton.icon(
+                    // Overrides the app theme's OutlinedButton default of
+                    // minimumSize: Size.fromHeight(56) (full-width: infinite
+                    // minWidth). That's fine as the sole/stretched child of a
+                    // Column, but inside a Row a non-flex child is given an
+                    // unbounded maxWidth, so an infinite minWidth survives
+                    // BoxConstraints.enforce() unclamped and crashes layout
+                    // ("BoxConstraints forces an infinite width").
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                    onPressed: _facilityId == null || _isCheckingInOut
+                        ? null
+                        : _toggleCheckin,
+                    icon: Icon(
+                      _checkedIn == true
+                          ? Icons.check_circle
+                          : Icons.check_circle_outline,
+                    ),
+                    label: Text(_checkedIn == true ? '나 여기 있음 취소' : '나 여기 있음'),
+                  ),
+                  const SizedBox(width: 12),
+                  if (_checkinCount != null)
+                    Flexible(
+                      child: Text(
+                        '현재 $_checkinCount명 있음',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                ],
+              ),
             ),
             if (_upcomingMeetups != null && _upcomingMeetups!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text(
-                '여기서 열리는 모임',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              for (final meetup in _upcomingMeetups!)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event),
-                  title: Text(meetup['title'] as String),
-                  subtitle: Text(_formatEventAt(meetup['event_at'] as String)),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PostDetailPage(postId: meetup['id'] as String),
-                    ),
+              const SizedBox(height: 12),
+              SectionCard(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                header: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '여기서 열리는 모임',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                child: Column(
+                  children: [
+                    for (final meetup in _upcomingMeetups!)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const IconBadge(icon: Icons.event),
+                        title: Text(
+                          meetup['title'] as String,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          _formatEventAt(meetup['event_at'] as String),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textTertiary,
+                        ),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PostDetailPage(postId: meetup['id'] as String),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: AppColors.textSecondary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text, style: Theme.of(context).textTheme.bodyLarge),
+        ),
+      ],
+    );
+  }
+}
+
+const _floatShadow = <BoxShadow>[
+  BoxShadow(color: Color(0x14111827), blurRadius: 10, offset: Offset(0, 2)),
+];
+
+class _SearchHereButton extends StatelessWidget {
+  const _SearchHereButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: _floatShadow,
+      ),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onPressed,
+          child: SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.refresh,
+                    size: 20,
+                    color: onPressed == null
+                        ? AppColors.textTertiary
+                        : AppColors.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '이 위치에서 검색',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: onPressed == null
+                          ? AppColors.textTertiary
+                          : AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -642,26 +766,67 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 2,
-      borderRadius: BorderRadius.circular(12),
-      child: TextField(
-        controller: controller,
-        enabled: !isSearching,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => onSubmitted(),
-        decoration: InputDecoration(
-          hintText: '시설 이름으로 검색 (예: 서울대병원)',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.arrow_forward),
-            onPressed: isSearching ? null : onSubmitted,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: _floatShadow,
+      ),
+      child: SizedBox(
+        height: 56,
+        child: TextField(
+          controller: controller,
+          enabled: !isSearching,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => onSubmitted(),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            hintText: '시설 이름으로 검색 (예: 서울대병원)',
+            hintStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textTertiary,
+            ),
+            prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+            suffixIcon: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Material(
+                color: AppColors.tint,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: isSearching ? null : onSubmitted,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Icon(
+                      Icons.arrow_forward,
+                      color: isSearching
+                          ? AppColors.textTertiary
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            filled: true,
+            fillColor: AppColors.surface,
+            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
       ),
@@ -684,37 +849,40 @@ class _CategoryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 2,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        height: 56,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          children: [
-            for (final category in categories)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        children: [
+          for (final category in categories)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: _floatShadow,
+                ),
                 child: ChoiceChip(
                   label: Text(category),
                   selected: selected == category,
                   onSelected: isSearching ? null : (_) => onSelected(category),
                 ),
               ),
-            if (isSearching)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+            ),
+          if (isSearching)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

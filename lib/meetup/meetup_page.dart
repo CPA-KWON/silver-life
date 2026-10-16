@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../community/post_detail_page.dart';
 import '../core/comment_count.dart';
 import '../core/meetup_category.dart';
+import '../app_theme.dart';
 import '../core/region_scope.dart';
 import '../ui/design_widgets.dart';
 import 'new_meetup_page.dart';
@@ -81,9 +82,29 @@ class _MeetupPageState extends State<MeetupPage> {
 
   String _formatEventAt(String iso) {
     final dt = DateTime.parse(iso).toLocal();
-    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     final minute = dt.minute.toString().padLeft(2, '0');
-    return '${dt.month}월 ${dt.day}일 (${weekdays[dt.weekday - 1]}) ${dt.hour}:$minute';
+    final period = dt.hour < 12 ? '오전' : '오후';
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    return '$period $hour12:$minute';
+  }
+
+  Widget _buildSection(String title, List<Map<String, dynamic>> items, bool isPast) {
+    return SectionCard(
+      header: SectionHeader(title: title),
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.divider),
+            _MeetupCard(
+              meetup: items[i],
+              isPast: isPast,
+              formatEventAt: _formatEventAt,
+              onReturn: _refresh,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -106,14 +127,27 @@ class _MeetupPageState extends State<MeetupPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('불러오지 못했습니다: ${snapshot.error}'));
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        '불러오지 못했습니다: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  );
                 }
                 final all = snapshot.data ?? [];
                 if (all.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      '모임이 없습니다.\n첫 모임을 만들어보세요.',
-                      textAlign: TextAlign.center,
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        '모임이 없습니다.\n첫 모임을 만들어보세요.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   );
                 }
@@ -132,35 +166,13 @@ class _MeetupPageState extends State<MeetupPage> {
                 return RefreshIndicator(
                   onRefresh: () async => _refresh(),
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     children: [
-                      if (upcoming.isNotEmpty) ...[
-                        Text('예정된 모임', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        for (final meetup in upcoming) ...[
-                          _MeetupCard(
-                            meetup: meetup,
-                            isPast: false,
-                            formatEventAt: _formatEventAt,
-                            onReturn: _refresh,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                      if (past.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text('지난 모임', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        for (final meetup in past) ...[
-                          _MeetupCard(
-                            meetup: meetup,
-                            isPast: true,
-                            formatEventAt: _formatEventAt,
-                            onReturn: _refresh,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
+                      if (upcoming.isNotEmpty)
+                        _buildSection('다가오는 모임', upcoming, false),
+                      if (upcoming.isNotEmpty && past.isNotEmpty)
+                        const SizedBox(height: 24),
+                      if (past.isNotEmpty) _buildSection('지난 모임', past, true),
                     ],
                   ),
                 );
@@ -198,82 +210,73 @@ class _MeetupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nickname = (meetup['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
     final facilityName = (meetup['facilities'] as Map?)?['name'] as String? ?? '';
-    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final eventAt = meetup['event_at'] as String;
+    final meta = facilityName.isEmpty
+        ? formatEventAt(eventAt)
+        : '${formatEventAt(eventAt)} · $facilityName';
 
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => PostDetailPage(postId: meetup['id'] as String)),
-          );
-          onReturn();
-        },
-        child: Opacity(
-          opacity: isPast ? 0.6 : 1,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: scheme.secondary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PostDetailPage(postId: meetup['id'] as String)),
+        );
+        onReturn();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            DateBlock(
+              date: DateTime.parse(eventAt).toLocal(),
+              size: DateBlockSize.compact,
+              muted: isPast,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    meetup['title'] as String,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isPast ? AppColors.scheduleText : AppColors.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Icon(
-                    isPast ? Icons.event_available : Icons.event,
-                    color: scheme.secondary,
+                  const SizedBox(height: 4),
+                  Text(
+                    meta,
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              meetup['title'] as String,
-                              style: Theme.of(context).textTheme.titleMedium,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (isPast)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: Chip(
-                                label: Text('완료'),
-                                visualDensity: VisualDensity.compact,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                            ),
-                        ],
+                      StatusPill(
+                        label: isPast ? '완료' : '예정',
+                        tone: isPast ? StatusPillTone.neutral : StatusPillTone.success,
                       ),
-                      const SizedBox(height: 4),
-                      Text(formatEventAt(meetup['event_at'] as String)),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '$facilityName · $nickname',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          CommentCountBadge(commentCountOf(meetup)),
-                        ],
-                      ),
+                      CommentCountBadge(commentCountOf(meetup)),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

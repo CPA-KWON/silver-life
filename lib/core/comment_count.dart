@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../app_theme.dart';
+
 /// Reads the aggregate count out of a PostgREST embedded-count select
 /// (`comments(count)`), which comes back as `[{'count': N}]`.
 int commentCountOf(Map<String, dynamic> post) {
@@ -19,9 +21,18 @@ class CommentCountBadge extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.mode_comment_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
+        const Icon(
+          Icons.chat_bubble_outline,
+          size: 14,
+          color: AppColors.textSecondary,
+        ),
         const SizedBox(width: 4),
-        Text('$count', style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          '$count',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
       ],
     );
   }

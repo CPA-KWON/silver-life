@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/comment_count.dart';
 import '../core/region_scope.dart';
 import '../core/meetup_category.dart';
+import '../core/time_ago.dart';
 import '../ui/design_widgets.dart';
 import 'new_post_page.dart';
 import 'post_detail_page.dart';
@@ -96,6 +97,61 @@ class _CommunityPageState extends State<CommunityPage> {
     });
   }
 
+  static TagTone _toneFor(String category) => switch (category) {
+    '자유게시판' => TagTone.lavender,
+    '건강정보' => TagTone.mint,
+    '나눔·도움요청' => TagTone.blue,
+    _ => TagTone.neutral,
+  };
+
+  Widget _buildPostRow(Map<String, dynamic> post) {
+    final nickname =
+        (post['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
+    final category = post['category'] as String? ?? '';
+    final created = DateTime.tryParse(post['created_at'] as String? ?? '');
+    final comments = commentCountOf(post);
+    final meta = [
+      nickname,
+      if (created != null) timeAgo(created.toLocal()),
+      if (comments > 0) '댓글 $comments',
+    ].join(' · ');
+    final textTheme = Theme.of(context).textTheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PostDetailPage(postId: post['id'] as String),
+          ),
+        );
+        _refresh();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TagBadge(label: category, tone: _toneFor(category)),
+            const SizedBox(height: 8),
+            Text(
+              post['title'] as String,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              meta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,47 +173,44 @@ class _CommunityPageState extends State<CommunityPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('불러오지 못했습니다: ${snapshot.error}'));
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        '불러오지 못했습니다: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  );
                 }
                 final posts = snapshot.data ?? [];
                 if (posts.isEmpty) {
-                  return const Center(child: Text('아직 게시글이 없습니다.'));
+                  return Center(
+                    child: Text(
+                      '아직 게시글이 없습니다.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  );
                 }
                 return RefreshIndicator(
                   onRefresh: () async => _refresh(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: posts.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) {
-                      final post = posts[i];
-                      final nickname =
-                          (post['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
-                      final subtitle = '[${post['category']}] $nickname';
-                      return Card(
-                        child: ListTile(
-                          title: Text(
-                            post['title'] as String,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: CommentCountBadge(commentCountOf(post)),
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => PostDetailPage(postId: post['id'] as String),
-                              ),
-                            );
-                            _refresh();
-                          },
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    children: [
+                      SectionCard(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                      );
-                    },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final post in posts) _buildPostRow(post),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -165,7 +218,7 @@ class _CommunityPageState extends State<CommunityPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const NewPostPage()),
@@ -174,7 +227,8 @@ class _CommunityPageState extends State<CommunityPage> {
           // success — a stale list is worse than one harmless extra fetch.
           _refresh();
         },
-        child: const Icon(Icons.edit),
+        icon: const Icon(Icons.edit),
+        label: const Text('글쓰기'),
       ),
     );
   }
@@ -188,11 +242,11 @@ class _CategoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 56,
+    return SizedBox(
+      height: 64,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
