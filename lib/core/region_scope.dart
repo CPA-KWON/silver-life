@@ -34,7 +34,10 @@ class RegionScopeBar extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: Row(
+          // IntrinsicHeight bounds the stretched Row when the bar sits in an
+          // unbounded parent (e.g. a ListView), keeping both segments equal.
+          child: IntrinsicHeight(
+            child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
@@ -57,6 +60,7 @@ class RegionScopeBar extends StatelessWidget {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),

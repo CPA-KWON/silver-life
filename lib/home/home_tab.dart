@@ -414,29 +414,33 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: _QuickTile(
-            icon: Icons.search,
-            title: '시설 찾기',
-            sub: '병원 · 약국 · 경로당',
-            primary: true,
-            onTap: () => widget.onNavigate?.call(1),
+    // IntrinsicHeight gives the stretched Row a finite height inside the
+    // ListView, so both tiles match the taller one (e.g. at large text).
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _QuickTile(
+              icon: Icons.search,
+              title: '시설 찾기',
+              sub: '병원 · 약국 · 경로당',
+              primary: true,
+              onTap: () => widget.onNavigate?.call(1),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _QuickTile(
-            icon: Icons.group_add_outlined,
-            title: '모임 만들기',
-            sub: '함께할 이웃 모으기',
-            primary: false,
-            onTap: _createMeetup,
+          const SizedBox(width: 8),
+          Expanded(
+            child: _QuickTile(
+              icon: Icons.group_add_outlined,
+              title: '모임 만들기',
+              sub: '함께할 이웃 모으기',
+              primary: false,
+              onTap: _createMeetup,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -574,7 +578,7 @@ class _HomeTabState extends State<HomeTab> {
     return InkWell(
       onTap: () => _openPost(post['id'] as String),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 56),
+        constraints: const BoxConstraints(minHeight: 56, minWidth: double.infinity),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(

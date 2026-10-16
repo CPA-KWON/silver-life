@@ -132,6 +132,7 @@ class _MyPostListPageState extends State<MyPostListPage> {
               children: [
                 SectionCard(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (var i = 0; i < posts.length; i++) ...[
                         _buildRow(posts[i]),

@@ -394,8 +394,8 @@ class _NearbyRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             children: [
-              SizedBox(
-                width: 48,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48),
                 child: Center(
                   child: TagBadge(label: item.typeLabel, tone: _tone),
                 ),

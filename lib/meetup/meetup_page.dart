@@ -110,6 +110,7 @@ class _MeetupPageState extends State<MeetupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const PageTitle('모임'),
           RegionScopeBar(
