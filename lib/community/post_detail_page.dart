@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/meetup_category.dart';
+import '../core/report.dart';
 import '../meetup/new_meetup_page.dart';
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
@@ -113,7 +114,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   Future<List<Map<String, dynamic>>> _fetchComments() async {
     final result = await Supabase.instance.client
         .from('comments')
-        .select('id, content, created_at, profiles(nickname)')
+        .select('id, content, created_at, author_id, profiles(nickname)')
         .eq('post_id', widget.postId)
         .order('created_at');
     return List<Map<String, dynamic>>.from(result);
@@ -234,7 +235,18 @@ class _PostDetailPageState extends State<PostDetailPage> {
               if (post == null) return const SizedBox.shrink();
               final isAuthor =
                   post['author_id'] == Supabase.instance.client.auth.currentUser!.id;
-              if (!isAuthor) return const SizedBox.shrink();
+              if (!isAuthor) {
+                return TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.scheduleText,
+                    minimumSize: const Size(0, 48),
+                    textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: () => showReportFlow(context, postId: widget.postId),
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('신고하기'),
+                );
+              }
               return PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'edit') _editPost(post);
@@ -339,6 +351,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       );
                     }
                     final comments = snapshot.data ?? [];
+                    final myId = Supabase.instance.client.auth.currentUser!.id;
                     return SectionCard(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -411,6 +424,21 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                       ],
                                     ),
                                   ),
+                                  if (comment['author_id'] != myId)
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: AppColors.scheduleText,
+                                        minimumSize: const Size(48, 48),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                      ),
+                                      onPressed: () => showReportFlow(
+                                        context,
+                                        commentId: comment['id'] as String,
+                                      ),
+                                      icon: const Icon(Icons.flag_outlined, size: 18),
+                                      label: const Text('신고'),
+                                    ),
                                 ],
                               ),
                             ),
