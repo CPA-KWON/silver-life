@@ -53,6 +53,7 @@ class _RegionPickerState extends State<RegionPicker> {
         Expanded(
           child: DropdownButtonFormField<String>(
             initialValue: _sido,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: '시/도'),
             items: [
               for (final sido in kKoreaRegions.keys)
@@ -71,6 +72,7 @@ class _RegionPickerState extends State<RegionPicker> {
         Expanded(
           child: DropdownButtonFormField<String>(
             initialValue: _sigungu,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: '시/군/구'),
             items: [
               for (final sigungu in sigunguOptions)

@@ -5,6 +5,8 @@ import '../core/address_region.dart';
 import '../facility/facility_search_page.dart';
 import '../facility/naver_local_search.dart';
 import '../core/meetup_category.dart';
+import '../ui/design_widgets.dart';
+import '../app_theme.dart';
 
 class NewMeetupPage extends StatefulWidget {
   const NewMeetupPage({super.key, this.existingPost});
@@ -181,43 +183,55 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              OutlinedButton.icon(
-                onPressed: _pickDate,
-                icon: const Icon(Icons.calendar_today),
-                label: Text(
-                  _eventDate == null
-                      ? '날짜 선택'
-                      : '${_eventDate!.year}.${_eventDate!.month}.${_eventDate!.day}',
+              _PickerRow(
+                icon: Icons.calendar_today_outlined,
+                label: '날짜',
+                value: _eventDate == null
+                    ? '날짜 선택'
+                    : '${_eventDate!.year}.${_eventDate!.month}.${_eventDate!.day}',
+                hasValue: _eventDate != null,
+                onTap: _pickDate,
+              ),
+              const SizedBox(height: 8),
+              _PickerRow(
+                icon: Icons.access_time,
+                label: '시간',
+                value: _eventTime == null ? '시간 선택' : _eventTime!.format(context),
+                hasValue: _eventTime != null,
+                onTap: _pickTime,
+              ),
+              const SizedBox(height: 8),
+              _PickerRow(
+                icon: Icons.place_outlined,
+                label: '장소',
+                value: _eventFacility == null ? '장소 선택' : _eventFacility!.name,
+                hasValue: _eventFacility != null,
+                onTap: _pickFacility,
+              ),
+              const SizedBox(height: 12),
+              SectionCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(labelText: '모임 제목'),
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty) ? '제목을 입력해주세요' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _contentController,
+                      decoration: const InputDecoration(labelText: '내용'),
+                      maxLines: 8,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty) ? '내용을 입력해주세요' : null,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _pickTime,
-                icon: const Icon(Icons.access_time),
-                label: Text(_eventTime == null ? '시간 선택' : _eventTime!.format(context)),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _pickFacility,
-                icon: const Icon(Icons.place_outlined),
-                label: Text(_eventFacility == null ? '장소 선택' : _eventFacility!.name),
-              ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: '모임 제목'),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? '제목을 입력해주세요' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contentController,
-                decoration: const InputDecoration(labelText: '내용'),
-                maxLines: 8,
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? '내용을 입력해주세요' : null,
-              ),
-              const SizedBox(height: 24),
               FilledButton(
                 onPressed: _isSaving ? null : _submit,
                 child: _isSaving
@@ -229,6 +243,73 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
                     : Text(_isEditing ? '수정하기' : '등록하기'),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerRow extends StatelessWidget {
+  const _PickerRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.hasValue,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool hasValue;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                IconBadge(icon: icon, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        value,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: hasValue
+                              ? AppColors.scheduleText
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppColors.textTertiary),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../ui/design_widgets.dart';
 import 'community_page.dart' show kPostCategories;
 
 class NewPostPage extends StatefulWidget {
@@ -80,6 +81,11 @@ class _NewPostPageState extends State<NewPostPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              SectionCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
               DropdownButtonFormField<String>(
                 initialValue: _category,
                 decoration: const InputDecoration(
@@ -91,7 +97,7 @@ class _NewPostPageState extends State<NewPostPage> {
                 ],
                 onChanged: (value) => setState(() => _category = value!),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(
@@ -100,7 +106,7 @@ class _NewPostPageState extends State<NewPostPage> {
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? '제목을 입력해주세요' : null,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _contentController,
                 decoration: const InputDecoration(
@@ -110,7 +116,10 @@ class _NewPostPageState extends State<NewPostPage> {
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? '내용을 입력해주세요' : null,
               ),
-              const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               FilledButton(
                 onPressed: _isSaving ? null : _submit,
                 child: _isSaving

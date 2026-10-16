@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../app_theme.dart';
 import '../core/region_picker.dart';
+import '../ui/design_widgets.dart';
 
 class AccountSettingsPage extends StatefulWidget {
   const AccountSettingsPage({super.key});
@@ -138,10 +140,29 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('불러오지 못했습니다: ${snapshot.error}'));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  '불러오지 못했습니다: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            );
           }
 
           final profile = snapshot.data!;
+          final textTheme = Theme.of(context).textTheme;
+          final labelStyle = textTheme.bodyMedium?.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          );
+          final valueStyle = textTheme.bodyLarge?.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          );
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(
@@ -149,55 +170,60 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('이름', style: Theme.of(context).textTheme.bodyMedium),
-                          Text(
-                            profile['name'] as String,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 12),
-                          Text('가입일', style: Theme.of(context).textTheme.bodyMedium),
-                          Text(
-                            (profile['created_at'] as String).split('T').first,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ],
-                      ),
+                  SectionCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('이름', style: labelStyle),
+                        const SizedBox(height: 4),
+                        Text(profile['name'] as String, style: valueStyle),
+                        const SizedBox(height: 16),
+                        Text('가입일', style: labelStyle),
+                        const SizedBox(height: 4),
+                        Text(
+                          (profile['created_at'] as String).split('T').first,
+                          style: valueStyle,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _nicknameController,
-                    decoration: const InputDecoration(labelText: '닉네임'),
-                    validator: (value) =>
-                        (value == null || value.trim().isEmpty) ? '닉네임을 입력해주세요' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  RegionPicker(
-                    initialSido: _sido,
-                    initialSigungu: _sigungu,
-                    onChanged: (sido, sigungu) {
-                      _sido = sido;
-                      _sigungu = sigungu;
-                    },
+                  const SizedBox(height: 24),
+                  SectionCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _nicknameController,
+                          decoration: const InputDecoration(labelText: '닉네임'),
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty) ? '닉네임을 입력해주세요' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        RegionPicker(
+                          initialSido: _sido,
+                          initialSigungu: _sigungu,
+                          onChanged: (sido, sigungu) {
+                            _sido = sido;
+                            _sigungu = sigungu;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: _isSaving ? null : _save,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('저장'),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _isSaving ? null : _save,
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('저장'),
-                  ),
-                  const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: _confirmSignOut,
                     child: const Text('로그아웃'),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ui/design_widgets.dart';
+
 /// Draft privacy policy text — reviewed for accuracy against what the app
 /// actually collects/stores, but not a substitute for legal review before
 /// the Play Store submission (see README "배포 전 남은 작업").
@@ -65,25 +67,44 @@ class PrivacyPolicyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final bodyStyle = textTheme.bodyLarge?.copyWith(
+      fontSize: 15,
+      fontWeight: FontWeight.w400,
+      height: 1.6,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('개인정보 처리방침')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          Text('시행일: $_lastUpdated', style: textTheme.bodyMedium),
-          const SizedBox(height: 16),
-          Text(
-            '실버라이프(이하 "앱")는 이용자의 개인정보를 소중히 여기며, 「개인정보 보호법」 '
-            '등 관련 법령을 준수합니다. 본 방침은 앱이 어떤 개인정보를 수집하고 어떻게 '
-            '이용·보호하는지 안내합니다.',
-            style: textTheme.bodyLarge,
+          SectionCard(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('시행일: $_lastUpdated', style: textTheme.bodyMedium),
+                const SizedBox(height: 16),
+                Text(
+                  '실버라이프(이하 "앱")는 이용자의 개인정보를 소중히 여기며, 「개인정보 보호법」 '
+                  '등 관련 법령을 준수합니다. 본 방침은 앱이 어떤 개인정보를 수집하고 어떻게 '
+                  '이용·보호하는지 안내합니다.',
+                  style: bodyStyle,
+                ),
+                for (final (title, body) in _sections) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(body, style: bodyStyle),
+                ],
+              ],
+            ),
           ),
-          for (final (title, body) in _sections) ...[
-            const SizedBox(height: 24),
-            Text(title, style: textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(body, style: textTheme.bodyLarge),
-          ],
         ],
       ),
     );

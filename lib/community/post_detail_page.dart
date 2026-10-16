@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/meetup_category.dart';
 import '../meetup/new_meetup_page.dart';
+import '../app_theme.dart';
+import '../ui/design_widgets.dart';
 import 'new_post_page.dart';
 
 class PostDetailPage extends StatefulWidget {
@@ -89,7 +91,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('삭제'),
+            child: const Text('삭제', style: TextStyle(color: AppColors.danger)),
           ),
         ],
       ),
@@ -154,10 +156,68 @@ class _PostDetailPageState extends State<PostDetailPage> {
   String _nicknameOf(Map<String, dynamic> row) =>
       (row['profiles'] as Map?)?['nickname'] as String? ?? '알 수 없음';
 
-  String _formatEventAt(String iso) {
+  String _timeOf(String? iso) {
+    if (iso == null) return '';
     final dt = DateTime.parse(iso).toLocal();
     final minute = dt.minute.toString().padLeft(2, '0');
-    return '${dt.year}.${dt.month}.${dt.day} ${dt.hour}:$minute';
+    return '${dt.month}.${dt.day} ${dt.hour}:$minute';
+  }
+
+  TagTone _toneOf(String category) => switch (category) {
+        '자유게시판' => TagTone.lavender,
+        '건강정보' => TagTone.mint,
+        '나눔' || '도움요청' || '나눔·도움요청' => TagTone.blue,
+        _ => TagTone.neutral,
+      };
+
+  Widget _meetupCard(Map<String, dynamic> post, TextTheme textTheme) {
+    final eventAt = DateTime.parse(post['event_at'] as String).toLocal();
+    final upcoming = eventAt.isAfter(DateTime.now());
+    final minute = eventAt.minute.toString().padLeft(2, '0');
+    final placeName = (post['facilities'] as Map?)?['name'] as String? ?? '';
+    final rowStyle = textTheme.bodyMedium?.copyWith(
+      fontSize: 15,
+      fontWeight: FontWeight.w500,
+      color: AppColors.scheduleText,
+    );
+    return SectionCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DateBlock(date: eventAt),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                StatusPill(
+                  label: upcoming ? '예정' : '완료',
+                  tone: upcoming ? StatusPillTone.success : StatusPillTone.neutral,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('${eventAt.hour}:$minute', style: rowStyle)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.place_outlined, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(placeName, style: rowStyle)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -202,58 +262,67 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
-                      return Text('불러오지 못했습니다: ${snapshot.error}');
+                      return Center(
+                        child: Text(
+                          '불러오지 못했습니다: ${snapshot.error}',
+                          style: textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      );
                     }
                     final post = snapshot.data!;
                     return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('[${post['category']}]', style: textTheme.bodyMedium),
-                        const SizedBox(height: 4),
-                        Text(post['title'] as String, style: textTheme.titleLarge),
-                        const SizedBox(height: 4),
-                        Text(_nicknameOf(post), style: textTheme.bodyMedium),
+                        SectionCard(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              TagBadge(
+                                label: post['category'] as String,
+                                tone: _toneOf(post['category'] as String),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                post['title'] as String,
+                                style: textTheme.titleLarge?.copyWith(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _nicknameOf(post),
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                post['content'] as String,
+                                style: textTheme.bodyLarge?.copyWith(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w400,
+                                  height: 1.5,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         if (post['event_at'] != null) ...[
                           const SizedBox(height: 12),
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.event, size: 20),
-                                      const SizedBox(width: 8),
-                                      Text(_formatEventAt(post['event_at'] as String)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.place_outlined, size: 20),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          (post['facilities'] as Map?)?['name'] as String? ?? '',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                          _meetupCard(post, textTheme),
                         ],
-                        const Divider(height: 32),
-                        Text(post['content'] as String, style: textTheme.bodyLarge),
                       ],
                     );
                   },
                 ),
-                const Divider(height: 32),
-                Text('댓글', style: textTheme.titleLarge),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 FutureBuilder<List<Map<String, dynamic>>>(
                   future: _commentsFuture,
                   builder: (context, snapshot) {
@@ -261,52 +330,132 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
-                      return Text('댓글을 불러오지 못했습니다: ${snapshot.error}');
+                      return Center(
+                        child: Text(
+                          '댓글을 불러오지 못했습니다: ${snapshot.error}',
+                          style: textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      );
                     }
                     final comments = snapshot.data ?? [];
-                    if (comments.isEmpty) {
-                      return const Text('첫 댓글을 남겨보세요.');
-                    }
-                    return Column(
-                      children: [
-                        for (final comment in comments)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(comment['content'] as String),
-                            subtitle: Text(_nicknameOf(comment)),
+                    return SectionCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            '댓글 ${comments.length}',
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                      ],
+                          const SizedBox(height: 12),
+                          if (comments.isEmpty)
+                            Text('첫 댓글을 남겨보세요.', style: textTheme.bodyMedium),
+                          for (final comment in comments)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: AppColors.tint,
+                                    child: Text(
+                                      _nicknameOf(comment).isEmpty ? '?' : _nicknameOf(comment).characters.first,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 8,
+                                          children: [
+                                            Text(
+                                              _nicknameOf(comment),
+                                              style: textTheme.bodyMedium?.copyWith(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            Text(
+                                              _timeOf(comment['created_at'] as String?),
+                                              style: textTheme.bodyMedium?.copyWith(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          comment['content'] as String,
+                                          style: textTheme.bodyMedium?.copyWith(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w400,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     );
                   },
                 ),
               ],
             ),
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _commentController,
-                      decoration: const InputDecoration(
-                        hintText: '댓글을 입력하세요',
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.navBorder)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        decoration: const InputDecoration(
+                          hintText: '댓글을 입력하세요',
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: _isPostingComment
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                    onPressed: _isPostingComment ? null : _submitComment,
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    IconButton(
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                      color: AppColors.primary,
+                      icon: _isPostingComment
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send),
+                      onPressed: _isPostingComment ? null : _submitComment,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

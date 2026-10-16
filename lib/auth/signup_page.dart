@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/korea_regions.dart';
 import '../core/region_picker.dart';
+import '../app_theme.dart';
+import '../ui/design_widgets.dart';
 
 // Must be registered as an intent-filter on MainActivity (see
 // AndroidManifest.xml) and added to Supabase Dashboard > Authentication >
@@ -158,6 +160,7 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('회원가입')),
       body: Center(
         child: SingleChildScrollView(
@@ -170,143 +173,167 @@ class _SignupPageState extends State<SignupPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: '이메일 (아이디)',
-                            helperText: _emailAvailable == null
-                                ? null
-                                : (_emailAvailable!
-                                    ? '사용 가능한 이메일입니다.'
-                                    : '이미 가입된 이메일입니다.'),
-                            helperStyle: TextStyle(
-                              color: _emailAvailable == true
-                                  ? Colors.green
-                                  : Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                          // Any edit invalidates a previous 중복확인 result —
-                          // it only ever applies to the exact email it was
-                          // run against.
-                          onChanged: (_) => setState(() {
-                            _checkedEmail = null;
-                            _emailAvailable = null;
-                          }),
-                          validator: (value) {
-                            if (value == null || !value.contains('@')) {
-                              return '올바른 이메일을 입력해주세요';
-                            }
-                            return null;
-                          },
+                  const Center(
+                    child: IconBadge(
+                      icon: Icons.favorite_rounded,
+                      size: 64,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '실버라이프',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: OutlinedButton(
-                          onPressed: _isCheckingEmail ? null : _checkEmailAvailability,
-                          // Same theme-override reason as elsewhere in the
-                          // app: a Row gives non-flex children unbounded
-                          // width, and the app theme's default button
-                          // minimumSize is full-width (Size.fromHeight(56)),
-                          // which crashes layout if left as-is here.
-                          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 56)),
-                          child: _isCheckingEmail
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text('중복확인'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: '비밀번호 (6자 이상)',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.length < 6) {
-                        return '비밀번호는 6자 이상이어야 합니다';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordConfirmController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: '비밀번호 확인',
-                    ),
-                    validator: (value) {
-                      if (value != _passwordController.text) {
-                        return '비밀번호가 일치하지 않습니다';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: '이름',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '이름을 입력해주세요';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _nicknameController,
-                    decoration: const InputDecoration(
-                      labelText: '닉네임',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '닉네임을 입력해주세요';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  RegionPicker(
-                    initialSido: _sido,
-                    initialSigungu: _sigungu,
-                    onChanged: (sido, sigungu) {
-                      _sido = sido;
-                      _sigungu = sigungu;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _birthYearController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '출생년도 (예: 1955)',
-                    ),
-                    validator: (value) {
-                      final year = int.tryParse(value ?? '');
-                      final currentYear = DateTime.now().year;
-                      if (year == null || year < 1900 || year > currentYear) {
-                        return '올바른 출생년도를 입력해주세요';
-                      }
-                      return null;
-                    },
                   ),
                   const SizedBox(height: 24),
+                  SectionCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: InputDecoration(
+                                    labelText: '이메일 (아이디)',
+                                    helperText: _emailAvailable == null
+                                        ? null
+                                        : (_emailAvailable!
+                                            ? '사용 가능한 이메일입니다.'
+                                            : '이미 가입된 이메일입니다.'),
+                                    helperStyle: TextStyle(
+                                      color: _emailAvailable == true
+                                          ? AppColors.success
+                                          : Theme.of(context).colorScheme.error,
+                                    ),
+                                  ),
+                                  // Any edit invalidates a previous 중복확인 result —
+                                  // it only ever applies to the exact email it was
+                                  // run against.
+                                  onChanged: (_) => setState(() {
+                                    _checkedEmail = null;
+                                    _emailAvailable = null;
+                                  }),
+                                  validator: (value) {
+                                    if (value == null || !value.contains('@')) {
+                                      return '올바른 이메일을 입력해주세요';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: OutlinedButton(
+                                  onPressed: _isCheckingEmail ? null : _checkEmailAvailability,
+                                  // Same theme-override reason as elsewhere in the
+                                  // app: a Row gives non-flex children unbounded
+                                  // width, and the app theme's default button
+                                  // minimumSize is full-width (Size.fromHeight(56)),
+                                  // which crashes layout if left as-is here.
+                                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 56)),
+                                  child: _isCheckingEmail
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Text('중복확인'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: '비밀번호 (6자 이상)',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.length < 6) {
+                                return '비밀번호는 6자 이상이어야 합니다';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passwordConfirmController,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: '비밀번호 확인',
+                            ),
+                            validator: (value) {
+                              if (value != _passwordController.text) {
+                                return '비밀번호가 일치하지 않습니다';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(
+                              labelText: '이름',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return '이름을 입력해주세요';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _nicknameController,
+                            decoration: const InputDecoration(
+                              labelText: '닉네임',
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return '닉네임을 입력해주세요';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          RegionPicker(
+                            initialSido: _sido,
+                            initialSigungu: _sigungu,
+                            onChanged: (sido, sigungu) {
+                              _sido = sido;
+                              _sigungu = sigungu;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _birthYearController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: '출생년도 (예: 1955)',
+                            ),
+                            validator: (value) {
+                              final year = int.tryParse(value ?? '');
+                              final currentYear = DateTime.now().year;
+                              if (year == null || year < 1900 || year > currentYear) {
+                                return '올바른 출생년도를 입력해주세요';
+                              }
+                              return null;
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _isLoading ? null : _signup,
                     child: _isLoading

@@ -94,7 +94,6 @@ class _MeetupPageState extends State<MeetupPage> {
       child: Column(
         children: [
           for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: AppColors.divider),
             _MeetupCard(
               meetup: items[i],
               isPast: isPast,

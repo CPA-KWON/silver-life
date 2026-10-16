@@ -39,6 +39,9 @@ class NearbyFacilitiesService {
   static final NearbyFacilitiesService instance = NearbyFacilitiesService._();
 
   static const _ttl = Duration(minutes: 10);
+  // Past [_ttl] the position is re-read; if the user hasn't moved far, the
+  // cached list is still reused up to this age before searching again.
+  static const _maxReuse = Duration(minutes: 30);
   static const _moveThresholdMeters = 500.0;
 
   Position? _cachedPosition;
@@ -46,6 +49,16 @@ class NearbyFacilitiesService {
   List<NearbyFacility>? _cached;
 
   Future<List<NearbyFacility>> load({bool force = false}) async {
+    // A fresh cache is returned as-is, without even reading the position,
+    // so revisiting the home tab costs no GPS read and no search calls.
+    final freshAt = _fetchedAt;
+    if (!force &&
+        _cached != null &&
+        freshAt != null &&
+        DateTime.now().difference(freshAt) < _ttl) {
+      return _cached!;
+    }
+
     final permission = await _ensurePermission();
     if (permission == LocationPermission.denied) {
       throw const NearbyException(NearbyFailure.permissionDenied);
@@ -63,7 +76,7 @@ class NearbyFacilitiesService {
         cached != null &&
         cachedPos != null &&
         at != null &&
-        DateTime.now().difference(at) < _ttl &&
+        DateTime.now().difference(at) < _maxReuse &&
         Geolocator.distanceBetween(
               cachedPos.latitude,
               cachedPos.longitude,
