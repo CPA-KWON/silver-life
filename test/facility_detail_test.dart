@@ -108,14 +108,21 @@ void main() {
       final checkins = Completer<http.Response>();
       final meetups = Completer<http.Response>();
       respond = (request) async {
-        if (request.url.path.endsWith('/checkins')) return checkins.future;
+        if (request.url.path.endsWith('/facility_presence')) {
+          return checkins.future;
+        }
         if (request.url.path.endsWith('/posts')) return meetups.future;
-        return jsonResponse('[]', 200);
+        return jsonResponse(
+          request.url.path.endsWith('/facility_presence')
+              ? '{"count":0,"checked_in":false}'
+              : '[]',
+          200,
+        );
       };
       await tester.pumpWidget(page());
       await tester.pump();
       expect(
-        requests.where((r) => r.url.path.endsWith('/checkins')),
+        requests.where((r) => r.url.path.endsWith('/facility_presence')),
         hasLength(1),
       );
       expect(
@@ -130,7 +137,7 @@ void main() {
       expect(query['facility_id'], 'eq.${facility.id}');
       expect(query['event_at'], startsWith('gte.'));
       meetups.complete(jsonResponse('[]', 200));
-      checkins.complete(jsonResponse('[]', 200));
+      checkins.complete(jsonResponse('{"count":0,"checked_in":false}', 200));
       await tester.pump();
       await tester.pump();
       expect(find.text('현재 0명 있음'), findsOneWidget);
@@ -149,12 +156,17 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.view.resetPhysicalSize);
       var failing = true;
-      respond = (_) async => failing
+      respond = (request) async => failing
           ? jsonResponse(
               '{"message":"temporary failure","code":"test_error"}',
               400,
             )
-          : jsonResponse('[]', 200);
+          : jsonResponse(
+              request.url.path.endsWith('/facility_presence')
+                  ? '{"count":0,"checked_in":false}'
+                  : '[]',
+              200,
+            );
       await tester.pumpWidget(page(facility, 1.3));
       await tester.pump();
       await tester.pump();
@@ -177,9 +189,14 @@ void main() {
     'closing during facility upsert cannot create a late realtime channel',
     (tester) async {
       final upsert = Completer<http.Response>();
-      respond = (request) async => request.url.path.endsWith('/facilities')
+      respond = (request) async => request.url.path.endsWith('/ensure_facility')
           ? upsert.future
-          : jsonResponse('[]', 200);
+          : jsonResponse(
+              request.url.path.endsWith('/facility_presence')
+                  ? '{"count":0,"checked_in":false}'
+                  : '[]',
+              200,
+            );
       const external = FacilityResult(
         name: '외부 검색 시설',
         category: '병원',
@@ -192,7 +209,7 @@ void main() {
       await tester.pumpWidget(page(external));
       await tester.pump();
       await tester.pumpWidget(const SizedBox.shrink());
-      upsert.complete(jsonResponse(jsonEncode({'id': facility.id}), 200));
+      upsert.complete(jsonResponse(jsonEncode(facility.id), 200));
       await tester.pump();
       await tester.pump();
       expect(supabase.client.getChannels(), isEmpty);

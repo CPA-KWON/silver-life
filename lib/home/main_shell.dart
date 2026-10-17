@@ -7,9 +7,12 @@ import '../meetup/meetup_page.dart';
 import '../profile/profile_page.dart';
 import 'home_tab.dart';
 import 'retained_map_tab.dart';
+import 'nearby_facilities.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  const MainShell({super.key, this.facilityPage, this.nearbyLoader});
+  final Widget? facilityPage;
+  final NearbyLoader? nearbyLoader;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -22,6 +25,7 @@ class _MainShellState extends State<MainShell> {
     switch (_index) {
       case 0:
         return HomeTab(
+          nearbyLoader: widget.nearbyLoader,
           onNavigate: (int index) => setState(() => _index = index),
         );
       case 1:
@@ -70,7 +74,8 @@ class _MainShellState extends State<MainShell> {
         bottom: false,
         child: RetainedMapTab(
           selected: _index == 1,
-          mapBuilder: (_, active) => FacilitySearchPage(isActive: active),
+          mapBuilder: (_, active) =>
+              widget.facilityPage ?? FacilitySearchPage(isActive: active),
           child: _buildPage(),
         ),
       ),

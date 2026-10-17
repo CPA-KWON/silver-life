@@ -26,7 +26,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isLoading || !_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
@@ -45,6 +45,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showError(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
@@ -78,19 +79,14 @@ class _LoginPageState extends State<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Center(
-                    child: IconBadge(
-                      icon: Icons.favorite_rounded,
-                      size: 64,
-                    ),
+                    child: IconBadge(icon: Icons.favorite_rounded, size: 64),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     '실버라이프',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: Theme.of(context).textTheme.titleLarge
+                        ?.copyWith(fontSize: 24, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 24),
                   SectionCard(
@@ -98,33 +94,31 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              labelText: '이메일 (아이디)',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return '이메일을 입력해주세요';
-                              }
-                              return null;
-                            },
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: '이메일 (아이디)',
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: '비밀번호',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return '비밀번호를 입력해주세요';
-                              }
-                              return null;
-                            },
-                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '이메일을 입력해주세요';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(labelText: '비밀번호'),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return '비밀번호를 입력해주세요';
+                            }
+                            return null;
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -144,10 +138,10 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: _isLoading
                         ? null
                         : () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SignupPage(),
-                              ),
+                            MaterialPageRoute(
+                              builder: (_) => const SignupPage(),
                             ),
+                          ),
                     child: const Text('회원가입'),
                   ),
                 ],

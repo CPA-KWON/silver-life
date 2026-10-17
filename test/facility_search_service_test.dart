@@ -37,20 +37,19 @@ void main() {
       final area = Completer<String>();
       var geocodes = 0;
       var requests = 0;
-      final service = FacilitySearchService(
+      final service = testService(
         resolveArea: (_, _) {
           geocodes++;
           return area.future;
         },
         client: MockClient((request) async {
           requests++;
-          expect(request.url.host, 'naverapihub.apigw.ntruss.com');
-          expect(request.url.path, '/search/v1/local');
-          expect(request.url.queryParameters, {
-            'query': '중구 병원',
-            'display': '5',
-          });
-          expect(request.headers, contains('X-NCP-APIGW-API-KEY-ID'));
+          expect(request.method, 'POST');
+          expect(request.url.host, 'supabase.invalid');
+          expect(request.url.path, '/functions/v1/facility-search');
+          expect(jsonDecode(request.body), {'query': '중구 병원'});
+          expect(request.headers['Authorization'], 'Bearer offline-session');
+          expect(request.headers, isNot(contains('X-NCP-APIGW-API-KEY')));
           return results();
         }),
       );
@@ -79,13 +78,13 @@ void main() {
       final area = Completer<String>();
       var geocodes = 0;
       final queries = <String>[];
-      final service = FacilitySearchService(
+      final service = testService(
         resolveArea: (_, _) {
           geocodes++;
           return area.future;
         },
         client: MockClient((request) async {
-          queries.add(request.url.queryParameters['query']!);
+          queries.add((jsonDecode(request.body) as Map)['query'] as String);
           return results();
         }),
       );
@@ -104,7 +103,7 @@ void main() {
       var now = DateTime(2026, 10, 16);
       var requests = 0;
       var geocodes = 0;
-      final service = FacilitySearchService(
+      final service = testService(
         now: () => now,
         resolveArea: (_, _) async {
           geocodes++;
@@ -133,7 +132,7 @@ void main() {
     '429 stays distinguishable and a failed request can be retried',
     () async {
       var requests = 0;
-      final service = FacilitySearchService(
+      final service = testService(
         resolveArea: (_, _) async => '중구',
         client: MockClient(
           (_) async => ++requests == 1 ? http.Response('', 429) : results(),
@@ -154,13 +153,13 @@ void main() {
     () async {
       var calls = 0;
       final queries = <String>[];
-      final service = FacilitySearchService(
+      final service = testService(
         resolveArea: (_, _) {
           if (++calls == 1) throw StateError('temporary geocoder failure');
           return Future.value('중구');
         },
         client: MockClient((request) async {
-          queries.add(request.url.queryParameters['query']!);
+          queries.add((jsonDecode(request.body) as Map)['query'] as String);
           return results();
         }),
       );
@@ -174,10 +173,10 @@ void main() {
   testWidgets('slow geocoder falls back after its deadline', (tester) async {
     final area = Completer<String>();
     final queries = <String>[];
-    final service = FacilitySearchService(
+    final service = testService(
       resolveArea: (_, _) => area.future,
       client: MockClient((request) async {
-        queries.add(request.url.queryParameters['query']!);
+        queries.add((jsonDecode(request.body) as Map)['query'] as String);
         return results();
       }),
     );
@@ -193,7 +192,7 @@ void main() {
     tester,
   ) async {
     final client = _StalledClient();
-    final service = FacilitySearchService(
+    final service = testService(
       client: client,
       resolveArea: (_, _) async => '중구',
     );
@@ -209,7 +208,7 @@ void main() {
   });
 
   test('raw error bodies are not displayed to users', () async {
-    final service = FacilitySearchService(
+    final service = testService(
       resolveArea: (_, _) async => '중구',
       client: MockClient(
         (_) async => http.Response('internal diagnostic data', 503),
@@ -244,3 +243,20 @@ class _StalledClient extends http.BaseClient {
     return done.future;
   }
 }
+
+FacilitySearchService testService({
+  http.Client? client,
+  Future<String> Function(double, double)? resolveArea,
+  DateTime Function()? now,
+  Duration geocodingTimeout = const Duration(seconds: 3),
+  Duration requestTimeout = const Duration(seconds: 10),
+}) => FacilitySearchService(
+  client: client,
+  resolveArea: resolveArea,
+  now: now,
+  geocodingTimeout: geocodingTimeout,
+  requestTimeout: requestTimeout,
+  supabaseUrl: 'https://supabase.invalid',
+  supabaseAnonKey: 'public-test-key',
+  accessToken: () => 'offline-session',
+);

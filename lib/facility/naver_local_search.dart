@@ -5,9 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-const _clientId = String.fromEnvironment('NAVER_SEARCH_CLIENT_ID');
-const _clientSecret = String.fromEnvironment('NAVER_SEARCH_CLIENT_SECRET');
+const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
 /// Thrown when the NAVER API Hub free quota is exhausted (HTTP 429), so
 /// callers can show a friendly message instead of a raw error.
@@ -60,12 +61,21 @@ class FacilitySearchService {
     http.Client? client,
     Future<String> Function(double lat, double lng)? resolveArea,
     DateTime Function()? now,
+    this.supabaseUrl = _supabaseUrl,
+    this.supabaseAnonKey = _supabaseAnonKey,
+    String? Function()? accessToken,
     this.geocodingTimeout = const Duration(seconds: 3),
     this.requestTimeout = const Duration(seconds: 10),
   }) : _client = client ?? http.Client(),
        _resolveArea = resolveArea ?? _reverseGeocode,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _accessToken =
+           accessToken ??
+           (() => Supabase.instance.client.auth.currentSession?.accessToken);
 
+  final String supabaseUrl;
+  final String supabaseAnonKey;
+  final String? Function() _accessToken;
   final http.Client _client;
   final Future<String> Function(double lat, double lng) _resolveArea;
   final DateTime Function() _now;
@@ -154,17 +164,25 @@ class FacilitySearchService {
     double lat,
     double lng,
   ) async {
+    final token = _accessToken();
+    if (token == null ||
+        token.isEmpty ||
+        supabaseUrl.isEmpty ||
+        supabaseAnonKey.isEmpty) {
+      throw StateError('시설 검색 연결 설정과 로그인을 확인해 주세요.');
+    }
     final area = await _area(lat, lng);
-    final uri = Uri.https('naverapihub.apigw.ntruss.com', '/search/v1/local', {
-      'query': area.isEmpty ? category : '$area $category',
-      'display': '5',
-    });
+    final uri = Uri.parse('$supabaseUrl/functions/v1/facility-search');
     final abort = Completer<void>();
     final request =
-        http.AbortableRequest('GET', uri, abortTrigger: abort.future)
+        http.AbortableRequest('POST', uri, abortTrigger: abort.future)
           ..headers.addAll({
-            'X-NCP-APIGW-API-KEY-ID': _clientId,
-            'X-NCP-APIGW-API-KEY': _clientSecret,
+            'Authorization': 'Bearer $token',
+            'apikey': supabaseAnonKey,
+            'Content-Type': 'application/json',
+          })
+          ..body = jsonEncode({
+            'query': area.isEmpty ? category : '$area $category',
           });
     final http.Response response;
     try {

@@ -2,12 +2,13 @@
 # Search for "{구} {이름}" and taking the first hit's mapx/mapy, instead of
 # a dedicated (currently unavailable) geocoding API.
 import sys
+import os
 import time
 import requests
 import pandas as pd
 
-CLIENT_ID = "vhhnls9i8g"
-CLIENT_SECRET = "iis32yS41GgSZg9v3WO04sOxE5EJEZ08H286T3O0"
+CLIENT_ID = os.environ["NAVER_SEARCH_CLIENT_ID"]
+CLIENT_SECRET = os.environ["NAVER_SEARCH_CLIENT_SECRET"]
 URL = "https://naverapihub.apigw.ntruss.com/search/v1/local"
 HEADERS = {"X-NCP-APIGW-API-KEY-ID": CLIENT_ID, "X-NCP-APIGW-API-KEY": CLIENT_SECRET}
 

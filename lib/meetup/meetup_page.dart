@@ -29,17 +29,26 @@ class _MeetupPageState extends State<MeetupPage> {
   }
 
   Future<void> _loadMyRegion() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final profile = await Supabase.instance.client
-        .from('profiles')
-        .select('region_sido, region_sigungu')
-        .eq('id', userId)
-        .single();
-    if (mounted) {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('region_sido, region_sigungu')
+          .eq('id', userId)
+          .single();
+      if (mounted) {
+        setState(() {
+          _mySido = profile['region_sido'] as String;
+          _mySigungu = profile['region_sigungu'] as String;
+          _meetupsFuture = _fetchMeetups();
+        });
+      }
+    } catch (error, stack) {
+      if (!mounted) return;
+      final failed = Future<List<Map<String, dynamic>>>.error(error, stack);
+      failed.ignore();
       setState(() {
-        _mySido = profile['region_sido'] as String;
-        _mySigungu = profile['region_sigungu'] as String;
-        _meetupsFuture = _fetchMeetups();
+        _meetupsFuture = failed;
       });
     }
   }
@@ -67,7 +76,11 @@ class _MeetupPageState extends State<MeetupPage> {
   }
 
   void _refresh() {
-    if (_mySido == null) return;
+    if (!mounted) return;
+    if (_mySido == null) {
+      _loadMyRegion();
+      return;
+    }
     setState(() {
       _meetupsFuture = _fetchMeetups();
     });
@@ -88,7 +101,11 @@ class _MeetupPageState extends State<MeetupPage> {
     return '$period $hour12:$minute';
   }
 
-  Widget _buildSection(String title, List<Map<String, dynamic>> items, bool isPast) {
+  Widget _buildSection(
+    String title,
+    List<Map<String, dynamic>> items,
+    bool isPast,
+  ) {
     return SectionCard(
       header: SectionHeader(title: title),
       child: Column(
@@ -130,10 +147,15 @@ class _MeetupPageState extends State<MeetupPage> {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        '불러오지 못했습니다: ${snapshot.error}',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('불러오지 못했어요.'),
+                          TextButton(
+                            onPressed: _refresh,
+                            child: const Text('다시 시도'),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -153,14 +175,27 @@ class _MeetupPageState extends State<MeetupPage> {
                 }
 
                 final now = DateTime.now();
-                final upcoming = all
-                    .where((m) => DateTime.parse(m['event_at'] as String).toLocal().isAfter(now))
-                    .toList()
-                  ..sort(
-                    (a, b) => (a['event_at'] as String).compareTo(b['event_at'] as String),
-                  );
+                final upcoming =
+                    all
+                        .where(
+                          (m) =>
+                              DateTime.parse(m['event_at'] as String)
+                                  .toLocal()
+                                  .isAfter(now),
+                        )
+                        .toList()
+                      ..sort(
+                        (a, b) => (a['event_at'] as String).compareTo(
+                          b['event_at'] as String,
+                        ),
+                      );
                 final past = all
-                    .where((m) => !DateTime.parse(m['event_at'] as String).toLocal().isAfter(now))
+                    .where(
+                      (m) =>
+                          !DateTime.parse(m['event_at'] as String)
+                              .toLocal()
+                              .isAfter(now),
+                    )
                     .toList();
 
                 return RefreshIndicator(
@@ -210,7 +245,8 @@ class _MeetupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final facilityName = (meetup['facilities'] as Map?)?['name'] as String? ?? '';
+    final facilityName =
+        (meetup['facilities'] as Map?)?['name'] as String? ?? '';
     final textTheme = Theme.of(context).textTheme;
     final eventAt = meetup['event_at'] as String;
     final meta = facilityName.isEmpty
@@ -221,7 +257,9 @@ class _MeetupCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: () async {
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => PostDetailPage(postId: meetup['id'] as String)),
+          MaterialPageRoute(
+            builder: (_) => PostDetailPage(postId: meetup['id'] as String),
+          ),
         );
         onReturn();
       },
@@ -242,9 +280,11 @@ class _MeetupCard extends StatelessWidget {
                   Text(
                     meetup['title'] as String,
                     style: textTheme.titleMedium?.copyWith(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: isPast ? AppColors.scheduleText : AppColors.textPrimary,
+                      color: isPast
+                          ? AppColors.scheduleText
+                          : AppColors.textPrimary,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -253,7 +293,7 @@ class _MeetupCard extends StatelessWidget {
                   Text(
                     meta,
                     style: textTheme.bodyMedium?.copyWith(
-                      fontSize: 13,
+                      fontSize: 18,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
@@ -268,7 +308,9 @@ class _MeetupCard extends StatelessWidget {
                     children: [
                       StatusPill(
                         label: isPast ? '완료' : '예정',
-                        tone: isPast ? StatusPillTone.neutral : StatusPillTone.success,
+                        tone: isPast
+                            ? StatusPillTone.neutral
+                            : StatusPillTone.success,
                       ),
                       CommentCountBadge(commentCountOf(meetup)),
                     ],

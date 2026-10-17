@@ -38,28 +38,28 @@ class RegionScopeBar extends StatelessWidget {
           // unbounded parent (e.g. a ListView), keeping both segments equal.
           child: IntrinsicHeight(
             child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: _Segment(
-                  label: mySido == null ? '시/도' : '$mySido 전체',
-                  selected: scope == RegionScope.sido,
-                  onTap: onChanged == null
-                      ? null
-                      : () => onChanged!(RegionScope.sido),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _Segment(
+                    label: mySido == null ? '시/도' : '$mySido 전체',
+                    selected: scope == RegionScope.sido,
+                    onTap: onChanged == null
+                        ? null
+                        : () => onChanged!(RegionScope.sido),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: _Segment(
-                  label: mySigungu == null ? '시/군/구' : '$mySigungu만',
-                  selected: scope == RegionScope.sigungu,
-                  onTap: onChanged == null
-                      ? null
-                      : () => onChanged!(RegionScope.sigungu),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _Segment(
+                    label: mySigungu == null ? '시/군/구' : '$mySigungu만',
+                    selected: scope == RegionScope.sigungu,
+                    onTap: onChanged == null
+                        ? null
+                        : () => onChanged!(RegionScope.sigungu),
+                  ),
                 ),
-              ),
-            ],
+              ],
             ),
           ),
         ),
@@ -120,8 +120,10 @@ class _Segment extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontSize: 18,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: selected
                             ? AppColors.textPrimary
                             : AppColors.scheduleText,

@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import '../core/phone_call.dart';
+import '../community/new_post_page.dart';
+import '../meetup/new_meetup_page.dart';
+import '../core/meetup_category.dart';
 
 import '../app_theme.dart';
 import '../community/post_detail_page.dart';
-import '../core/address_region.dart';
+import 'facility_repository.dart';
 import '../ui/design_widgets.dart';
 import 'local_facility_search.dart';
 import 'naver_local_search.dart';
@@ -23,9 +27,11 @@ class FacilitySearchPage extends StatefulWidget {
     this.onPicked,
     this.initialFacility,
     this.isActive = true,
+    this.mapPlaceholder,
+    this.enableRealtime = true,
   });
 
-  /// The retained map pauses GPS and heading subscriptions on other tabs.
+  /// Pause location tracking while the map tab is hidden.
   final bool isActive;
 
   /// When set, tapping a marker calls this with the picked facility instead
@@ -37,6 +43,8 @@ class FacilitySearchPage extends StatefulWidget {
   /// used when arriving here from outside the map (e.g. tapping a favorite
   /// on the home tab) instead of by tapping a marker.
   final FacilityResult? initialFacility;
+  final Widget? mapPlaceholder;
+  final bool enableRealtime;
 
   @override
   State<FacilitySearchPage> createState() => _FacilitySearchPageState();
@@ -74,13 +82,79 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   // see _openFacilityDetail for why.
   late FacilityResult? _selectedFacility = widget.initialFacility;
 
+  String? _postId;
+  Widget? _editor;
+  Completer<bool?>? _editResult;
+  Completer<FacilityResult?>? _placeResult;
+  int _detailVersion = 0;
+  void _finishEditor(bool changed) {
+    final result = _editResult;
+    setState(() {
+      _editor = null;
+      _editResult = null;
+    });
+    if (result != null && !result.isCompleted) result.complete(changed);
+  }
+
+  Future<bool?> _editInPlace(Map<String, dynamic> post) {
+    final result = Completer<bool?>();
+    final data = {...post, 'facility': post['facilities']};
+    setState(() {
+      _editResult = result;
+      _editor = post['category'] == kMeetupCategory
+          ? NewMeetupPage(
+              existingPost: data,
+              onFinished: _finishEditor,
+              facilityPicker: _pickInPlace,
+            )
+          : NewPostPage(existingPost: data, onFinished: _finishEditor);
+    });
+    return result.future;
+  }
+
+  Future<FacilityResult?> _pickInPlace() {
+    final result = Completer<FacilityResult?>();
+    setState(() {
+      _placeResult = result;
+    });
+    return result.future;
+  }
+
+  void _pickedInPlace(FacilityResult? place) {
+    final result = _placeResult;
+    setState(() {
+      _placeResult = null;
+    });
+    if (result != null && !result.isCompleted) result.complete(place);
+  }
+
+  void _backInPlace() {
+    if (_placeResult != null) {
+      _pickedInPlace(null);
+    } else if (_editor != null) {
+      _finishEditor(false);
+    } else if (_postId != null) {
+      setState(() {
+        _postId = null;
+        _detailVersion++;
+      });
+    } else {
+      _closeFacilityDetail();
+    }
+  }
+
   @override
   void didUpdateWidget(covariant FacilitySearchPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive == widget.isActive) return;
     // The previous implementation closed details when leaving the tab. Keep
     // that behavior and release its realtime subscription while retaining map.
-    if (!widget.isActive) _selectedFacility = null;
+    if (!widget.isActive) {
+      _selectedFacility = null;
+      _postId = null;
+      _pickedInPlace(null);
+      _finishEditor(false);
+    }
     final controller = _controller;
     _locationTracker.setActive(widget.isActive);
     if (controller == null) return;
@@ -121,6 +195,12 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   void dispose() {
     _locationTracker.setActive(false);
     _controller = null;
+    if (_editResult != null && !_editResult!.isCompleted) {
+      _editResult!.complete(null);
+    }
+    if (_placeResult != null && !_placeResult!.isCompleted) {
+      _placeResult!.complete(null);
+    }
     _searchController.dispose();
     super.dispose();
   }
@@ -199,6 +279,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
       if (!mounted || !identical(controller, _controller)) return;
       final markers = <NMarker>{};
       for (final result in results) {
+        if (!mounted || _controller != controller) return;
         final marker = NMarker(
           id: '${result.lat},${result.lng},${result.name}',
           position: NLatLng(result.lat, result.lng),
@@ -206,7 +287,9 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
         );
         marker.setOnTapListener((_) {
           if (!mounted || !widget.isActive) return;
-          if (widget.onPicked != null) {
+          if (_placeResult != null) {
+            _pickedInPlace(result);
+          } else if (widget.onPicked != null) {
             widget.onPicked!(result);
           } else {
             _openFacilityDetail(result);
@@ -215,22 +298,26 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
         markers.add(marker);
       }
 
-      await controller.clearOverlays(type: NOverlayType.marker).timeout(
-        const Duration(seconds: 3),
-      );
+      await controller
+          .clearOverlays(type: NOverlayType.marker)
+          .timeout(const Duration(seconds: 3));
       if (!mounted || !identical(controller, _controller)) return;
       if (markers.isNotEmpty) {
-        await controller.addOverlayAll(markers).timeout(const Duration(seconds: 3));
+        await controller
+            .addOverlayAll(markers)
+            .timeout(const Duration(seconds: 3));
       }
       if (!mounted || !identical(controller, _controller)) return;
 
       if (results.isNotEmpty && mounted) {
-        await controller.updateCamera(
-          NCameraUpdate.withParams(
-            target: NLatLng(results.first.lat, results.first.lng),
-            zoom: 15,
-          ),
-        ).timeout(const Duration(seconds: 3));
+        await controller
+            .updateCamera(
+              NCameraUpdate.withParams(
+                target: NLatLng(results.first.lat, results.first.lng),
+                zoom: 15,
+              ),
+            )
+            .timeout(const Duration(seconds: 3));
       } else if (mounted && widget.isActive) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -256,9 +343,11 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
       if (mounted && widget.isActive) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(
-            content: Text('시설을 검색하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
-          ));
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('시설을 검색하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
+            ),
+          );
       }
     } finally {
       if (mounted) setState(() => _isSearching = false);
@@ -288,104 +377,150 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
     // is open so it closes the overlay instead of popping this whole page
     // (there is no separate route to pop back out of any more).
     return PopScope(
-      canPop: !widget.isActive || _selectedFacility == null,
+      canPop:
+          !widget.isActive ||
+          _selectedFacility == null &&
+              _postId == null &&
+              _editor == null &&
+              _placeResult == null,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && widget.isActive && _selectedFacility != null) {
-          _closeFacilityDetail();
-        }
+        if (!didPop && widget.isActive) _backInPlace();
       },
       child: Stack(
-      children: [
-        NaverMap(
-          options: const NaverMapViewOptions(
-            initialCameraPosition: NCameraPosition(
-              target: _seoulCityHall,
-              zoom: 14,
-            ),
-            locationButtonEnable: true,
-          ),
-          onMapReady: (controller) {
-            if (!mounted) return;
-            setState(() => _controller = controller);
-            // The built-in location button must also use the guarded tracker.
-            _locationTracker.setActive(widget.isActive);
-            controller.setMyLocationTracker(_locationTracker);
-            if (widget.isActive) unawaited(_startInitialTracking());
-          },
-          onCameraChange: (reason, animated) {
-            final userMoved =
-                reason == NCameraUpdateReason.gesture ||
-                reason == NCameraUpdateReason.control;
-            if (userMoved && _activeSearchTerm != null && !_showSearchHereButton) {
-              setState(() => _showSearchHereButton = true);
-            }
-          },
-        ),
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SearchField(
-                controller: _searchController,
-                isSearching: _isSearching || _controller == null,
-                onSubmitted: _submitTextSearch,
+        fit: StackFit.expand,
+        children: [
+          widget.mapPlaceholder ??
+              NaverMap(
+                options: const NaverMapViewOptions(
+                  initialCameraPosition: NCameraPosition(
+                    target: _seoulCityHall,
+                    zoom: 14,
+                  ),
+                  locationButtonEnable: true,
+                ),
+                onMapReady: (controller) {
+                  if (!mounted) return;
+                  setState(() => _controller = controller);
+                  _locationTracker.setActive(widget.isActive);
+                  controller.setMyLocationTracker(_locationTracker);
+                  if (widget.isActive) unawaited(_startInitialTracking());
+                },
+                onCameraChange: (reason, animated) {
+                  final userMoved =
+                      reason == NCameraUpdateReason.gesture ||
+                      reason == NCameraUpdateReason.control;
+                  if (userMoved &&
+                      _activeSearchTerm != null &&
+                      !_showSearchHereButton) {
+                    setState(() => _showSearchHereButton = true);
+                  }
+                },
               ),
-              const SizedBox(height: 10),
-              _CategoryBar(
-                selected: _category,
-                isSearching: _isSearching || _controller == null,
-                onSelected: _selectCategory,
-              ),
-              if (_category == '병원') ...[
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SearchField(
+                  controller: _searchController,
+                  isSearching:
+                      _isSearching ||
+                      (_controller == null && widget.mapPlaceholder == null),
+                  onSubmitted: _submitTextSearch,
+                ),
                 const SizedBox(height: 10),
                 _CategoryBar(
-                  categories: kHospitalSubcategories,
-                  selected: _subcategory,
-                  isSearching: _isSearching || _controller == null,
-                  onSelected: _selectSubcategory,
+                  selected: _category,
+                  isSearching:
+                      _isSearching ||
+                      (_controller == null && widget.mapPlaceholder == null),
+                  onSelected: _selectCategory,
                 ),
-              ],
-              if (widget.onPicked != null) ...[
-                const SizedBox(height: 10),
-                Material(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: _floatShadow,
-                    ),
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      '검색 후 지도에서 장소를 선택해주세요.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                if (_category == '병원') ...[
+                  const SizedBox(height: 10),
+                  _CategoryBar(
+                    categories: kHospitalSubcategories,
+                    selected: _subcategory,
+                    isSearching:
+                        _isSearching ||
+                        (_controller == null && widget.mapPlaceholder == null),
+                    onSelected: _selectSubcategory,
+                  ),
+                ],
+                if (widget.onPicked != null) ...[
+                  const SizedBox(height: 10),
+                  Material(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: _floatShadow,
+                      ),
+                      padding: const EdgeInsets.all(14),
+                      child: Text(
+                        '검색 후 지도에서 장소를 선택해주세요.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
-                ),
-              ],
-              if (_showSearchHereButton) ...[
-                const SizedBox(height: 10),
-                Center(
-                  child: _SearchHereButton(
-                    onPressed: _isSearching ? null : _searchHere,
+                ],
+                if (_showSearchHereButton) ...[
+                  const SizedBox(height: 10),
+                  Center(
+                    child: _SearchHereButton(
+                      onPressed: _isSearching ? null : _searchHere,
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-        ),
-        if (_selectedFacility != null)
-          Positioned.fill(
-            child: FacilityDetailPage(
-              result: _selectedFacility!,
-              onClose: _closeFacilityDetail,
             ),
           ),
+          if (_selectedFacility != null)
+            Positioned.fill(
+              child: Offstage(
+                offstage:
+                    _postId != null || _editor != null || _placeResult != null,
+                child: FacilityDetailPage(
+                  result: _selectedFacility!,
+                  onClose: _closeFacilityDetail,
+                  onOpenPost: (id) => setState(() {
+                    _postId = id;
+                  }),
+                  enableRealtime: widget.enableRealtime,
+                  refreshVersion: _detailVersion,
+                ),
+              ),
+            ),
+          if (_postId != null)
+            Positioned.fill(
+              child: Offstage(
+                offstage: _editor != null || _placeResult != null,
+                child: PostDetailPage(
+                  postId: _postId!,
+                  onClose: _backInPlace,
+                  onEdit: _editInPlace,
+                ),
+              ),
+            ),
+          if (_editor != null)
+            Positioned.fill(
+              child: Offstage(offstage: _placeResult != null, child: _editor!),
+            ),
+          if (_placeResult != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: FilledButton(
+                onPressed: () => _pickedInPlace(null),
+                child: const Text('장소 선택 취소'),
+              ),
+            ),
         ],
       ),
     );
@@ -413,9 +548,15 @@ class FacilityDetailPage extends StatefulWidget {
     super.key,
     required this.result,
     required this.onClose,
+    this.onOpenPost,
+    this.enableRealtime = true,
+    this.refreshVersion = 0,
   });
 
   final FacilityResult result;
+  final ValueChanged<String>? onOpenPost;
+  final bool enableRealtime;
+  final int refreshVersion;
 
   /// Called instead of a Navigator pop — this page is shown as an in-place
   /// overlay over [FacilitySearchPage], not a pushed route (see
@@ -425,8 +566,6 @@ class FacilityDetailPage extends StatefulWidget {
   @override
   State<FacilityDetailPage> createState() => _FacilityDetailPageState();
 }
-
-const _checkinValidFor = Duration(hours: 3);
 
 class _FacilityDetailPageState extends State<FacilityDetailPage> {
   bool? _isFavorite;
@@ -443,15 +582,31 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   int _detailGeneration = 0;
   int _checkinRefresh = 0;
 
+  Timer? _expiryTimer;
+  void _safeRefresh() {
+    _refreshCheckinState().catchError((Object _) {});
+  }
+
+  @override
+  void didUpdateWidget(covariant FacilityDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshVersion != widget.refreshVersion) _loadDetails();
+  }
+
   @override
   void initState() {
     super.initState();
     _loadDetails();
+    _expiryTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _safeRefresh(),
+    );
   }
 
   @override
   void dispose() {
     _detailGeneration++;
+    _expiryTimer?.cancel();
     final channel = _checkinChannel;
     if (channel != null) Supabase.instance.client.removeChannel(channel);
     super.dispose();
@@ -497,50 +652,36 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     if (result.id != null) {
       facilityId = result.id!;
     } else {
-      final (sido, sigungu) = parseRegionFromAddress(result.address);
-      final facility = await client
-          .from('facilities')
-          .upsert({
-            'name': result.name,
-            'address': result.address,
-            'lat': result.lat,
-            'lng': result.lng,
-            'category': result.category,
-            'telephone': result.telephone,
-            'region_sido': sido,
-            'region_sigungu': sigungu,
-          }, onConflict: 'name,address')
-          .select('id')
-          .single()
-          .timeout(const Duration(seconds: 10));
-      facilityId = facility['id'] as String;
+      facilityId = await ensureFacility(result);
     }
     if (!mounted || generation != _detailGeneration) return;
     setState(() => _facilityId = facilityId);
 
     // Register before awaiting reads, so closing during a read cannot create
     // an orphan subscription after dispose. The reads run independently.
-    _checkinChannel = client
-        .channel('checkins_$facilityId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'checkins',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'facility_id',
-            value: facilityId,
-          ),
-          callback: (_) async {
-            if (!mounted || generation != _detailGeneration) return;
-            try {
-              await _refreshCheckinState();
-            } catch (_) {
-              if (mounted) setState(() => _detailLoadFailed = true);
-            }
-          },
-        )
-        .subscribe();
+    if (widget.enableRealtime) {
+      _checkinChannel = client
+          .channel('checkins_$facilityId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'checkins',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'facility_id',
+              value: facilityId,
+            ),
+            callback: (_) async {
+              if (!mounted || generation != _detailGeneration) return;
+              try {
+                await _refreshCheckinState();
+              } catch (_) {
+                if (mounted) setState(() => _detailLoadFailed = true);
+              }
+            },
+          )
+          .subscribe();
+    }
     await Future.wait([
       _refreshCheckinState(),
       _loadUpcomingMeetups(facilityId),
@@ -553,17 +694,9 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     final facilityId = _facilityId;
     if (facilityId == null) return;
     final client = Supabase.instance.client;
-    final userId = client.auth.currentUser!.id;
-    final since = DateTime.now()
-        .subtract(_checkinValidFor)
-        .toUtc()
-        .toIso8601String();
 
-    final rows = await client
-        .from('checkins')
-        .select('user_id')
-        .eq('facility_id', facilityId)
-        .gte('checked_in_at', since)
+    final summary = await client
+        .rpc('facility_presence', params: {'target_facility': facilityId})
         .timeout(const Duration(seconds: 10));
     if (!mounted ||
         generation != _detailGeneration ||
@@ -571,8 +704,8 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
       return;
     }
     setState(() {
-      _checkinCount = rows.length;
-      _checkedIn = rows.any((row) => row['user_id'] == userId);
+      _checkinCount = (summary['count'] as num).toInt();
+      _checkedIn = summary['checked_in'] as bool;
     });
   }
 
@@ -600,7 +733,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
 
   Future<void> _toggleCheckin() async {
     final facilityId = _facilityId;
-    if (facilityId == null) return;
+    if (facilityId == null || _checkedIn == null || _isCheckingInOut) return;
 
     setState(() => _isCheckingInOut = true);
     try {
@@ -646,6 +779,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   }
 
   Future<void> _toggleFavorite() async {
+    if (_isToggling || _isFavorite == null) return;
     setState(() => _isToggling = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
@@ -746,8 +880,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                   if (result.telephone.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: () =>
-                          launchUrl(Uri.parse('tel:${result.telephone}')),
+                      onPressed: () => callFacility(context, result.telephone),
                       icon: const Icon(Icons.call),
                       label: Text('${result.telephone} 전화 걸기'),
                     ),
@@ -758,7 +891,10 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
             const SizedBox(height: 12),
             SectionCard(
               padding: const EdgeInsets.all(20),
-              child: Row(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   OutlinedButton.icon(
                     // Overrides the app theme's OutlinedButton default of
@@ -769,9 +905,12 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     // BoxConstraints.enforce() unclamped and crashes layout
                     // ("BoxConstraints forces an infinite width").
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 48),
+                      minimumSize: const Size(0, 56),
                     ),
-                    onPressed: _facilityId == null || _isCheckingInOut
+                    onPressed:
+                        _facilityId == null ||
+                            _checkedIn == null ||
+                            _isCheckingInOut
                         ? null
                         : _toggleCheckin,
                     icon: Icon(
@@ -781,13 +920,10 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     ),
                     label: Text(_checkedIn == true ? '나 여기 있음 취소' : '나 여기 있음'),
                   ),
-                  const SizedBox(width: 12),
                   if (_checkinCount != null)
-                    Flexible(
-                      child: Text(
-                        '현재 $_checkinCount명 있음',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                    Text(
+                      '현재 $_checkinCount명 있음',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                 ],
               ),
@@ -821,12 +957,15 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                           Icons.chevron_right,
                           color: AppColors.textTertiary,
                         ),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PostDetailPage(postId: meetup['id'] as String),
-                          ),
-                        ),
+                        onTap: () => widget.onOpenPost != null
+                            ? widget.onOpenPost!(meetup['id'] as String)
+                            : Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => PostDetailPage(
+                                    postId: meetup['id'] as String,
+                                  ),
+                                ),
+                              ),
                       ),
                   ],
                 ),
@@ -900,7 +1039,7 @@ class _SearchHereButton extends StatelessWidget {
                   Text(
                     '이 위치에서 검색',
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: onPressed == null
                           ? AppColors.textTertiary
@@ -942,15 +1081,18 @@ class _SearchField extends StatelessWidget {
           enabled: !isSearching,
           textInputAction: TextInputAction.search,
           onSubmitted: (_) => onSubmitted(),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: '시설 이름으로 검색 (예: 서울대병원)',
             hintStyle: const TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
               color: AppColors.textTertiary,
             ),
-            prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: AppColors.textSecondary,
+            ),
             suffixIcon: Padding(
               padding: const EdgeInsets.all(6),
               child: Material(

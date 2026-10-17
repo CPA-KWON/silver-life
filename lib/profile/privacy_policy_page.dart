@@ -68,7 +68,7 @@ class PrivacyPolicyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final bodyStyle = textTheme.bodyLarge?.copyWith(
-      fontSize: 15,
+      fontSize: 18,
       fontWeight: FontWeight.w400,
       height: 1.6,
     );
@@ -95,7 +95,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                   Text(
                     title,
                     style: textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
+                      fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

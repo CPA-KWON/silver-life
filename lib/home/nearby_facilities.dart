@@ -161,7 +161,11 @@ class NearbyFacilitiesService {
   Future<Position> _readPosition() async {
     try {
       final last = await Geolocator.getLastKnownPosition();
-      if (last != null) return last;
+      if (last != null &&
+          DateTime.now().difference(last.timestamp).abs() <=
+              const Duration(minutes: 5)) {
+        return last;
+      }
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
@@ -191,7 +195,8 @@ class NearbyFacilitiesSection extends StatefulWidget {
     super.key,
     required this.onOpenFacility,
     required this.onShowMap,
-    @visibleForTesting this.loader,
+    this.loader,
+    this.refreshVersion = 0,
   });
 
   final void Function(FacilityResult) onOpenFacility;
@@ -199,6 +204,7 @@ class NearbyFacilitiesSection extends StatefulWidget {
 
   /// Test hook: replaces the real service.
   final NearbyLoader? loader;
+  final int refreshVersion;
 
   @override
   State<NearbyFacilitiesSection> createState() =>
@@ -215,6 +221,12 @@ class _NearbyFacilitiesSectionState extends State<NearbyFacilitiesSection> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant NearbyFacilitiesSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshVersion != widget.refreshVersion) _load(force: true);
   }
 
   Future<void> _load({bool force = false}) async {
@@ -268,7 +280,7 @@ class _NearbyFacilitiesSectionState extends State<NearbyFacilitiesSection> {
               onPressed: widget.onShowMap,
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
-                minimumSize: const Size(48, 48),
+                minimumSize: const Size(48, 56),
               ),
               child: const Text('지도에서 보기'),
             ),
@@ -359,7 +371,7 @@ class _NearbyFacilitiesSectionState extends State<NearbyFacilitiesSection> {
           FilledButton.tonal(
             onPressed: () => action(),
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+              minimumSize: const Size.fromHeight(56),
               foregroundColor: AppColors.primary,
               backgroundColor: AppColors.tint,
             ),
@@ -407,7 +419,7 @@ class _NearbyRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -417,7 +429,7 @@ class _NearbyRow extends StatelessWidget {
               Text(
                 formatNearbyDistance(item.result.distanceMeters),
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,
                 ),

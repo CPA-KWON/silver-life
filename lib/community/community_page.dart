@@ -37,17 +37,26 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   Future<void> _loadMyRegion() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final profile = await Supabase.instance.client
-        .from('profiles')
-        .select('region_sido, region_sigungu')
-        .eq('id', userId)
-        .single();
-    if (mounted) {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('region_sido, region_sigungu')
+          .eq('id', userId)
+          .single();
+      if (mounted) {
+        setState(() {
+          _mySido = profile['region_sido'] as String;
+          _mySigungu = profile['region_sigungu'] as String;
+          _postsFuture = _fetchPosts();
+        });
+      }
+    } catch (error, stack) {
+      if (!mounted) return;
+      final failed = Future<List<Map<String, dynamic>>>.error(error, stack);
+      failed.ignore();
       setState(() {
-        _mySido = profile['region_sido'] as String;
-        _mySigungu = profile['region_sigungu'] as String;
-        _postsFuture = _fetchPosts();
+        _postsFuture = failed;
       });
     }
   }
@@ -80,7 +89,11 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 
   void _refresh() {
-    if (_mySido == null) return;
+    if (!mounted) return;
+    if (_mySido == null) {
+      _loadMyRegion();
+      return;
+    }
     // Must be a block body: an arrow body's value would be the Future
     // that _fetchPosts() returns, and setState() rejects a callback that
     // returns a Future instead of void.
@@ -165,7 +178,10 @@ class _CommunityPageState extends State<CommunityPage> {
             mySigungu: _mySigungu,
             onChanged: _mySido == null ? null : _setRegionScope,
           ),
-          _CategoryFilterBar(selected: _categoryFilter, onSelected: _setCategory),
+          _CategoryFilterBar(
+            selected: _categoryFilter,
+            onSelected: _setCategory,
+          ),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _postsFuture,
@@ -177,10 +193,15 @@ class _CommunityPageState extends State<CommunityPage> {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        '불러오지 못했습니다: ${snapshot.error}',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('불러오지 못했어요.'),
+                          TextButton(
+                            onPressed: _refresh,
+                            child: const Text('다시 시도'),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -221,9 +242,9 @@ class _CommunityPageState extends State<CommunityPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => const NewPostPage()),
-          );
+          await Navigator.of(
+            context,
+          ).push<bool>(MaterialPageRoute(builder: (_) => const NewPostPage()));
           // Always refresh on return, not just when NewPostPage reported
           // success — a stale list is worse than one harmless extra fetch.
           _refresh();

@@ -1,154 +1,145 @@
 # 실버라이프 (Silver Life)
 
-실버세대를 위한 생활 지원 앱 — 주변 시설(병원/약국/경로당/복지관) 찾기, 실버 커뮤니티, 동네모임
+내 주변의 시설과 사람을 연결하는 시니어 생활 앱입니다.
+Flutter(Android 우선) + Supabase(인증·DB) + 네이버 지도·지역검색을 사용합니다.
+Android 앱 ID: `com.silverlife.app`.
 
-- Package: `com.silverlife.app`
-- Stack: Flutter(Android) + Supabase(Postgres/Auth/Realtime) + 네이버 지도·지역검색
+## 현재 코드
 
-## 1. 개발 환경 세팅
+`fix/integrate-branches-and-security`는 기존 main의 신고 기능,
+지도 안정화 브랜치, 활동 미션·경험 은행 브랜치를 통합한 작업본입니다.
+충돌 파일의 신고 버튼·지도 유지·시설 위 게시글/편집/장소 선택 화면을 함께 보존했습니다.
+운영 서버 적용과 실제 기기 검증은 별도 작업입니다.
 
-### Flutter SDK
+## 실행 준비
 
-- 버전: Flutter 3.47.5 (stable) / Dart 3.13.4
-- 이 프로젝트는 Windows에서 `C:\Users\user\flutter\bin`에 설치된 SDK로 개발되었습니다. 새 환경에서는 [flutter.dev](https://docs.flutter.dev/get-started/install)에서 SDK를 받아 PATH에 추가하세요.
-- Android Studio + Android SDK 필요 (실기기 또는 에뮬레이터 실행용). 이 프로젝트는 지금까지 **실기기(USB 디버깅)로만 테스트**했습니다 — 에뮬레이터는 개발 PC 사양 문제로 사용하지 않았습니다.
-
-```bash
-flutter doctor      # 환경 점검, Android toolchain 관련 항목 확인
-flutter pub get     # 의존성 설치
-```
-
-### 알아둘 것: 의존성/SDK 버전 고정
-
-- `pubspec.yaml`의 `dependency_overrides: permission_handler_android: 13.0.1` — 최신 `permission_handler_android` 14.x가 요구하는 Android SDK 37이 아직 정식 배포되지 않아 고정해둔 것입니다. SDK 37이 정식 출시되면 override를 제거하고 업그레이드하세요.
-- `android/app/build.gradle.kts`의 `compileSdk = 36` — 위와 같은 이유로 36에 고정.
-- `flutter_naver_map` 플러그인이 Kotlin Gradle Plugin(KGP)을 직접 적용하고 있어, 빌드 시 "Future versions of Flutter will fail to build..." 경고가 뜹니다. 현재는 무시해도 되지만, 플러그인이 Built-in Kotlin을 지원하는 버전을 내면 업그레이드가 필요합니다.
-
-### 실행
+검증 환경: Flutter 3.47.6 / Dart 3.13.5. Dart 요구 조건은 `^3.13.4`입니다.
+Android Studio와 Android SDK 36이 필요합니다.
 
 ```bash
-flutter run --dart-define-from-file=.env.json
+flutter pub get
+flutter analyze --no-pub lib test
+flutter test --no-pub --concurrency=1
 ```
 
-## 2. 환경 변수 (.env.json)
-
-저장소에 커밋되지 않는 파일입니다 (`.gitignore`에 포함). 프로젝트 루트에 아래 형식으로 직접 만들어야 합니다:
+프로젝트 루트의 `.env.json`에는 공개 가능한 연결 설정만 넣습니다.
+이 파일은 git에서 제외됩니다.
 
 ```json
 {
-  "SUPABASE_URL": "https://xxxx.supabase.co",
-  "SUPABASE_ANON_KEY": "xxxxxxxx",
-  "NAVER_MAP_CLIENT_ID": "xxxxxxxx",
-  "NAVER_SEARCH_CLIENT_ID": "xxxxxxxx",
-  "NAVER_SEARCH_CLIENT_SECRET": "xxxxxxxx"
+  "SUPABASE_URL": "https://YOUR_PROJECT.supabase.co",
+  "SUPABASE_ANON_KEY": "YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY",
+  "NAVER_MAP_CLIENT_ID": "YOUR_MAP_CLIENT_ID"
 }
 ```
 
-| 키 | 용도 | 발급처 |
-|---|---|---|
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | 백엔드(DB/인증/실시간) | Supabase 프로젝트 대시보드 > Settings > API |
-| `NAVER_MAP_CLIENT_ID` | 지도 SDK (`flutter_naver_map`) | [NCP 콘솔](https://console.ncloud.com/maps/application) > Maps > Application 등록 (Android 패키지명 `com.silverlife.app`으로 등록) |
-| `NAVER_SEARCH_CLIENT_ID` / `_SECRET` | 지역검색 API (병원/약국/복지관 등 실시간 검색) | [NAVER 개발자센터](https://developers.naver.com/apps) > 애플리케이션 등록 > 검색 API 사용 설정 |
-
-> ⚠️ **네이버 지오코딩(Geocoding) API는 2025년 5월부터 신규 구독이 막혀 있습니다** (NCP 공지 확인됨). 좌표 변환이 필요하면 정식 Geocoding API 대신 **NAVER 지역검색(Local Search) API를 이름 기반으로 활용**하는 방식을 씁니다 (`lib/facility/naver_local_search.dart`, `geocode_via_local_search.py` 참고).
-
-이 키들이 없으면 앱이 "Supabase 설정이 없습니다" 안내 화면만 띄우고 동작하지 않습니다 (`lib/main.dart`).
-
-## 3. Supabase 스키마 세팅
-
-**새 Supabase 프로젝트**라면 SQL Editor에서 아래 순서대로 실행하세요 (각 파일 상단에 실행 순서 주석이 있습니다):
-
-1. `supabase/schema.sql` — `profiles` 테이블, 회원가입 트리거
-2. `supabase/community_schema.sql` — `posts`/`comments`, RLS (작성자만 수정·삭제 가능)
-3. `supabase/facilities_schema.sql` — `facilities`(장소), `favorites`(즐겨찾기), `checkins`(체크인), `posts`에 모임용 `event_at`/`facility_id` 컬럼 추가
-4. `supabase/region_split.sql` — `profiles.region`(단일 문자열)을 `region_sido`/`region_sigungu`로 분리
-5. `supabase/facility_region.sql` — `facilities`에도 동일하게 지역 컬럼 추가 + "동네모임 글은 반드시 장소가 있어야 한다" DB 제약조건
-6. `supabase/facilities_rls_fix.sql` — `facilities`/`checkins`에 빠져 있던 UPDATE 정책 추가 (없으면 체크인/모임 등록 시 upsert가 RLS 에러로 실패함)
-7. `supabase/realtime_setup.sql` — `checkins` 테이블 Realtime 활성화 (체크인 인원수 실시간 반영용)
-
-**기존 프로젝트를 이어받는 경우**는 위 파일들이 이미 실행되어 있을 가능성이 높으니, Table Editor에서 테이블/컬럼이 이미 있는지 먼저 확인 후 없는 것만 실행하세요.
-
-### 경로당 데이터 (선택)
-
-서울시 경로당 2,729곳의 좌표 데이터를 미리 가져와두고 싶다면:
-1. `supabase/delete_old_gyeongrodang.sql` (예전 전국 데이터가 이미 들어있다면 먼저 삭제)
-2. `supabase/import_gyeongrodang.sql` (서울시 경로당 현황 xlsx를 NAVER 지역검색으로 좌표 매칭한 INSERT문, 3,644건 중 2,729건 매칭)
-
-`import_facilities.sql`은 예전 전국 데이터셋 기준으로 만든 구버전이라 더 이상 쓰지 않습니다. 데이터를 새로 갱신하려면 `geocode_via_local_search.py` / `geocode_and_generate_sql.py`가 xlsx → SQL 생성 파이프라인입니다 (앱 런타임과는 무관한 1회성 스크립트).
-
-## 4. 프로젝트 구조
-
-```
-lib/
-  main.dart              앱 진입점, Supabase/NaverMap 초기화
-  app_theme.dart          브랜드 컬러·테마 (아래 5번 참고)
-  auth/                   로그인/회원가입
-  home/                   홈 탭, 하단 네비게이션(MainShell)
-  facility/                시설찾기 (지도, 검색, 상세, 체크인, 즐겨찾기)
-  community/              커뮤니티 게시판, 게시글 상세/댓글
-  meetup/                 동네모임 (커뮤니티와 별도 탭, 시설 위치 기반)
-  profile/                내 정보 (프로필 수정, 내가 쓴 글 모아보기)
-  core/                   여러 화면이 공유하는 것들:
-    region_scope.dart       지역 필터 UI(시도/시군구)
-    region_picker.dart      지역 선택 드롭다운
-    korea_regions.dart      17개 시도/시군구 전체 목록
-    address_region.dart     주소 문자열 → (시도, 시군구) 파싱
-    meetup_category.dart    동네모임 카테고리 상수 (순환 import 방지용)
-    comment_count.dart      댓글 수 조회/배지 위젯 공용 헬퍼
+```bash
+flutter run --dart-define-from-file=.env.json
+flutter build apk --debug --dart-define-from-file=.env.json
 ```
 
-멀티플랫폼 폴더(`ios/`, `linux/`, `macos/`, `web/`, `windows/`)는 Android Studio가 자동 생성한 것으로 그대로 두었지만, **배포 대상은 Android(플레이스토어)뿐**입니다.
+앱의 `.env.json`에는 검색 비밀키나 Supabase 관리자 키를 넣지 마세요.
+지도 Client ID는 앱 ID `com.silverlife.app`에 맞춰 등록해야 합니다.
+로그인 이메일 인증 복귀 주소는 `com.silverlife.app://login-callback`입니다.
+Supabase 설정이 없으면 앱은 설정 안내 화면을 표시합니다.
 
-## 5. 브랜드 컬러 / 테마
+## 운영 서버 적용 순서
 
-`lib/app_theme.dart`에 5개 토큰으로 정의되어 있습니다:
+기존 DB를 백업하고 현재 테이블과 권한을 확인한 뒤 적용합니다.
+이미 운영 중인 DB에서 최초 생성 SQL을 다시 실행하지 마세요.
 
-| 토큰 | 값 | 용도 |
-|---|---|---|
-| `_primary` | `#2563EB` | 버튼, OutlinedButton 테두리/글자, 선택된 칩/포커스 테두리 |
-| `_dark` | `#0B1220` | 앱바·하단 탭바 배경, 본문 텍스트 색 |
-| `_surface` | `#F5F8FF` | (현재 미사용 — 페이지 배경은 흰색으로 통일됨) |
-| `_accent` | `#60A5FA` | `colorScheme.secondary`, 하단 탭바 선택 아이콘 |
-| `_highlight` | `#E0EAFF` | 칩/배지 기본 배경, 앱 아이콘 배경 |
+1. Supabase 프로젝트 → SQL Editor에서 기존 main 스키마가 적용됐는지 확인합니다.
+   필요한 기존 파일: schema.sql → community_schema.sql → facilities_schema.sql →
+   region_split.sql → facility_region.sql → facilities_rls_fix.sql →
+   realtime_setup.sql → email_exists_function.sql → reports.sql.
+2. SQL Editor → New query에서 `supabase/integration_security.sql`을 붙여넣고 Run을 누릅니다.
+   이 파일은 트랜잭션 단위이고 다시 실행할 수 있습니다.
+3. 활동 기능이 아직 없다면 `supabase/activity_expansion.sql`을 별도 New query에서 적용합니다.
+   이 파일은 한 번만 실행합니다. 이미 activity_* 테이블이 있다면 재실행하지 마세요.
+4. 아래 설명대로 검색 서버 함수와 새 검색 키를 배포합니다.
+5. 앱을 새 설정으로 빌드하고 일반 회원 2명과 기관 담당자로 기능을 확인합니다.
 
-**중요:** `_primary`는 흰 글씨를 올려도 대비가 충분(≈5.2:1)하지만, `_accent`/`_highlight`처럼 밝은 색 위에는 항상 진한 잉크색(`_textPrimary` = `_dark`) 텍스트를 써야 합니다 — 실버 사용자 대상 고대비 요구사항 때문입니다. 새 버튼/배지를 추가할 때 이 규칙을 지켜주세요.
+`integration_security.sql`은 다른 사람의 이름·출생연도를 공개하지 않고
+닉네임·시도·시군구만 연결하는 공개 프로필 관계를 추가합니다.
+기존 `profiles!inner(...)` 지역 필터는 유지합니다.
+시설은 기존 장소를 재사용하며 다른 회원이 덮어쓰지 못하게 합니다.
+체크인은 타인의 계정/위치 목록 대신 `facility_presence`의 인원수와 본인 상태만 받습니다.
+권한 강화 후 다른 사람의 체크인 이벤트는 직접 전달되지 않으므로,
+시설 인원수는 본인 조작·화면 갱신·1분 간격 조회로 갱신됩니다.
 
-앱 아이콘은 `assets/icon/icon.png`(1024×1024, `_highlight` 배경 + `_dark` 색 "S")이며, 수정 후 아래 명령으로 재생성합니다:
+## 네이버 검색 비밀키 교체와 서버 배포
+
+이전 커밋에 검색 비밀키가 공개되었습니다. 소스에서 제거했어도 과거 이력에는 남습니다.
+발급한 NAVER Cloud API Hub 콘솔에서 해당 키를 폐기하고 새로 발급해야 합니다.
+비밀키를 채팅·커밋·앱 파일에 넣지 마세요.
+
+검색은 `supabase/functions/facility-search`에서만 네이버에 요청합니다.
+서버는 Supabase Auth로 로그인 토큰을 검증한 뒤 고정된 네이버 주소를 호출합니다.
+`verify_jwt=false`는 앱을 공개 허용한다는 뜻이 아닙니다. 함수 내부의 Auth 검사가 필수입니다.
+
+Supabase CLI를 사용할 수 있는 개발 환경에서는:
 
 ```bash
-dart run flutter_launcher_icons
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+# git에 포함되지 않는 supabase/functions/.env 파일에 새 검색 키를 저장한 뒤:
+supabase secrets set --env-file supabase/functions/.env
+supabase functions deploy facility-search
 ```
 
-## 6. 알려진 이슈 / 개발 중 겪은 트러블슈팅
+서버의 `supabase/functions/.env`에는 `NAVER_SEARCH_CLIENT_ID`와
+`NAVER_SEARCH_CLIENT_SECRET`만 설정합니다. Supabase URL/anon 키는 호스팅 환경에서 제공합니다.
+해당 파일은 `.gitignore`에 포함되어 있습니다. 로컬 serve 사용 시에도 두 값을 준비합니다.
 
-- **NaverMap(PlatformView) + Navigator 전환 충돌**: 지도가 떠 있는 화면 위로 `Navigator.push`로 새 라우트를 띄우면(애니메이션이 0초여도) 렌더 트리가 깨지는 크래시가 반복 발생했습니다. 해결: 시설 상세 화면(`FacilityDetailPage`)을 별도 라우트로 push하지 않고, `FacilitySearchPage`의 `Stack` 안에 `Positioned.fill` 오버레이로 표시하도록 구조를 바꿨습니다 (`lib/facility/facility_search_page.dart`). **지도가 마운트된 화면 위에 새 라우트를 push하는 패턴은 피하세요.**
-- **테마의 `Size.fromHeight(56)`(전체 폭 버튼) + `Row`**: 버튼을 `Expanded`/`Flexible` 없이 `Row` 안에 직접 넣으면 "BoxConstraints forces an infinite width" 크래시가 납니다 (`Row`가 non-flex 자식에게 무제한 너비를 주는데, 버튼 테마의 `minWidth: double.infinity`가 그대로 통과되기 때문). `Row` 안에 버튼을 넣을 땐 `style: OutlinedButton.styleFrom(minimumSize: Size(0, 48))`처럼 개별적으로 폭 제약을 풀어주거나 `Flexible`로 감싸세요.
-- **Supabase 쿼리 기본 행 개수 제한**: `order()` 없는 쿼리는 서버가 임의 순서로 약 1000행까지만 반환할 수 있어, 거리순 정렬 전에 결과가 잘려 "가까운 곳인데 검색 안 됨" 버그가 났습니다. 위도/경도 바운딩 박스로 먼저 좁힌 뒤 정렬하세요 (`lib/facility/local_facility_search.dart`의 `searchOwnFacilities` 참고).
-- **`DateTime.toIso8601String()` 타임존**: `.toUtc()` 없이 바로 직렬화하면 Postgres가 로컬 시각을 UTC로 오인해 9시간이 밀립니다. `event_at`/`checked_in_at` 등 timestamptz 컬럼에 쓸 땐 항상 `.toUtc().toIso8601String()`.
-- **`FlutterJNI ... headingStream` 로그 스팸**: 지도의 "내 위치 따라가기" 모드가 켜둔 나침반 센서 리스너가, 핫 리스타트 시 옛 Flutter 엔진이 끊긴 뒤에도 값을 보내려다 나는 경고입니다. 기능상 문제는 없고, 지도 화면에서는 핫 리스타트 대신 완전 재시작을 하면 줄어듭니다.
+공공데이터 Python 도구는 같은 이름의 운영체제 환경 변수에서 검색 키를 읽습니다.
+앱 설정 파일에서 비밀키를 읽지 않습니다. 키가 없으면 실행을 중단합니다.
 
-## 7. 주요 기능 현황
+## 정식 Android 서명
 
-- **인증**: 이메일/비밀번호 가입(닉네임/이름/지역/출생년도), 한글 에러 메시지 번역
-- **홈**: 인사말, 다가오는 모임 미리보기, 즐겨찾는 시설, 최근 커뮤니티 글
-- **시설찾기**: 네이버 지도, 카테고리(병원/약국/경로당/복지관) + 병원 세부과 필터, "이 위치에서 검색", 경로당은 자체 DB 우선 검색, 상세 화면(체크인·즐겨찾기·전화걸기·여기서 열리는 모임)
-- **커뮤니티**: 카테고리별 게시판, 지역 범위 필터(시도/시군구), 글쓰기/수정/삭제(작성자만), 댓글, 댓글 수 표시
-- **동네모임**: 시설 위치 기준 지역 필터(글쓴이 아님), 장소 필수 선택, 지난 모임 "완료" 표시, 작성자 수정/삭제
-- **내 정보**: 닉네임/지역 수정, 로그아웃, 내가 쓴 모임 글/커뮤니티 글 모아보기
+정식 APK는 팀이 보관하는 하나의 서명 키로 빌드해야 합니다.
+`android/key.properties`를 아래 형식으로 준비합니다. 이 파일과 keystore는 git에서 제외됩니다.
 
-## 8. 자주 쓰는 명령어
+```properties
+storeFile=/ABSOLUTE/PATH/TO/upload-keystore.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
 
 ```bash
-flutter analyze lib test                                    # 정적 분석
-flutter test                                                 # 위젯 테스트
-flutter run --dart-define-from-file=.env.json                 # 디버그 실행
-flutter build appbundle --release --dart-define-from-file=.env.json   # 플레이스토어 업로드용
-flutter build apk --release --split-per-abi --dart-define-from-file=.env.json  # 사이드로드/기기 직접 설치용
+flutter build apk --release --split-per-abi --dart-define-from-file=.env.json
+flutter build appbundle --release --dart-define-from-file=.env.json
 ```
 
-## 9. 플레이스토어 배포 전 남은 작업
+서명 설정이 없으면 release 빌드를 중단합니다. 테스트용 debug 서명으로 대신 배포하지 않습니다.
+폰용 APK는 arm64-v8a, 블루스택용 APK는 x86_64를 사용합니다.
+이전 앱과 서명이 다르면 기존 앱을 삭제해야 설치할 수 있으므로 팀 서명 키를 일관되게 사용하세요.
 
-- [x] 앱 아이콘 교체
-- [ ] 릴리스 서명 키(keystore) 생성 및 `android/key.properties` 설정 (커밋 금지)
-- [ ] Play Console 개인정보처리방침 URL 준비 (위치 정보 수집 앱은 필수)
-- [ ] 내부 테스트 트랙 업로드 및 실기기 QA
+## 주요 코드 위치
+
+- `lib/main.dart`, `auth/`: 초기화·로그인·회원가입
+- `lib/home/`: 홈, 5개 탭, 지도 탭 유지, 주변 시설
+- `lib/facility/`: 네이버 지도·검색·시설 상세·즐겨찾기·체크인
+- `lib/community/`, `meetup/`: 글·댓글·신고·동네모임
+- `lib/activity/`: 활동 추천·미션·경험·기관 운영
+- `lib/profile/`: 내 정보·회원정보 수정
+- `lib/core/`: 지역·신고·전화·공통 기능
+- `lib/app_theme.dart`, `lib/ui/`: v5 보라색 테마·Pretendard·공통 화면 부품
+- `supabase/`: DB 설계·권한 보완·서버 검색 함수
+
+동네모임은 posts.category='동네모임'으로 저장하며 facilities의 지역으로 필터링합니다.
+커뮤니티는 작성자의 지역으로 필터링합니다. 즐겨찾기는 시설 정보 사본을 저장합니다.
+활동 프로그램과 기존 동네모임은 별도 흐름이며 카드 결제·정산은 구현되어 있지 않습니다.
+
+## DB와 서버 자동 검사
+
+운영 DB에 접속하지 않고 임시 PostgreSQL에서 검사합니다.
+Node.js 24 이상과 별도 설치한 `@electric-sql/pglite`가 필요합니다.
+
+```bash
+PGLITE_MODULE=/ABSOLUTE/PATH/node_modules/@electric-sql/pglite/dist/index.js node test/integration_security_test.mjs
+PGLITE_MODULE=/ABSOLUTE/PATH/node_modules/@electric-sql/pglite/dist/index.js node test/activity_database_test.mjs
+node --test test/facility_search_edge_test.mjs
+```
+
+실제 네이버 지도·GPS·운영 DB·이메일 인증·기관 운영 계정은 기기와 서버에서 추가 확인해야 합니다.

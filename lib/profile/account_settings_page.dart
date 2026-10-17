@@ -39,6 +39,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         .select()
         .eq('id', userId)
         .single();
+    if (!mounted) return profile;
     _nicknameController.text = profile['nickname'] as String;
     _sido = profile['region_sido'] as String;
     _sigungu = profile['region_sigungu'] as String;
@@ -49,7 +50,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     if (!_formKey.currentState!.validate()) return;
 
     final password = await _promptPassword();
-    if (password == null) return;
+    if (password == null || !mounted) return;
 
     setState(() => _isSaving = true);
     try {
@@ -68,11 +69,14 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         return;
       }
 
-      await Supabase.instance.client.from('profiles').update({
-        'nickname': _nicknameController.text.trim(),
-        'region_sido': _sido,
-        'region_sigungu': _sigungu,
-      }).eq('id', user.id);
+      await Supabase.instance.client
+          .from('profiles')
+          .update({
+            'nickname': _nicknameController.text.trim(),
+            'region_sido': _sido,
+            'region_sigungu': _sigungu,
+          })
+          .eq('id', user.id);
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -80,7 +84,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       }
     } on PostgrestException catch (e) {
       if (mounted) {
-        final message = e.code == '23505' ? '이미 사용 중인 닉네임입니다.' : '저장에 실패했습니다: ${e.message}';
+        final message = e.code == '23505'
+            ? '이미 사용 중인 닉네임입니다.'
+            : '저장에 실패했습니다: ${e.message}';
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(content: Text(message)));
@@ -155,12 +161,12 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
           final profile = snapshot.data!;
           final textTheme = Theme.of(context).textTheme;
           final labelStyle = textTheme.bodyMedium?.copyWith(
-            fontSize: 13,
+            fontSize: 18,
             fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
           );
           final valueStyle = textTheme.bodyLarge?.copyWith(
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: FontWeight.w500,
           );
           return SingleChildScrollView(
@@ -198,7 +204,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                           controller: _nicknameController,
                           decoration: const InputDecoration(labelText: '닉네임'),
                           validator: (value) =>
-                              (value == null || value.trim().isEmpty) ? '닉네임을 입력해주세요' : null,
+                              (value == null || value.trim().isEmpty)
+                              ? '닉네임을 입력해주세요'
+                              : null,
                         ),
                         const SizedBox(height: 16),
                         RegionPicker(
@@ -216,7 +224,9 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('저장'),
                         ),
@@ -271,7 +281,8 @@ class _PasswordPromptDialogState extends State<_PasswordPromptDialog> {
           obscureText: true,
           autofocus: true,
           decoration: const InputDecoration(labelText: '현재 비밀번호'),
-          validator: (value) => (value == null || value.isEmpty) ? '비밀번호를 입력해주세요' : null,
+          validator: (value) =>
+              (value == null || value.isEmpty) ? '비밀번호를 입력해주세요' : null,
         ),
       ),
       actions: [

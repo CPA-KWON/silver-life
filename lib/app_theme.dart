@@ -67,14 +67,14 @@ final TextTheme _textTheme = TextTheme(
   headlineMedium: _style(26, FontWeight.w700, _textPrimary, height: 1.3),
   headlineSmall: _style(24, FontWeight.w700, _textPrimary, height: 1.3),
   titleLarge: _style(22, FontWeight.w600, _textPrimary, height: 1.3),
-  titleMedium: _style(17, FontWeight.w600, _textPrimary, height: 1.35),
-  titleSmall: _style(16, FontWeight.w600, _textPrimary, height: 1.35),
-  bodyLarge: _style(16, FontWeight.w400, _textPrimary, height: 1.4),
-  bodyMedium: _style(14, FontWeight.w500, _textSecondary, height: 1.4),
-  bodySmall: _style(13, FontWeight.w500, _textSecondary, height: 1.4),
-  labelLarge: _style(16, FontWeight.w600, _textPrimary, height: 1.3),
-  labelMedium: _style(14, FontWeight.w600, _textPrimary, height: 1.3),
-  labelSmall: _style(13, FontWeight.w600, _textPrimary, height: 1.3),
+  titleMedium: _style(22, FontWeight.w600, _textPrimary, height: 1.35),
+  titleSmall: _style(22, FontWeight.w600, _textPrimary, height: 1.35),
+  bodyLarge: _style(18, FontWeight.w400, _textPrimary, height: 1.4),
+  bodyMedium: _style(18, FontWeight.w500, _textSecondary, height: 1.4),
+  bodySmall: _style(18, FontWeight.w500, _textSecondary, height: 1.4),
+  labelLarge: _style(18, FontWeight.w600, _textPrimary, height: 1.3),
+  labelMedium: _style(18, FontWeight.w600, _textPrimary, height: 1.3),
+  labelSmall: _style(18, FontWeight.w600, _textPrimary, height: 1.3),
 );
 
 final RoundedRectangleBorder _buttonShape = RoundedRectangleBorder(
@@ -131,7 +131,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     surfaceTintColor: Colors.transparent,
     centerTitle: false,
     toolbarHeight: 56,
-    titleTextStyle: _style(18, FontWeight.w600, _textPrimary),
+    titleTextStyle: _style(22, FontWeight.w600, _textPrimary),
     iconTheme: const IconThemeData(size: 24, color: AppColors.textPrimary),
   ),
 
@@ -147,7 +147,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     labelTextStyle: WidgetStateProperty.resolveWith((states) {
       final selected = states.contains(WidgetState.selected);
       return _style(
-        13,
+        18,
         selected ? FontWeight.w600 : FontWeight.w500,
         selected ? AppColors.primary : AppColors.textSecondary,
       );
@@ -170,7 +170,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
       minimumSize: const Size.fromHeight(56),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       shape: _buttonShape,
-      textStyle: _style(16, FontWeight.w600, Colors.white),
+      textStyle: _style(18, FontWeight.w600, Colors.white),
     ),
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
@@ -182,7 +182,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
       minimumSize: const Size.fromHeight(56),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       shape: _buttonShape,
-      textStyle: _style(16, FontWeight.w600, Colors.white),
+      textStyle: _style(18, FontWeight.w600, Colors.white),
     ),
   ),
   outlinedButtonTheme: OutlinedButtonThemeData(
@@ -193,18 +193,18 @@ final ThemeData seniorFriendlyTheme = ThemeData(
       minimumSize: const Size.fromHeight(56),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       shape: _buttonShape,
-      textStyle: _style(16, FontWeight.w600, AppColors.primary),
+      textStyle: _style(18, FontWeight.w600, AppColors.primary),
     ),
   ),
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
       foregroundColor: AppColors.primary,
-      minimumSize: const Size(48, 48),
-      textStyle: _style(15, FontWeight.w600, AppColors.primary),
+      minimumSize: const Size(48, 56),
+      textStyle: _style(18, FontWeight.w600, AppColors.primary),
     ),
   ),
   iconButtonTheme: IconButtonThemeData(
-    style: IconButton.styleFrom(minimumSize: const Size(48, 48), iconSize: 24),
+    style: IconButton.styleFrom(minimumSize: const Size(48, 56), iconSize: 24),
   ),
   floatingActionButtonTheme: FloatingActionButtonThemeData(
     backgroundColor: AppColors.primary,
@@ -212,7 +212,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     elevation: 2,
     highlightElevation: 4,
     shape: const StadiumBorder(),
-    extendedTextStyle: _style(16, FontWeight.w600, Colors.white),
+    extendedTextStyle: _style(18, FontWeight.w600, Colors.white),
     sizeConstraints: const BoxConstraints.tightFor(width: 56, height: 56),
     extendedSizeConstraints: const BoxConstraints.tightFor(height: 56),
   ),
@@ -229,8 +229,8 @@ final ThemeData seniorFriendlyTheme = ThemeData(
   listTileTheme: ListTileThemeData(
     minVerticalPadding: 10,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    titleTextStyle: _style(16, FontWeight.w600, _textPrimary),
-    subtitleTextStyle: _style(13, FontWeight.w500, _textSecondary),
+    titleTextStyle: _style(22, FontWeight.w600, _textPrimary),
+    subtitleTextStyle: _style(22, FontWeight.w500, _textSecondary),
     iconColor: AppColors.primary,
     minLeadingWidth: 40,
   ),
@@ -243,7 +243,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     shape: const StadiumBorder(),
     labelStyle: TextStyle(
       fontFamily: _fontFamily,
-      fontSize: 15,
+      fontSize: 18,
       fontWeight: FontWeight.w500,
       color: WidgetStateColor.resolveWith(
         (states) => states.contains(WidgetState.selected)
@@ -251,7 +251,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
             : AppColors.textPrimary,
       ),
     ),
-    secondaryLabelStyle: _style(15, FontWeight.w600, Colors.white),
+    secondaryLabelStyle: _style(18, FontWeight.w600, Colors.white),
     checkmarkColor: Colors.white,
     showCheckmark: true,
   ),
@@ -265,25 +265,25 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     focusedBorder: _inputBorder(AppColors.primary, 2),
     errorBorder: _inputBorder(AppColors.danger, 1),
     focusedErrorBorder: _inputBorder(AppColors.danger, 2),
-    labelStyle: _style(15, FontWeight.w500, _textSecondary),
-    hintStyle: _style(15, FontWeight.w500, _textSecondary),
-    floatingLabelStyle: _style(15, FontWeight.w600, AppColors.primary),
+    labelStyle: _style(18, FontWeight.w500, _textSecondary),
+    hintStyle: _style(18, FontWeight.w500, _textSecondary),
+    floatingLabelStyle: _style(18, FontWeight.w600, AppColors.primary),
     prefixIconColor: AppColors.textSecondary,
-    errorStyle: _style(13, FontWeight.w500, AppColors.danger),
+    errorStyle: _style(18, FontWeight.w500, AppColors.danger),
   ),
 
   dialogTheme: DialogThemeData(
     backgroundColor: AppColors.surface,
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    titleTextStyle: _style(18, FontWeight.w600, _textPrimary),
-    contentTextStyle: _style(15, FontWeight.w400, _textPrimary, height: 1.4),
+    titleTextStyle: _style(22, FontWeight.w600, _textPrimary),
+    contentTextStyle: _style(18, FontWeight.w400, _textPrimary, height: 1.4),
   ),
 
   snackBarTheme: SnackBarThemeData(
     behavior: SnackBarBehavior.floating,
     backgroundColor: AppColors.textPrimary,
-    contentTextStyle: _style(15, FontWeight.w500, Colors.white),
+    contentTextStyle: _style(18, FontWeight.w500, Colors.white),
     actionTextColor: const Color(0xFFC7CBFF),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
   ),
@@ -308,10 +308,10 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     color: AppColors.surface,
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    textStyle: _style(15, FontWeight.w500, _textPrimary),
+    textStyle: _style(18, FontWeight.w500, _textPrimary),
   ),
   dropdownMenuTheme: DropdownMenuThemeData(
-    textStyle: _style(15, FontWeight.w500, _textPrimary),
+    textStyle: _style(18, FontWeight.w500, _textPrimary),
   ),
   menuTheme: MenuThemeData(
     style: MenuStyle(

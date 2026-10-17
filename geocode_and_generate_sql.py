@@ -2,12 +2,13 @@
 # (by name, not address — see geocode_via_local_search.py for why) and
 # writes the resulting INSERT statements to supabase/import_gyeongrodang.sql,
 # overwriting the previous (national-dataset-based) version.
+import os
 import time
 import requests
 import pandas as pd
 
-CLIENT_ID = "vhhnls9i8g"
-CLIENT_SECRET = "iis32yS41GgSZg9v3WO04sOxE5EJEZ08H286T3O0"
+CLIENT_ID = os.environ["NAVER_SEARCH_CLIENT_ID"]
+CLIENT_SECRET = os.environ["NAVER_SEARCH_CLIENT_SECRET"]
 URL = "https://naverapihub.apigw.ntruss.com/search/v1/local"
 HEADERS = {"X-NCP-APIGW-API-KEY-ID": CLIENT_ID, "X-NCP-APIGW-API-KEY": CLIENT_SECRET}
 
