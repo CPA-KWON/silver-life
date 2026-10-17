@@ -8,10 +8,10 @@
 - 현재 기준: `fix/integrate-branches-and-security`. main 신고 기능, 지도 안정화, 활동 기능 통합.
 - 최신 실행·SQL·검색 서버·서명 안내는 README.md를 기준으로 합니다.
 - 검색 비밀키는 앱에서 제거했고 Python 도구는 환경 변수를 사용합니다. 과거 노출 키 교체는 별도입니다.
-- `supabase/integration_security.sql`과 검색 서버 함수는 코드만 준비됐으며 운영 적용은 확인 전입니다.
+- 검증 프로젝트에 통합 보안/활동 SQL과 ins 검증 기관 연결 적용 완료(2026-10-17). 검색 함수 코드는 배포했지만 키 저장은 관리자 권한 확인 대기입니다. 다른 프로젝트는 별도로 상태 확인이 필요합니다.
 - 공개 프로필 관계로 닉네임·지역만 공유합니다. 개인 profiles 조회는 본인에게만 허용합니다.
 - 체크인 조회는 facility_presence, 외부 시설 등록은 ensure_facility를 사용합니다.
-- 활동 SQL은 운영에 이미 적용됐는지 확인한 뒤 처리합니다. 중복 실행용이 아닙니다.
+- 활동 기본 SQL은 중복 실행용이 아닙니다. 기관 설정은 tool/prepare_institution_setup.py로 만든 institution_setup.sql, 기존 함수 보완은 activity_usability_fix.sql을 검토합니다.
 
 ## 1. 우리 팀과 작업 방식 (가장 중요)
 

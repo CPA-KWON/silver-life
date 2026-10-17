@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:silver_life/activity/activity_hub_page.dart';
+import 'package:silver_life/activity/activity_map_page.dart';
 import 'package:silver_life/activity/activity_forms.dart';
 import 'package:silver_life/activity/activity_detail_page.dart';
 import 'package:silver_life/activity/activity_agency_page.dart';
@@ -98,16 +99,57 @@ void main() {
     await tap(t, find.text('활동 신청'));
     await tap(t, find.text('확인'));
     expect(r.applyCalls, 1);
+    await t.scrollUntilVisible(
+      find.textContaining('승인 대기'),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.textContaining('승인 대기'), findsOneWidget);
     await tap(t, find.text('신청 취소'));
     await tap(t, find.text('확인'));
     expect(r.cancelCalls, 1);
     await finish(t);
   });
+  testWidgets(
+    'program map opens stored coordinates and returns to same detail',
+    (t) async {
+      final r = FakeActivityRepository();
+      await mount(
+        t,
+        ActivityDetailPage(
+          programId: 'program',
+          repository: r,
+          mapPlaceholder: const Center(child: Text('지도 검증 영역')),
+        ),
+      );
+      await tap(t, find.text('지도에서 보기'));
+      final page = t.widget<ActivityMapPage>(find.byType(ActivityMapPage));
+      expect(page.program['lat'], 37.5666);
+      expect(page.program['lng'], 126.979);
+      expect(find.text('활동 장소 지도'), findsOneWidget);
+      await tap(t, find.text('활동 상세로 돌아가기'));
+      expect(find.text('활동 안내'), findsOneWidget);
+      expect(r.applyCalls, 0);
+      await finish(t);
+    },
+  );
+  testWidgets('invalid coordinates cannot open a misleading map', (t) async {
+    final r = FakeActivityRepository();
+    r.programs.first['lat'] = 100;
+    await mount(t, ActivityDetailPage(programId: 'program', repository: r));
+    final button = find.widgetWithText(OutlinedButton, '지도에서 보기');
+    expect(t.widget<OutlinedButton>(button).onPressed, isNull);
+    await finish(t);
+  });
   testWidgets('full and closed activity cannot submit', (t) async {
     final r = FakeActivityRepository();
     r.programs.first['enrolled'] = 10;
     await mount(t, ActivityDetailPage(programId: 'program', repository: r));
+    await t.scrollUntilVisible(
+      find.text('정원이 모두 찼어요.'),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('정원이 모두 찼어요.'), findsOneWidget);
     await t.scrollUntilVisible(
       find.widgetWithText(FilledButton, '활동 신청'),
@@ -122,6 +164,11 @@ void main() {
     );
     r.programs.first['status'] = 'closed';
     await mount(t, ActivityDetailPage(programId: 'program', repository: r));
+    await t.scrollUntilVisible(
+      find.text('모집이 마감된 활동이에요.'),
+      180,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('모집이 마감된 활동이에요.'), findsOneWidget);
     await finish(t);
   });

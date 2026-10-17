@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:silver_life/auth/login_page.dart';
+import 'package:silver_life/auth/auth_gate.dart';
 import 'package:silver_life/auth/signup_page.dart';
 import 'package:silver_life/home/main_shell.dart';
 import 'package:silver_life/profile/account_settings_page.dart';
@@ -230,6 +231,32 @@ void main() {
     expect(Supabase.instance.client.auth.currentUser, isNull);
     await finish(t);
   });
+  testWidgets(
+    'signout clears pushed private routes and back cannot reveal them',
+    (t) async {
+      await mount(
+        t,
+        AuthGate(
+          signedInPage: MainShell(nearbyLoader: ({force = false}) async => []),
+        ),
+      );
+      await tap(t, find.text('내 정보'));
+      await tap(t, find.text('회원정보 관리'));
+      expect(find.byType(AccountSettingsPage), findsOneWidget);
+      await tap(t, find.widgetWithText(OutlinedButton, '로그아웃'));
+      await tap(t, find.widgetWithText(TextButton, '로그아웃'));
+      expect(find.byType(LoginPage), findsOneWidget);
+      expect(find.byType(AccountSettingsPage), findsNothing);
+      expect(find.byType(MainShell), findsNothing);
+      final navigator = t.state<NavigatorState>(find.byType(Navigator).last);
+      expect(navigator.canPop(), false);
+      await backend.signIn();
+      await t.pumpAndSettle();
+      expect(find.byType(MainShell), findsOneWidget);
+      expect(find.byType(AccountSettingsPage), findsNothing);
+      await finish(t);
+    },
+  );
   testWidgets('five navigation destinations and profile menus open', (t) async {
     await mount(
       t,

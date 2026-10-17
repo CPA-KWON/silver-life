@@ -141,6 +141,9 @@ class _ActivityAgencyPageState extends State<ActivityAgencyPage> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         Text(
+                          '신청자: ${e['applicant']?['nickname'] ?? '닉네임 정보 없음'}',
+                        ),
+                        Text(
                           '신청번호 ${e['id']}\n${activityStatuses[e['status']]} · ${activityMoney(e['final_fee'])}',
                         ),
                         if (e['experience_snapshot'] != null) ...[

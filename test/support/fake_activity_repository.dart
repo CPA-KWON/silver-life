@@ -12,6 +12,8 @@ class FakeActivityRepository extends ActivityRepository {
       'category': activityCategories.first,
       'kind': 'activity',
       'place_name': '동네 공원',
+      'lat': 37.5666,
+      'lng': 126.979,
       'fee': 5001,
       'capacity': 10,
       'enrolled': 0,

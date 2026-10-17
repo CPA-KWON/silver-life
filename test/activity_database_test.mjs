@@ -11,6 +11,7 @@ async function as(id,fn){await db.exec(`reset role;set role authenticated;set re
 async function test(name,fn){await fn();count++;console.log(`PASS ${name}`);}
 async function denied(fn){let rejected=false;try{await fn();}catch{rejected=true;}assert(rejected,'expected database to reject operation');}
 await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users values('${user}'),('${manager}'),('${other}');`);
+await db.exec('create table public.profiles(id uuid primary key references auth.users,nickname text);');
 await db.exec(await readFile(new URL('../supabase/activity_expansion.sql',import.meta.url),'utf8'));
 await db.exec(`insert into activity_organizations values('${org}','지역 복지관',true);insert into activity_org_members values('${org}','${manager}');
 insert into activity_preferences values('${user}','익숙한 동네',37.5,127,3,array['건강·운동'],'도보','무관',120,2,true);

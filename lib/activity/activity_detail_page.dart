@@ -4,15 +4,18 @@ import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
 import 'activity_forms.dart';
+import 'activity_map_page.dart';
 
 class ActivityDetailPage extends StatefulWidget {
   const ActivityDetailPage({
     super.key,
     required this.programId,
     this.repository,
+    this.mapPlaceholder,
   });
   final String programId;
   final ActivityRepository? repository;
+  final Widget? mapPlaceholder;
   @override
   State<ActivityDetailPage> createState() => _ActivityDetailPageState();
 }
@@ -134,6 +137,22 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
                     Text(
                       '${p['place_name']}\n${activityDate(p['starts_at'])} ~ ${activityDate(p['ends_at'])}\n모집 마감 ${activityDate(p['deadline'])}',
                     ),
+                    OutlinedButton.icon(
+                      onPressed: ActivityMapPage.hasCoordinates(p)
+                          ? () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ActivityMapPage(
+                                  program: p,
+                                  mapPlaceholder: widget.mapPlaceholder,
+                                ),
+                              ),
+                            )
+                          : null,
+                      icon: const Icon(Icons.map_outlined),
+                      label: const Text('지도에서 보기'),
+                    ),
+                    const Text('기준 장소와의 거리는 직선거리예요. 실제 이동 경로와 시간은 달라질 수 있어요.'),
                     const SizedBox(height: 12),
                     Text(p['description']),
                     const SizedBox(height: 12),

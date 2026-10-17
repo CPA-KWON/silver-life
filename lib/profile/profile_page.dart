@@ -134,12 +134,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       title: '회원정보 관리',
                       subtitle: '닉네임, 거주 지역 수정 및 로그아웃',
                       onTap: () async {
+                        final userId =
+                            Supabase.instance.client.auth.currentUser?.id;
                         await Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const AccountSettingsPage(),
                           ),
                         );
-                        if (!mounted) return;
+                        if (!mounted ||
+                            userId == null ||
+                            Supabase.instance.client.auth.currentUser?.id !=
+                                userId) {
+                          return;
+                        }
                         setState(() {
                           _profileFuture = _loadProfile();
                         });
