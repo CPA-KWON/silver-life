@@ -6,9 +6,12 @@ import '../facility/facility_search_page.dart';
 import '../meetup/meetup_page.dart';
 import '../profile/profile_page.dart';
 import 'home_tab.dart';
+import 'nearby_facilities.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  const MainShell({super.key, this.facilityPage, this.nearbyLoader});
+  final Widget? facilityPage;
+  final NearbyLoader? nearbyLoader;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -21,10 +24,11 @@ class _MainShellState extends State<MainShell> {
     switch (_index) {
       case 0:
         return HomeTab(
+          nearbyLoader: widget.nearbyLoader,
           onNavigate: (int index) => setState(() => _index = index),
         );
       case 1:
-        return const FacilitySearchPage();
+        return widget.facilityPage ?? const FacilitySearchPage();
       case 2:
         return const MeetupPage();
       case 3:

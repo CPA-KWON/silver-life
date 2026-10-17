@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import '../core/phone_call.dart';
+import '../community/new_post_page.dart';
+import '../meetup/new_meetup_page.dart';
+import '../core/meetup_category.dart';
 
 import '../app_theme.dart';
 import '../community/post_detail_page.dart';
@@ -15,7 +21,13 @@ const kFacilityCategories = ['병원', '약국', '경로당', '복지관'];
 const kHospitalSubcategories = ['내과', '정형외과', '안과', '치과', '이비인후과', '피부과'];
 
 class FacilitySearchPage extends StatefulWidget {
-  const FacilitySearchPage({super.key, this.onPicked, this.initialFacility});
+  const FacilitySearchPage({
+    super.key,
+    this.onPicked,
+    this.initialFacility,
+    this.mapPlaceholder,
+    this.enableRealtime = true,
+  });
 
   /// When set, tapping a marker calls this with the picked facility instead
   /// of opening the detail sheet — used by the "장소 선택" flow for meetup
@@ -26,6 +38,8 @@ class FacilitySearchPage extends StatefulWidget {
   /// used when arriving here from outside the map (e.g. tapping a favorite
   /// on the home tab) instead of by tapping a marker.
   final FacilityResult? initialFacility;
+  final Widget? mapPlaceholder;
+  final bool enableRealtime;
 
   @override
   State<FacilitySearchPage> createState() => _FacilitySearchPageState();
@@ -52,8 +66,75 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   // see _openFacilityDetail for why.
   late FacilityResult? _selectedFacility = widget.initialFacility;
 
+  String? _postId;
+  Widget? _editor;
+  Completer<bool?>? _editResult;
+  Completer<FacilityResult?>? _placeResult;
+  int _detailVersion = 0;
+  void _finishEditor(bool changed) {
+    final result = _editResult;
+    setState(() {
+      _editor = null;
+      _editResult = null;
+    });
+    if (result != null && !result.isCompleted) result.complete(changed);
+  }
+
+  Future<bool?> _editInPlace(Map<String, dynamic> post) {
+    final result = Completer<bool?>();
+    final data = {...post, 'facility': post['facilities']};
+    setState(() {
+      _editResult = result;
+      _editor = post['category'] == kMeetupCategory
+          ? NewMeetupPage(
+              existingPost: data,
+              onFinished: _finishEditor,
+              facilityPicker: _pickInPlace,
+            )
+          : NewPostPage(existingPost: data, onFinished: _finishEditor);
+    });
+    return result.future;
+  }
+
+  Future<FacilityResult?> _pickInPlace() {
+    final result = Completer<FacilityResult?>();
+    setState(() {
+      _placeResult = result;
+    });
+    return result.future;
+  }
+
+  void _pickedInPlace(FacilityResult? place) {
+    final result = _placeResult;
+    setState(() {
+      _placeResult = null;
+    });
+    if (result != null && !result.isCompleted) result.complete(place);
+  }
+
+  void _backInPlace() {
+    if (_placeResult != null) {
+      _pickedInPlace(null);
+    } else if (_editor != null) {
+      _finishEditor(false);
+    } else if (_postId != null) {
+      setState(() {
+        _postId = null;
+        _detailVersion++;
+      });
+    } else {
+      _closeFacilityDetail();
+    }
+  }
+
   @override
   void dispose() {
+    if (_editResult != null && !_editResult!.isCompleted) {
+      _editResult!.complete(null);
+    }
+    if (_placeResult != null && !_placeResult!.isCompleted) {
+      _placeResult!.complete(null);
+    }
     _searchController.dispose();
     super.dispose();
   }
@@ -104,6 +185,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
     final controller = _controller;
     if (controller == null) return;
     final position = await controller.getCameraPosition();
+    if (!mounted || _controller != controller) return;
     await _search(
       searchTerm,
       position.target.latitude,
@@ -130,15 +212,19 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
               lng: lng,
             );
 
+      if (!mounted || _controller != controller) return;
       await controller.clearOverlays(type: NOverlayType.marker);
       for (final result in results) {
+        if (!mounted || _controller != controller) return;
         final marker = NMarker(
           id: '${result.lat},${result.lng},${result.name}',
           position: NLatLng(result.lat, result.lng),
           caption: NOverlayCaption(text: result.name),
         );
         marker.setOnTapListener(
-          (_) => widget.onPicked != null
+          (_) => _placeResult != null
+              ? _pickedInPlace(result)
+              : widget.onPicked != null
               ? widget.onPicked!(result)
               : _openFacilityDetail(result),
         );
@@ -200,107 +286,151 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
     // is open so it closes the overlay instead of popping this whole page
     // (there is no separate route to pop back out of any more).
     return PopScope(
-      canPop: _selectedFacility == null,
+      canPop:
+          _selectedFacility == null &&
+          _postId == null &&
+          _editor == null &&
+          _placeResult == null,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _selectedFacility != null) _closeFacilityDetail();
+        if (!didPop) _backInPlace();
       },
       child: Stack(
-      children: [
-        NaverMap(
-          options: const NaverMapViewOptions(
-            initialCameraPosition: NCameraPosition(
-              target: _seoulCityHall,
-              zoom: 14,
-            ),
-            locationButtonEnable: true,
-          ),
-          onMapReady: (controller) async {
-            _controller = controller;
-            // Set before any tracking starts so the built-in location
-            // button goes through it too (see _SafeLocationTracker).
-            controller.setMyLocationTracker(_SafeLocationTracker());
-            final status = await Permission.location.request();
-            // The page may have been left while the permission prompt was
-            // up, in which case the controller is already disposed.
-            if (!mounted) return;
-            if (status.isGranted) {
-              controller.setLocationTrackingMode(NLocationTrackingMode.follow);
-            }
-          },
-          onCameraChange: (reason, animated) {
-            final userMoved =
-                reason == NCameraUpdateReason.gesture ||
-                reason == NCameraUpdateReason.control;
-            if (userMoved && _activeSearchTerm != null && !_showSearchHereButton) {
-              setState(() => _showSearchHereButton = true);
-            }
-          },
-        ),
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SearchField(
-                controller: _searchController,
-                isSearching: _isSearching,
-                onSubmitted: _submitTextSearch,
+        fit: StackFit.expand,
+        children: [
+          widget.mapPlaceholder ??
+              NaverMap(
+                options: const NaverMapViewOptions(
+                  initialCameraPosition: NCameraPosition(
+                    target: _seoulCityHall,
+                    zoom: 14,
+                  ),
+                  locationButtonEnable: true,
+                ),
+                onMapReady: (controller) async {
+                  _controller = controller;
+                  // Set before any tracking starts so the built-in location
+                  // button goes through it too (see _SafeLocationTracker).
+                  controller.setMyLocationTracker(_SafeLocationTracker());
+                  final status = await Permission.location.request();
+                  // The page may have been left while the permission prompt was
+                  // up, in which case the controller is already disposed.
+                  if (!mounted) return;
+                  if (status.isGranted) {
+                    controller.setLocationTrackingMode(
+                      NLocationTrackingMode.follow,
+                    );
+                  }
+                },
+                onCameraChange: (reason, animated) {
+                  final userMoved =
+                      reason == NCameraUpdateReason.gesture ||
+                      reason == NCameraUpdateReason.control;
+                  if (userMoved &&
+                      _activeSearchTerm != null &&
+                      !_showSearchHereButton) {
+                    setState(() => _showSearchHereButton = true);
+                  }
+                },
               ),
-              const SizedBox(height: 10),
-              _CategoryBar(
-                selected: _category,
-                isSearching: _isSearching,
-                onSelected: _selectCategory,
-              ),
-              if (_category == '병원') ...[
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SearchField(
+                  controller: _searchController,
+                  isSearching: _isSearching,
+                  onSubmitted: _submitTextSearch,
+                ),
                 const SizedBox(height: 10),
                 _CategoryBar(
-                  categories: kHospitalSubcategories,
-                  selected: _subcategory,
+                  selected: _category,
                   isSearching: _isSearching,
-                  onSelected: _selectSubcategory,
+                  onSelected: _selectCategory,
                 ),
-              ],
-              if (widget.onPicked != null) ...[
-                const SizedBox(height: 10),
-                Material(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: _floatShadow,
-                    ),
-                    padding: const EdgeInsets.all(14),
-                    child: Text(
-                      '검색 후 지도에서 장소를 선택해주세요.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                if (_category == '병원') ...[
+                  const SizedBox(height: 10),
+                  _CategoryBar(
+                    categories: kHospitalSubcategories,
+                    selected: _subcategory,
+                    isSearching: _isSearching,
+                    onSelected: _selectSubcategory,
+                  ),
+                ],
+                if (widget.onPicked != null) ...[
+                  const SizedBox(height: 10),
+                  Material(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: _floatShadow,
+                      ),
+                      padding: const EdgeInsets.all(14),
+                      child: Text(
+                        '검색 후 지도에서 장소를 선택해주세요.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
-                ),
-              ],
-              if (_showSearchHereButton) ...[
-                const SizedBox(height: 10),
-                Center(
-                  child: _SearchHereButton(
-                    onPressed: _isSearching ? null : _searchHere,
+                ],
+                if (_showSearchHereButton) ...[
+                  const SizedBox(height: 10),
+                  Center(
+                    child: _SearchHereButton(
+                      onPressed: _isSearching ? null : _searchHere,
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-        ),
-        if (_selectedFacility != null)
-          Positioned.fill(
-            child: FacilityDetailPage(
-              result: _selectedFacility!,
-              onClose: _closeFacilityDetail,
             ),
           ),
+          if (_selectedFacility != null)
+            Positioned.fill(
+              child: Offstage(
+                offstage:
+                    _postId != null || _editor != null || _placeResult != null,
+                child: FacilityDetailPage(
+                  result: _selectedFacility!,
+                  onClose: _closeFacilityDetail,
+                  onOpenPost: (id) => setState(() {
+                    _postId = id;
+                  }),
+                  enableRealtime: widget.enableRealtime,
+                  refreshVersion: _detailVersion,
+                ),
+              ),
+            ),
+          if (_postId != null)
+            Positioned.fill(
+              child: Offstage(
+                offstage: _editor != null || _placeResult != null,
+                child: PostDetailPage(
+                  postId: _postId!,
+                  onClose: _backInPlace,
+                  onEdit: _editInPlace,
+                ),
+              ),
+            ),
+          if (_editor != null)
+            Positioned.fill(
+              child: Offstage(offstage: _placeResult != null, child: _editor!),
+            ),
+          if (_placeResult != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 24,
+              child: FilledButton(
+                onPressed: () => _pickedInPlace(null),
+                child: const Text('장소 선택 취소'),
+              ),
+            ),
         ],
       ),
     );
@@ -324,9 +454,19 @@ class FacilityPickerPage extends StatelessWidget {
 }
 
 class FacilityDetailPage extends StatefulWidget {
-  const FacilityDetailPage({super.key, required this.result, required this.onClose});
+  const FacilityDetailPage({
+    super.key,
+    required this.result,
+    required this.onClose,
+    this.onOpenPost,
+    this.enableRealtime = true,
+    this.refreshVersion = 0,
+  });
 
   final FacilityResult result;
+  final ValueChanged<String>? onOpenPost;
+  final bool enableRealtime;
+  final int refreshVersion;
 
   /// Called instead of a Navigator pop — this page is shown as an in-place
   /// overlay over [FacilitySearchPage], not a pushed route (see
@@ -350,15 +490,48 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   RealtimeChannel? _checkinChannel;
   List<Map<String, dynamic>>? _upcomingMeetups;
 
+  String? _loadError;
+  Timer? _expiryTimer;
+  Future<void> _loadDetails() async {
+    if (mounted) {
+      setState(() {
+        _loadError = null;
+      });
+    }
+    try {
+      await Future.wait([_loadFavoriteStatus(), _initCheckins()]);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loadError = '시설 정보를 불러오지 못했어요.';
+        });
+      }
+    }
+  }
+
+  void _safeRefresh() {
+    _refreshCheckinState().catchError((Object _) {});
+  }
+
+  @override
+  void didUpdateWidget(covariant FacilityDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshVersion != widget.refreshVersion) _loadDetails();
+  }
+
   @override
   void initState() {
     super.initState();
-    _loadFavoriteStatus();
-    _initCheckins();
+    _loadDetails();
+    _expiryTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _safeRefresh(),
+    );
   }
 
   @override
   void dispose() {
+    _expiryTimer?.cancel();
     final channel = _checkinChannel;
     if (channel != null) Supabase.instance.client.removeChannel(channel);
     super.dispose();
@@ -395,6 +568,10 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     await _refreshCheckinState();
     await _loadUpcomingMeetups(facilityId);
 
+    if (!mounted || !widget.enableRealtime) return;
+    final old = _checkinChannel;
+    if (old != null) await client.removeChannel(old);
+    if (!mounted) return;
     _checkinChannel = client
         .channel('checkins_$facilityId')
         .onPostgresChanges(
@@ -406,7 +583,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
             column: 'facility_id',
             value: facilityId,
           ),
-          callback: (_) => _refreshCheckinState(),
+          callback: (_) => _safeRefresh(),
         )
         .subscribe();
   }
@@ -455,7 +632,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
 
   Future<void> _toggleCheckin() async {
     final facilityId = _facilityId;
-    if (facilityId == null) return;
+    if (facilityId == null || _checkedIn == null || _isCheckingInOut) return;
 
     setState(() => _isCheckingInOut = true);
     try {
@@ -498,6 +675,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   }
 
   Future<void> _toggleFavorite() async {
+    if (_isToggling || _isFavorite == null) return;
     setState(() => _isToggling = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
@@ -561,6 +739,18 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_loadError != null)
+              SectionCard(
+                child: Column(
+                  children: [
+                    Text(_loadError!),
+                    TextButton(
+                      onPressed: _loadDetails,
+                      child: const Text('다시 시도'),
+                    ),
+                  ],
+                ),
+              ),
             SectionCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -571,10 +761,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  _InfoRow(
-                    icon: Icons.place_outlined,
-                    text: result.address,
-                  ),
+                  _InfoRow(icon: Icons.place_outlined, text: result.address),
                   const SizedBox(height: 10),
                   _InfoRow(
                     icon: Icons.directions_walk,
@@ -584,8 +771,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                   if (result.telephone.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: () =>
-                          launchUrl(Uri.parse('tel:${result.telephone}')),
+                      onPressed: () => callFacility(context, result.telephone),
                       icon: const Icon(Icons.call),
                       label: Text('${result.telephone} 전화 걸기'),
                     ),
@@ -596,7 +782,10 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
             const SizedBox(height: 12),
             SectionCard(
               padding: const EdgeInsets.all(20),
-              child: Row(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   OutlinedButton.icon(
                     // Overrides the app theme's OutlinedButton default of
@@ -606,8 +795,13 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     // unbounded maxWidth, so an infinite minWidth survives
                     // BoxConstraints.enforce() unclamped and crashes layout
                     // ("BoxConstraints forces an infinite width").
-                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                    onPressed: _facilityId == null || _isCheckingInOut
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
+                    onPressed:
+                        _facilityId == null ||
+                            _checkedIn == null ||
+                            _isCheckingInOut
                         ? null
                         : _toggleCheckin,
                     icon: Icon(
@@ -617,13 +811,10 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     ),
                     label: Text(_checkedIn == true ? '나 여기 있음 취소' : '나 여기 있음'),
                   ),
-                  const SizedBox(width: 12),
                   if (_checkinCount != null)
-                    Flexible(
-                      child: Text(
-                        '현재 $_checkinCount명 있음',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                    Text(
+                      '현재 $_checkinCount명 있음',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                 ],
               ),
@@ -657,12 +848,15 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                           Icons.chevron_right,
                           color: AppColors.textTertiary,
                         ),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PostDetailPage(postId: meetup['id'] as String),
-                          ),
-                        ),
+                        onTap: () => widget.onOpenPost != null
+                            ? widget.onOpenPost!(meetup['id'] as String)
+                            : Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => PostDetailPage(
+                                    postId: meetup['id'] as String,
+                                  ),
+                                ),
+                              ),
                       ),
                   ],
                 ),
@@ -786,7 +980,10 @@ class _SearchField extends StatelessWidget {
               fontWeight: FontWeight.w500,
               color: AppColors.textTertiary,
             ),
-            prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: AppColors.textSecondary,
+            ),
             suffixIcon: Padding(
               padding: const EdgeInsets.all(6),
               child: Material(

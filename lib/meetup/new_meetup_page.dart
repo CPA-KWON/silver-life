@@ -9,13 +9,20 @@ import '../ui/design_widgets.dart';
 import '../app_theme.dart';
 
 class NewMeetupPage extends StatefulWidget {
-  const NewMeetupPage({super.key, this.existingPost});
+  const NewMeetupPage({
+    super.key,
+    this.existingPost,
+    this.onFinished,
+    this.facilityPicker,
+  });
 
   /// When set (id, title, content, event_at, facility), the page edits that
   /// meetup (UPDATE) instead of creating a new one (INSERT). `facility` is
   /// a map with id/name/address/lat/lng/category/telephone, used to
   /// pre-fill the facility picker without a redundant lookup.
   final Map<String, dynamic>? existingPost;
+  final ValueChanged<bool>? onFinished;
+  final Future<FacilityResult?> Function()? facilityPicker;
 
   @override
   State<NewMeetupPage> createState() => _NewMeetupPageState();
@@ -32,9 +39,18 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   bool _isSaving = false;
 
   late DateTime? _eventDate = _initialEventAt?.toLocal();
-  late TimeOfDay? _eventTime =
-      _initialEventAt == null ? null : TimeOfDay.fromDateTime(_initialEventAt!.toLocal());
+  late TimeOfDay? _eventTime = _initialEventAt == null
+      ? null
+      : TimeOfDay.fromDateTime(_initialEventAt!.toLocal());
   late FacilityResult? _eventFacility = _initialFacility;
+
+  void _finish(bool changed) {
+    if (widget.onFinished != null) {
+      widget.onFinished!(changed);
+    } else {
+      Navigator.of(context).pop(changed);
+    }
+  }
 
   bool get _isEditing => widget.existingPost != null;
 
@@ -69,11 +85,13 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _eventDate ?? now,
+      initialDate: _eventDate != null && _eventDate!.isAfter(now)
+          ? _eventDate!
+          : now,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
     );
-    if (picked != null) setState(() => _eventDate = picked);
+    if (mounted && picked != null) setState(() => _eventDate = picked);
   }
 
   Future<void> _pickTime() async {
@@ -81,33 +99,50 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
       context: context,
       initialTime: _eventTime ?? TimeOfDay.now(),
     );
-    if (picked != null) setState(() => _eventTime = picked);
+    if (mounted && picked != null) setState(() => _eventTime = picked);
   }
 
   Future<void> _pickFacility() async {
     // No transition animation: FacilityPickerPage contains a NaverMap
     // (native PlatformView), and animating it in/out during a route
     // transition is known to corrupt Flutter's render tree.
-    final picked = await Navigator.of(context).push<FacilityResult>(
-      PageRouteBuilder<FacilityResult>(
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const FacilityPickerPage(),
-      ),
-    );
-    if (picked != null) setState(() => _eventFacility = picked);
+    final picked = widget.facilityPicker != null
+        ? await widget.facilityPicker!()
+        : await Navigator.of(context).push<FacilityResult>(
+            PageRouteBuilder<FacilityResult>(
+              transitionDuration: Duration.zero,
+              reverseTransitionDuration: Duration.zero,
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const FacilityPickerPage(),
+            ),
+          );
+    if (mounted && picked != null) setState(() => _eventFacility = picked);
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isSaving || !_formKey.currentState!.validate()) return;
     if (_eventDate == null || _eventTime == null || _eventFacility == null) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('모임 날짜·시간·장소를 모두 선택해주세요.')));
+        ..showSnackBar(
+          const SnackBar(content: Text('모임 날짜·시간·장소를 모두 선택해주세요.')),
+        );
       return;
     }
 
+    final selected = DateTime(
+      _eventDate!.year,
+      _eventDate!.month,
+      _eventDate!.day,
+      _eventTime!.hour,
+      _eventTime!.minute,
+    );
+    if (selected.isBefore(DateTime.now()) &&
+        (!_isEditing || selected.toUtc() != _initialEventAt!.toUtc())) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('미래의 모임 시간을 선택해주세요.')));
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       final client = Supabase.instance.client;
@@ -145,7 +180,13 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
       // serializing so Postgres (which assumes UTC for an offset-less
       // string) stores the instant the user actually picked, not that
       // wall-clock time relabeled as UTC.
-      final eventAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      final eventAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
 
       final data = {
         'category': kMeetupCategory,
@@ -155,11 +196,14 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
         'facility_id': facilityId,
       };
       if (_isEditing) {
-        await client.from('posts').update(data).eq('id', widget.existingPost!['id'] as String);
+        await client
+            .from('posts')
+            .update(data)
+            .eq('id', widget.existingPost!['id'] as String);
       } else {
         await client.from('posts').insert({...data, 'author_id': userId});
       }
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) _finish(true);
     } catch (e) {
       if (mounted) {
         final action = _isEditing ? '수정' : '등록';
@@ -175,7 +219,10 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? '모임 수정' : '모임 만들기')),
+      appBar: AppBar(
+        leading: BackButton(onPressed: () => _finish(false)),
+        title: Text(_isEditing ? '모임 수정' : '모임 만들기'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -196,7 +243,9 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
               _PickerRow(
                 icon: Icons.access_time,
                 label: '시간',
-                value: _eventTime == null ? '시간 선택' : _eventTime!.format(context),
+                value: _eventTime == null
+                    ? '시간 선택'
+                    : _eventTime!.format(context),
                 hasValue: _eventTime != null,
                 onTap: _pickTime,
               ),
@@ -218,7 +267,9 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
                       controller: _titleController,
                       decoration: const InputDecoration(labelText: '모임 제목'),
                       validator: (value) =>
-                          (value == null || value.trim().isEmpty) ? '제목을 입력해주세요' : null,
+                          (value == null || value.trim().isEmpty)
+                          ? '제목을 입력해주세요'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -226,7 +277,9 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
                       decoration: const InputDecoration(labelText: '내용'),
                       maxLines: 8,
                       validator: (value) =>
-                          (value == null || value.trim().isEmpty) ? '내용을 입력해주세요' : null,
+                          (value == null || value.trim().isEmpty)
+                          ? '내용을 입력해주세요'
+                          : null,
                     ),
                   ],
                 ),

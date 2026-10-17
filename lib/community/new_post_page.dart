@@ -5,11 +5,12 @@ import '../ui/design_widgets.dart';
 import 'community_page.dart' show kPostCategories;
 
 class NewPostPage extends StatefulWidget {
-  const NewPostPage({super.key, this.existingPost});
+  const NewPostPage({super.key, this.existingPost, this.onFinished});
 
   /// When set (id, category, title, content), the page edits that post
   /// (UPDATE) instead of creating a new one (INSERT).
   final Map<String, dynamic>? existingPost;
+  final ValueChanged<bool>? onFinished;
 
   @override
   State<NewPostPage> createState() => _NewPostPageState();
@@ -27,6 +28,14 @@ class _NewPostPageState extends State<NewPostPage> {
       widget.existingPost?['category'] as String? ?? kPostCategories.first;
   bool _isSaving = false;
 
+  void _finish(bool changed) {
+    if (widget.onFinished != null) {
+      widget.onFinished!(changed);
+    } else {
+      Navigator.of(context).pop(changed);
+    }
+  }
+
   bool get _isEditing => widget.existingPost != null;
 
   @override
@@ -37,7 +46,7 @@ class _NewPostPageState extends State<NewPostPage> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isSaving || !_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
     try {
@@ -49,12 +58,15 @@ class _NewPostPageState extends State<NewPostPage> {
       };
 
       if (_isEditing) {
-        await client.from('posts').update(data).eq('id', widget.existingPost!['id'] as String);
+        await client
+            .from('posts')
+            .update(data)
+            .eq('id', widget.existingPost!['id'] as String);
       } else {
         final userId = client.auth.currentUser!.id;
         await client.from('posts').insert({...data, 'author_id': userId});
       }
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) _finish(true);
     } catch (e) {
       if (mounted) {
         final action = _isEditing ? '수정' : '등록';
@@ -70,7 +82,10 @@ class _NewPostPageState extends State<NewPostPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? '글 수정' : '글쓰기')),
+      appBar: AppBar(
+        leading: BackButton(onPressed: () => _finish(false)),
+        title: Text(_isEditing ? '글 수정' : '글쓰기'),
+      ),
       // Scrollable so the form doesn't overflow when the keyboard opens
       // and shrinks the available height (title/content have multiple
       // fields plus an 8-line content box).
@@ -86,36 +101,37 @@ class _NewPostPageState extends State<NewPostPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-              DropdownButtonFormField<String>(
-                initialValue: _category,
-                decoration: const InputDecoration(
-                  labelText: '카테고리',
-                ),
-                items: [
-                  for (final category in kPostCategories)
-                    DropdownMenuItem(value: category, child: Text(category)),
-                ],
-                onChanged: (value) => setState(() => _category = value!),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: '제목',
-                ),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? '제목을 입력해주세요' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _contentController,
-                decoration: const InputDecoration(
-                  labelText: '내용',
-                ),
-                maxLines: 8,
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? '내용을 입력해주세요' : null,
-              ),
+                    DropdownButtonFormField<String>(
+                      initialValue: _category,
+                      decoration: const InputDecoration(labelText: '카테고리'),
+                      items: [
+                        for (final category in kPostCategories)
+                          DropdownMenuItem(
+                            value: category,
+                            child: Text(category),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() => _category = value!),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(labelText: '제목'),
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                          ? '제목을 입력해주세요'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _contentController,
+                      decoration: const InputDecoration(labelText: '내용'),
+                      maxLines: 8,
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                          ? '내용을 입력해주세요'
+                          : null,
+                    ),
                   ],
                 ),
               ),

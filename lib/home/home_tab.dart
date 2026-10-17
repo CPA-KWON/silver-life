@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import '../core/phone_call.dart';
+import '../activity/activity_widgets.dart';
 
 import '../app_theme.dart';
 import '../community/post_detail_page.dart';
@@ -14,9 +16,10 @@ import '../ui/design_widgets.dart';
 import 'nearby_facilities.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key, this.onNavigate});
+  const HomeTab({super.key, this.onNavigate, this.nearbyLoader});
 
   final ValueChanged<int>? onNavigate;
+  final NearbyLoader? nearbyLoader;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -24,6 +27,7 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   late Future<_HomeData> _dataFuture;
+  int _nearbyVersion = 0;
 
   @override
   void initState() {
@@ -41,40 +45,66 @@ class _HomeTabState extends State<HomeTab> {
         .eq('id', userId)
         .single();
 
-    final recentPosts = await client
-        .from('posts')
-        .select(
-          'id, title, category, created_at, comments(count), profiles(nickname)',
-        )
-        .neq('category', kMeetupCategory)
-        .order('created_at', ascending: false)
-        .limit(3);
+    final failed = <String>[];
+    Future<List<Map<String, dynamic>>> guarded(
+      String name,
+      Future<List<Map<String, dynamic>>> Function() fetch,
+    ) async {
+      try {
+        return await fetch();
+      } catch (_) {
+        failed.add(name);
+        return [];
+      }
+    }
 
-    // Home only ever shows the tightest scope (own 시/군/구) — the Meetup
-    // tab has the 전체/시도/시군구 toggle for anything broader. Filtered by
-    // where the meetup actually is (facilities.region_*), not where the
-    // poster lives.
-    final upcomingMeetups = await client
-        .from('posts')
-        .select(
-          'id, title, event_at, facilities!inner(name, region_sido, region_sigungu)',
-        )
-        .eq('category', kMeetupCategory)
-        .eq('facilities.region_sido', profile['region_sido'] as String)
-        .eq('facilities.region_sigungu', profile['region_sigungu'] as String)
-        .gte('event_at', DateTime.now().toUtc().toIso8601String())
-        .order('event_at')
-        .limit(2);
-
-    final favorites = await client
-        .from('favorites')
-        .select('id, name, address, telephone, lat, lng, category')
-        .eq('user_id', userId)
-        .order('created_at', ascending: false)
-        .limit(3);
+    final recentPosts = await guarded(
+      '최근 커뮤니티 글',
+      () async => List<Map<String, dynamic>>.from(
+        await client
+            .from('posts')
+            .select(
+              'id, title, category, created_at, comments(count), profiles(nickname)',
+            )
+            .neq('category', kMeetupCategory)
+            .order('created_at', ascending: false)
+            .limit(3),
+      ),
+    );
+    final upcomingMeetups = await guarded(
+      '다가오는 모임',
+      () async => List<Map<String, dynamic>>.from(
+        await client
+            .from('posts')
+            .select(
+              'id, title, event_at, facilities!inner(name, region_sido, region_sigungu)',
+            )
+            .eq('category', kMeetupCategory)
+            .eq('facilities.region_sido', profile['region_sido'] as String)
+            .eq(
+              'facilities.region_sigungu',
+              profile['region_sigungu'] as String,
+            )
+            .gte('event_at', DateTime.now().toUtc().toIso8601String())
+            .order('event_at')
+            .limit(2),
+      ),
+    );
+    final favorites = await guarded(
+      '즐겨찾는 시설',
+      () async => List<Map<String, dynamic>>.from(
+        await client
+            .from('favorites')
+            .select('id, name, address, telephone, lat, lng, category')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(3),
+      ),
+    );
 
     return _HomeData(
       nickname: profile['nickname'] as String,
+      failedSections: failed,
       recentPosts: List<Map<String, dynamic>>.from(recentPosts),
       upcomingMeetups: List<Map<String, dynamic>>.from(upcomingMeetups),
       favorites: List<Map<String, dynamic>>.from(favorites),
@@ -98,24 +128,41 @@ class _HomeTabState extends State<HomeTab> {
   String _facilityName(Map<String, dynamic> meetup) =>
       (meetup['facilities'] as Map?)?['name'] as String? ?? '';
 
-  void _openPost(String id) =>
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => PostDetailPage(postId: id)));
+  Future<void> _refreshHome() async {
+    if (!mounted) return;
+    final f = _loadHomeData();
+    setState(() {
+      _dataFuture = f;
+      _nearbyVersion++;
+    });
+    try {
+      await f;
+    } catch (_) {}
+  }
 
-  void _openFacility(FacilityResult r) => Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => Scaffold(
-        appBar: AppBar(title: const Text('시설찾기')),
-        body: FacilitySearchPage(initialFacility: r),
+  Future<void> _openPost(String id) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => PostDetailPage(postId: id)));
+    if (mounted) await _refreshHome();
+  }
+
+  Future<void> _openFacility(FacilityResult r) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('시설찾기')),
+          body: FacilitySearchPage(initialFacility: r),
+        ),
       ),
-    ),
-  );
+    );
+    if (mounted) await _refreshHome();
+  }
 
   Future<void> _createMeetup() async {
     await Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const NewMeetupPage()));
     if (!mounted) return;
-    setState(() => _dataFuture = _loadHomeData());
+    await _refreshHome();
   }
 
   static TagTone _toneFor(String category) => switch (category) {
@@ -138,43 +185,53 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      children: [
-        FutureBuilder<_HomeData>(
-          future: _dataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snapshot.hasError) return _buildError(context, snapshot.error);
-            return _buildTop(context, snapshot.data!);
-          },
-        ),
-        const SizedBox(height: 24),
-        _buildQuickActions(context),
-        const SizedBox(height: 24),
-        NearbyFacilitiesSection(
-          key: const ValueKey('home-nearby'),
-          onOpenFacility: _openFacility,
-          onShowMap: () => widget.onNavigate?.call(1),
-        ),
-        FutureBuilder<_HomeData>(
-          future: _dataFuture,
-          builder: (context, snapshot) {
-            final data = snapshot.data;
-            if (snapshot.connectionState != ConnectionState.done ||
-                snapshot.hasError ||
-                data == null) {
-              return const SizedBox.shrink();
-            }
-            return _buildBottom(context, data);
-          },
-        ),
-      ],
+    return RefreshIndicator(
+      onRefresh: _refreshHome,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          FutureBuilder<_HomeData>(
+            future: _dataFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return _buildError(context, snapshot.error);
+              }
+              return _buildTop(context, snapshot.data!);
+            },
+          ),
+          const SizedBox(height: 24),
+          _buildQuickActions(context),
+          const SizedBox(height: 24),
+          const ActivityHomeSection(),
+          const SizedBox(height: 24),
+          NearbyFacilitiesSection(
+            key: const ValueKey('home-nearby'),
+            loader: widget.nearbyLoader,
+            refreshVersion: _nearbyVersion,
+            onOpenFacility: _openFacility,
+            onShowMap: () => widget.onNavigate?.call(1),
+          ),
+          FutureBuilder<_HomeData>(
+            future: _dataFuture,
+            builder: (context, snapshot) {
+              final data = snapshot.data;
+              if (snapshot.connectionState != ConnectionState.done ||
+                  snapshot.hasError ||
+                  data == null) {
+                return const SizedBox.shrink();
+              }
+              return _buildBottom(context, data);
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -188,10 +245,7 @@ class _HomeTabState extends State<HomeTab> {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          TextButton(
-            onPressed: () => setState(() => _dataFuture = _loadHomeData()),
-            child: const Text('다시 시도'),
-          ),
+          TextButton(onPressed: _refreshHome, child: const Text('다시 시도')),
         ],
       ),
     );
@@ -217,6 +271,21 @@ class _HomeTabState extends State<HomeTab> {
           ),
           style: textTheme.titleLarge,
         ),
+        if (data.failedSections.isNotEmpty)
+          TextButton(
+            onPressed: _refreshHome,
+            child: Text('${data.failedSections.join(', ')} 조회 실패 · 다시 시도'),
+          ),
+        if (meetups.isEmpty && !data.failedSections.contains('다가오는 모임')) ...[
+          const SizedBox(height: 16),
+          const SectionCard(
+            header: SectionHeader(title: '다가오는 모임'),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('아직 예정된 모임이 없어요.'),
+            ),
+          ),
+        ],
         if (meetups.isNotEmpty) ...[
           const SizedBox(height: 16),
           _buildHeroMeetup(context, meetups.first),
@@ -449,12 +518,26 @@ class _HomeTabState extends State<HomeTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (data.favorites.isNotEmpty) ...[
+        if (data.failedSections.contains('즐겨찾는 시설')) ...[
+          const SizedBox(height: 24),
+          SectionCard(
+            header: const SectionHeader(title: '즐겨찾는 시설'),
+            child: TextButton(
+              onPressed: _refreshHome,
+              child: const Text('시설을 불러오지 못했어요. 다시 시도'),
+            ),
+          ),
+        ] else ...[
           const SizedBox(height: 24),
           SectionCard(
             header: const SectionHeader(title: '즐겨찾는 시설'),
             child: Column(
               children: [
+                if (data.favorites.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('아직 즐겨찾는 시설이 없어요.'),
+                  ),
                 for (final facility in data.favorites)
                   _buildFavoriteRow(context, facility),
               ],
@@ -470,7 +553,12 @@ class _HomeTabState extends State<HomeTab> {
               child: const Text('전체 보기'),
             ),
           ),
-          child: data.recentPosts.isEmpty
+          child: data.failedSections.contains('최근 커뮤니티 글')
+              ? TextButton(
+                  onPressed: _refreshHome,
+                  child: const Text('게시글을 불러오지 못했어요. 다시 시도'),
+                )
+              : data.recentPosts.isEmpty
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text('아직 게시글이 없습니다.', style: textTheme.bodyMedium),
@@ -544,7 +632,7 @@ class _HomeTabState extends State<HomeTab> {
                   message: '전화 걸기',
                   child: InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: () => launchUrl(Uri.parse('tel:$tel')),
+                    onTap: () => callFacility(context, tel),
                     child: const SizedBox(
                       width: 56,
                       height: 56,
@@ -578,7 +666,10 @@ class _HomeTabState extends State<HomeTab> {
     return InkWell(
       onTap: () => _openPost(post['id'] as String),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 56, minWidth: double.infinity),
+        constraints: const BoxConstraints(
+          minHeight: 56,
+          minWidth: double.infinity,
+        ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(
@@ -682,8 +773,10 @@ class _HomeData {
     required this.recentPosts,
     required this.upcomingMeetups,
     required this.favorites,
+    this.failedSections = const [],
   });
 
+  final List<String> failedSections;
   final String nickname;
   final List<Map<String, dynamic>> recentPosts;
   final List<Map<String, dynamic>> upcomingMeetups;

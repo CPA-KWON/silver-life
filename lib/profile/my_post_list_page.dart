@@ -10,7 +10,11 @@ import '../ui/design_widgets.dart';
 /// Shared by "내 게시글 관리" and "내 모임 관리": both just list the current
 /// user's own posts, split by whether the category is the meetup one.
 class MyPostListPage extends StatefulWidget {
-  const MyPostListPage({super.key, required this.title, required this.isMeetup});
+  const MyPostListPage({
+    super.key,
+    required this.title,
+    required this.isMeetup,
+  });
 
   final String title;
   final bool isMeetup;
@@ -105,7 +109,10 @@ class _MyPostListPageState extends State<MyPostListPage> {
   }
 
   void _refresh() {
-    setState(() => _postsFuture = _loadPosts());
+    if (!mounted) return;
+    setState(() {
+      _postsFuture = _loadPosts();
+    });
   }
 
   @override

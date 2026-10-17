@@ -8,9 +8,16 @@ import '../ui/design_widgets.dart';
 import 'new_post_page.dart';
 
 class PostDetailPage extends StatefulWidget {
-  const PostDetailPage({super.key, required this.postId});
+  const PostDetailPage({
+    super.key,
+    required this.postId,
+    this.onClose,
+    this.onEdit,
+  });
 
   final String postId;
+  final VoidCallback? onClose;
+  final Future<bool?> Function(Map<String, dynamic>)? onEdit;
 
   @override
   State<PostDetailPage> createState() => _PostDetailPageState();
@@ -49,28 +56,30 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   Future<void> _editPost(Map<String, dynamic> post) async {
     final isMeetup = post['category'] == kMeetupCategory;
-    final changed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => isMeetup
-            ? NewMeetupPage(
-                existingPost: {
-                  'id': post['id'],
-                  'title': post['title'],
-                  'content': post['content'],
-                  'event_at': post['event_at'],
-                  'facility': post['facilities'],
-                },
-              )
-            : NewPostPage(
-                existingPost: {
-                  'id': post['id'],
-                  'category': post['category'],
-                  'title': post['title'],
-                  'content': post['content'],
-                },
-              ),
-      ),
-    );
+    final changed = widget.onEdit != null
+        ? await widget.onEdit!(post)
+        : await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => isMeetup
+                  ? NewMeetupPage(
+                      existingPost: {
+                        'id': post['id'],
+                        'title': post['title'],
+                        'content': post['content'],
+                        'event_at': post['event_at'],
+                        'facility': post['facilities'],
+                      },
+                    )
+                  : NewPostPage(
+                      existingPost: {
+                        'id': post['id'],
+                        'category': post['category'],
+                        'title': post['title'],
+                        'content': post['content'],
+                      },
+                    ),
+            ),
+          );
     if (changed == true && mounted) {
       setState(() {
         _postFuture = _fetchPost();
@@ -99,8 +108,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
     if (confirmed != true) return;
 
     try {
-      await Supabase.instance.client.from('posts').delete().eq('id', widget.postId);
-      if (mounted) Navigator.of(context).pop(true);
+      await Supabase.instance.client
+          .from('posts')
+          .delete()
+          .eq('id', widget.postId);
+      if (mounted) {
+        if (widget.onClose != null) {
+          widget.onClose!();
+        } else {
+          Navigator.of(context).pop(true);
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -130,7 +148,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
   Future<void> _submitComment() async {
     final text = _commentController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isPostingComment) return;
 
     setState(() => _isPostingComment = true);
     try {
@@ -140,6 +158,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         'author_id': userId,
         'content': text,
       });
+      if (!mounted) return;
       _commentController.clear();
       _refreshComments();
     } catch (e) {
@@ -164,11 +183,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   TagTone _toneOf(String category) => switch (category) {
-        '자유게시판' => TagTone.lavender,
-        '건강정보' => TagTone.mint,
-        '나눔' || '도움요청' || '나눔·도움요청' => TagTone.blue,
-        _ => TagTone.neutral,
-      };
+    '자유게시판' => TagTone.lavender,
+    '건강정보' => TagTone.mint,
+    '나눔' || '도움요청' || '나눔·도움요청' => TagTone.blue,
+    _ => TagTone.neutral,
+  };
 
   Widget _meetupCard(Map<String, dynamic> post, TextTheme textTheme) {
     final eventAt = DateTime.parse(post['event_at'] as String).toLocal();
@@ -193,21 +212,33 @@ class _PostDetailPageState extends State<PostDetailPage> {
               children: [
                 StatusPill(
                   label: upcoming ? '예정' : '완료',
-                  tone: upcoming ? StatusPillTone.success : StatusPillTone.neutral,
+                  tone: upcoming
+                      ? StatusPillTone.success
+                      : StatusPillTone.neutral,
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 20, color: AppColors.primary),
+                    const Icon(
+                      Icons.access_time,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('${eventAt.hour}:$minute', style: rowStyle)),
+                    Expanded(
+                      child: Text('${eventAt.hour}:$minute', style: rowStyle),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.place_outlined, size: 20, color: AppColors.primary),
+                    const Icon(
+                      Icons.place_outlined,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(child: Text(placeName, style: rowStyle)),
                   ],
@@ -225,6 +256,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
+        leading: widget.onClose == null
+            ? null
+            : BackButton(onPressed: widget.onClose),
         title: const Text('게시글'),
         actions: [
           FutureBuilder<Map<String, dynamic>>(
@@ -233,7 +267,8 @@ class _PostDetailPageState extends State<PostDetailPage> {
               final post = snapshot.data;
               if (post == null) return const SizedBox.shrink();
               final isAuthor =
-                  post['author_id'] == Supabase.instance.client.auth.currentUser!.id;
+                  post['author_id'] ==
+                  Supabase.instance.client.auth.currentUser!.id;
               if (!isAuthor) return const SizedBox.shrink();
               return PopupMenuButton<String>(
                 onSelected: (value) {
@@ -364,7 +399,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                     radius: 18,
                                     backgroundColor: AppColors.tint,
                                     child: Text(
-                                      _nicknameOf(comment).isEmpty ? '?' : _nicknameOf(comment).characters.first,
+                                      _nicknameOf(comment).isEmpty
+                                          ? '?'
+                                          : _nicknameOf(comment)
+                                                .characters
+                                                .first,
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
@@ -375,27 +414,36 @@ class _PostDetailPageState extends State<PostDetailPage> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Wrap(
-                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
                                           spacing: 8,
                                           children: [
                                             Text(
                                               _nicknameOf(comment),
-                                              style: textTheme.bodyMedium?.copyWith(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.textPrimary,
-                                              ),
+                                              style: textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        AppColors.textPrimary,
+                                                  ),
                                             ),
                                             Text(
-                                              _timeOf(comment['created_at'] as String?),
-                                              style: textTheme.bodyMedium?.copyWith(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w500,
-                                                color: AppColors.textSecondary,
+                                              _timeOf(
+                                                comment['created_at']
+                                                    as String?,
                                               ),
+                                              style: textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w500,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
                                             ),
                                           ],
                                         ),
@@ -443,7 +491,10 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     ),
                     const SizedBox(width: 4),
                     IconButton(
-                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
                       color: AppColors.primary,
                       icon: _isPostingComment
                           ? const SizedBox(

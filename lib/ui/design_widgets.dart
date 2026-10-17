@@ -126,11 +126,9 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: ShapeDecoration(
-        color: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
       child: Padding(
         padding: padding,
         child: Column(

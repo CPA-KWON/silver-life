@@ -5,6 +5,7 @@ import 'account_settings_page.dart';
 import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
 import '../app_theme.dart';
+import '../activity/activity_hub_page.dart';
 import '../ui/design_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -46,7 +47,18 @@ class _ProfilePageState extends State<ProfilePage> {
               FutureBuilder<Map<String, dynamic>>(
                 future: _profileFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.hasError) return const SizedBox.shrink();
+                  if (snapshot.hasError) {
+                    return SectionCard(
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _profileFuture = _loadProfile();
+                          });
+                        },
+                        child: const Text('내 정보를 불러오지 못했어요. 다시 시도'),
+                      ),
+                    );
+                  }
                   if (!snapshot.hasData) return const _ProfileCardSkeleton();
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 24),
@@ -61,6 +73,19 @@ class _ProfilePageState extends State<ProfilePage> {
               SectionCard(
                 child: Column(
                   children: [
+                    _MenuRow(
+                      icon: Icons.explore_outlined,
+                      iconColor: AppColors.primary,
+                      badgeColor: AppColors.tint,
+                      title: '활동 미션 · 경험 은행',
+                      subtitle: '내 활동과 신청 이력 확인',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ActivityHubPage(initialTab: 3),
+                        ),
+                      ),
+                    ),
                     _MenuRow(
                       icon: Icons.article_outlined,
                       iconColor: AppColors.primary,
@@ -115,7 +140,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         );
                         if (!mounted) return;
-                        setState(() => _profileFuture = _loadProfile());
+                        setState(() {
+                          _profileFuture = _loadProfile();
+                        });
                       },
                     ),
                     _MenuRow(
@@ -201,7 +228,9 @@ class _ProfileCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Expanded(child: Text(region, style: textTheme.bodyMedium)),
+                      Expanded(
+                        child: Text(region, style: textTheme.bodyMedium),
+                      ),
                     ],
                   ),
                 ],
