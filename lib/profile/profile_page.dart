@@ -1,3 +1,5 @@
+import 'sign_out.dart';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,10 +8,14 @@ import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
 import '../app_theme.dart';
 import '../activity/activity_hub_page.dart';
+import '../activity/activity_repository.dart';
+import '../activity/activity_agency_page.dart';
+import '../facility/nearby_facilities_page.dart';
 import '../ui/design_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.activityRepository});
+  final ActivityRepository? activityRepository;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -17,11 +23,14 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   late Future<Map<String, dynamic>> _profileFuture;
+  late Future<ActivityData> _activityFuture;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = _loadProfile();
+    _activityFuture = (widget.activityRepository ?? ActivityRepository())
+        .home();
   }
 
   Future<Map<String, dynamic>> _loadProfile() async {
@@ -36,141 +45,192 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PageTitle('내 정보'),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
-              FutureBuilder<Map<String, dynamic>>(
-                future: _profileFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return SectionCard(
-                      child: TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _profileFuture = _loadProfile();
-                          });
-                        },
-                        child: const Text('내 정보를 불러오지 못했어요. 다시 시도'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('내 정보')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: [
+          FutureBuilder<Map<String, dynamic>>(
+            future: _profileFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return SectionCard(
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _profileFuture = _loadProfile();
+                      });
+                    },
+                    child: const Text('내 정보를 불러오지 못했어요. 다시 시도'),
+                  ),
+                );
+              }
+              if (!snapshot.hasData) return const _ProfileCardSkeleton();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _ProfileCard(profile: snapshot.data!),
+              );
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('내 활동', style: textTheme.titleMedium),
+          ),
+          SectionCard(
+            child: Column(
+              children: [
+                _MenuRow(
+                  icon: Icons.explore_outlined,
+                  iconColor: AppColors.primary,
+                  badgeColor: AppColors.tint,
+                  title: '나의 활동',
+                  subtitle: '내 활동과 신청 이력 확인',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ActivitySectionPage(
+                        section: ActivitySection.mine,
+                        repository: widget.activityRepository,
+                      ),
+                    ),
+                  ),
+                ),
+                _MenuRow(
+                  icon: Icons.article_outlined,
+                  iconColor: AppColors.primary,
+                  badgeColor: AppColors.tint,
+                  title: '내가 쓴 게시글',
+                  subtitle: '내가 쓴 커뮤니티 글 모아보기',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MyPostListPage(
+                        title: '내가 쓴 게시글',
+                        isMeetup: false,
+                      ),
+                    ),
+                  ),
+                ),
+                _MenuRow(
+                  icon: Icons.event_outlined,
+                  iconColor: AppColors.mintText,
+                  badgeColor: AppColors.mintTint,
+                  title: '내가 만든 모임',
+                  subtitle: '내가 쓴 동네모임 글 모아보기',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MyPostListPage(
+                        title: '내가 만든 모임',
+                        isMeetup: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _MenuRow(
+            icon: Icons.favorite_border,
+            iconColor: AppColors.primary,
+            badgeColor: AppColors.tint,
+            title: '즐겨찾는 시설',
+            subtitle: '저장해둔 시설 다시 보기',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FavoriteFacilitiesPage()),
+            ),
+          ),
+          FutureBuilder<ActivityData>(
+            future: _activityFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return TextButton(
+                  onPressed: () => setState(() {
+                    _activityFuture =
+                        (widget.activityRepository ?? ActivityRepository())
+                            .home();
+                  }),
+                  child: const Text('기관 권한 확인 다시 시도'),
+                );
+              }
+              final organizations = activityRows(
+                snapshot.data?['organizations'],
+              );
+              if (organizations.isEmpty) return const SizedBox.shrink();
+              return _MenuRow(
+                icon: Icons.business_outlined,
+                iconColor: AppColors.primary,
+                badgeColor: AppColors.tint,
+                title: '기관 관리',
+                subtitle: '프로그램·신청자·운영 성과 관리',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ActivityAgencyPage(
+                      organizations: organizations,
+                      repository: widget.activityRepository,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text('설정', style: textTheme.titleMedium),
+          ),
+          SectionCard(
+            child: Column(
+              children: [
+                _MenuRow(
+                  icon: Icons.manage_accounts_outlined,
+                  iconColor: AppColors.blueText,
+                  badgeColor: AppColors.blueTint,
+                  title: '회원정보 관리',
+                  subtitle: '닉네임, 거주 지역 수정 및 로그아웃',
+                  onTap: () async {
+                    final userId =
+                        Supabase.instance.client.auth.currentUser?.id;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AccountSettingsPage(),
                       ),
                     );
-                  }
-                  if (!snapshot.hasData) return const _ProfileCardSkeleton();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: _ProfileCard(profile: snapshot.data!),
-                  );
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 8),
-                child: Text('내 활동', style: textTheme.titleMedium),
-              ),
-              SectionCard(
-                child: Column(
-                  children: [
-                    _MenuRow(
-                      icon: Icons.explore_outlined,
-                      iconColor: AppColors.primary,
-                      badgeColor: AppColors.tint,
-                      title: '활동 미션 · 경험 은행',
-                      subtitle: '내 활동과 신청 이력 확인',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ActivityHubPage(initialTab: 3),
-                        ),
-                      ),
-                    ),
-                    _MenuRow(
-                      icon: Icons.article_outlined,
-                      iconColor: AppColors.primary,
-                      badgeColor: AppColors.tint,
-                      title: '내 게시글 관리',
-                      subtitle: '내가 쓴 커뮤니티 글 모아보기',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const MyPostListPage(
-                            title: '내 게시글 관리',
-                            isMeetup: false,
-                          ),
-                        ),
-                      ),
-                    ),
-                    _MenuRow(
-                      icon: Icons.event_outlined,
-                      iconColor: AppColors.mintText,
-                      badgeColor: AppColors.mintTint,
-                      title: '내 모임 관리',
-                      subtitle: '내가 쓴 동네모임 글 모아보기',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const MyPostListPage(
-                            title: '내 모임 관리',
-                            isMeetup: true,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    if (!mounted ||
+                        userId == null ||
+                        Supabase.instance.client.auth.currentUser?.id !=
+                            userId) {
+                      return;
+                    }
+                    setState(() {
+                      _profileFuture = _loadProfile();
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 8),
-                child: Text('설정', style: textTheme.titleMedium),
-              ),
-              SectionCard(
-                child: Column(
-                  children: [
-                    _MenuRow(
-                      icon: Icons.manage_accounts_outlined,
-                      iconColor: AppColors.blueText,
-                      badgeColor: AppColors.blueTint,
-                      title: '회원정보 관리',
-                      subtitle: '닉네임, 거주 지역 수정 및 로그아웃',
-                      onTap: () async {
-                        final userId =
-                            Supabase.instance.client.auth.currentUser?.id;
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const AccountSettingsPage(),
-                          ),
-                        );
-                        if (!mounted ||
-                            userId == null ||
-                            Supabase.instance.client.auth.currentUser?.id !=
-                                userId) {
-                          return;
-                        }
-                        setState(() {
-                          _profileFuture = _loadProfile();
-                        });
-                      },
+                _MenuRow(
+                  icon: Icons.privacy_tip_outlined,
+                  iconColor: AppColors.scheduleText,
+                  badgeColor: AppColors.neutralTint,
+                  title: '개인정보 처리방침',
+                  subtitle: '언제든 확인할 수 있어요',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PrivacyPolicyPage(),
                     ),
-                    _MenuRow(
-                      icon: Icons.privacy_tip_outlined,
-                      iconColor: AppColors.scheduleText,
-                      badgeColor: AppColors.neutralTint,
-                      title: '개인정보 처리방침',
-                      subtitle: '언제든 확인할 수 있어요',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const PrivacyPolicyPage(),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => confirmAccountSignOut(context),
+            icon: const Icon(Icons.logout),
+            label: const Text('로그아웃'),
+          ),
+        ],
+      ),
     );
   }
 }

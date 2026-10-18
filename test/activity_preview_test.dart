@@ -62,13 +62,16 @@ void main() {
       'category': '생활·기술',
       'active': true,
     });
-    for (final e in {'activity_missions': 0, 'experience_bank': 1}.entries) {
+    for (final e in {
+      'activity_missions': ActivitySection.missions,
+      'experience_sharing': ActivitySection.experience,
+    }.entries) {
       final key = GlobalKey();
       await mount(
         t,
         RepaintBoundary(
           key: key,
-          child: ActivityHubPage(repository: r, initialTab: e.value),
+          child: ActivitySectionPage(repository: r, section: e.value),
         ),
       );
       expect(t.takeException(), isNull);

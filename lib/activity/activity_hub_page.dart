@@ -1,29 +1,120 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
 import 'activity_forms.dart';
 import 'activity_detail_page.dart';
-import 'activity_agency_page.dart';
 
-class ActivityHubPage extends StatefulWidget {
-  const ActivityHubPage({super.key, this.initialTab = 0, this.repository});
-  final int initialTab;
-  final ActivityRepository? repository;
-  @override
-  State<ActivityHubPage> createState() => _ActivityHubPageState();
+enum ActivitySection {
+  find,
+  missions,
+  mine,
+  experience,
+  programs,
+  myExperiences,
+  recruitment,
+  support,
 }
 
-class _ActivityHubPageState extends State<ActivityHubPage> {
-  late final repo = widget.repository ?? ActivityRepository();
-  late Future<ActivityData> future;
-  bool busy = false;
+String activitySectionTitle(ActivitySection section) => switch (section) {
+  ActivitySection.find => '맞춤 활동 찾기',
+  ActivitySection.missions => '주간 미션',
+  ActivitySection.mine => '나의 활동',
+  ActivitySection.experience => '경험 나눔',
+  ActivitySection.programs => '전체 프로그램',
+  ActivitySection.myExperiences => '내 경험 관리',
+  ActivitySection.recruitment => '기관 모집 탐색',
+  ActivitySection.support => '경험 나눔 지원 현황',
+};
+
+/// A directory, not four sideways pages. Each destination has one purpose.
+class ActivityHubPage extends StatelessWidget {
+  const ActivityHubPage({super.key, this.repository});
+  final ActivityRepository? repository;
+
   @override
-  void initState() {
-    super.initState();
-    future = repo.home();
-  }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('활동')),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final entry in const [
+          (ActivitySection.find, Icons.search, '조건에 맞는 활동과 전체 프로그램'),
+          (ActivitySection.missions, Icons.flag_outlined, '이번 주 3단계 미션과 진행 현황'),
+          (ActivitySection.mine, Icons.event_available, '신청 상태·참여 이력·혜택'),
+          (
+            ActivitySection.experience,
+            Icons.volunteer_activism,
+            '내 경험 관리와 기관 모집 지원',
+          ),
+        ])
+          ActivityMenuLink(
+            title: activitySectionTitle(entry.$1),
+            subtitle: entry.$3,
+            icon: entry.$2,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ActivitySectionPage(
+                  section: entry.$1,
+                  repository: repository,
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class ActivityMenuLink extends StatelessWidget {
+  const ActivityMenuLink({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+  final String title, subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: SectionCard(
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    ),
+  );
+}
+
+class ActivitySectionPage extends StatefulWidget {
+  const ActivitySectionPage({
+    super.key,
+    required this.section,
+    this.repository,
+    this.place,
+  });
+  final ActivitySection section;
+  final ({String name, double lat, double lng})? place;
+  final ActivityRepository? repository;
+  @override
+  State<ActivitySectionPage> createState() => _ActivitySectionPageState();
+}
+
+class _ActivitySectionPageState extends State<ActivitySectionPage> {
+  late final repo = widget.repository ?? ActivityRepository();
+  late Future<ActivityData> future = repo.home();
+  bool busy = false;
+  String historyView = '신청 내역';
 
   Future<void> reload() async {
     if (!mounted) return;
@@ -34,7 +125,7 @@ class _ActivityHubPageState extends State<ActivityHubPage> {
     try {
       await f;
     } catch (_) {
-      /* FutureBuilder presents errors. */
+      /* FutureBuilder shows a retry. */
     }
   }
 
@@ -43,6 +134,8 @@ class _ActivityHubPageState extends State<ActivityHubPage> {
     if (mounted) await reload();
   }
 
+  void section(ActivitySection value) =>
+      open(ActivitySectionPage(section: value, repository: repo));
   Future<void> plan({bool rebuild = false}) async {
     if (busy) return;
     if (rebuild &&
@@ -58,8 +151,8 @@ class _ActivityHubPageState extends State<ActivityHubPage> {
     try {
       await repo.plan(rebuild: rebuild);
       await reload();
-    } catch (e) {
-      if (mounted) activityMessage(context, '미션을 만들지 못했어요. $e');
+    } catch (_) {
+      if (mounted) activityMessage(context, '미션을 만들지 못했어요. 잠시 후 다시 시도해주세요.');
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -70,200 +163,216 @@ class _ActivityHubPageState extends State<ActivityHubPage> {
     label: label,
     onTap: () => open(ActivityDetailPage(programId: p['id'], repository: repo)),
   );
-  Widget list(List<Widget> children) => RefreshIndicator(
-    onRefresh: reload,
-    child: ListView(
-      padding: const EdgeInsets.all(16),
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: children,
+  Widget settings(ActivityData d) => OutlinedButton.icon(
+    onPressed: () => open(
+      ActivityPreferencesPage(initial: d['preferences'], repository: repo),
     ),
+    icon: const Icon(Icons.tune),
+    label: const Text('추천 조건 설정'),
   );
-  Widget missions(ActivityData d) {
-    final m = activityRows(d['missions']);
-    return list([
-      const Text(
-        '이번 주 나의 활동 미션',
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+  List<Widget> find(ActivityData d) => [
+    settings(d),
+    const SizedBox(height: 12),
+    if (d['preferences'] == null)
+      const ActivityInfo('기준 장소와 관심 분야를 설정하면 맞춤 활동을 추천해드려요.')
+    else ...[
+      const SectionHeader(title: '맞춤 추천 결과'),
+      if (activityRows(d['recommendations']).isEmpty)
+        const ActivityInfo('현재 조건에 맞는 모집 중 활동이 없어요.'),
+      for (final p in activityRows(d['recommendations'])) program(p),
+    ],
+    const SizedBox(height: 12),
+    OutlinedButton(
+      onPressed: () => section(ActivitySection.programs),
+      child: const Text('전체 프로그램 탐색'),
+    ),
+  ];
+  List<Widget> missions(ActivityData d) {
+    final rows = activityRows(d['missions']);
+    return [
+      ActivityInfo(
+        '이번 주 미션 ${rows.where((m) => m['status'] == 'completed').length}/${rows.length}개 완료',
       ),
-      const SizedBox(height: 8),
-      const Text('멀리 가는 것보다, 원하는 활동을 꾸준히 하는 것이 목표예요.'),
       const SizedBox(height: 12),
-      OutlinedButton.icon(
-        onPressed: () => open(
-          ActivityPreferencesPage(initial: d['preferences'], repository: repo),
-        ),
-        icon: const Icon(Icons.tune),
-        label: const Text('활동 설정'),
-      ),
-      if (d['preferences'] == null)
-        const ActivityInfo('관심 분야와 기준 장소를 설정하면 내게 맞는 미션을 고를 수 있어요.')
-      else ...[
-        const SizedBox(height: 12),
+      if (d['preferences'] == null) ...[
+        const ActivityInfo('기준 장소와 관심 분야를 먼저 설정해주세요.'),
+        settings(d),
+      ] else ...[
         FilledButton(
           onPressed: busy ? null : () => plan(),
           child: Text(busy ? '미션 준비 중…' : '이번 주 미션 만들기'),
         ),
-        if (m.isNotEmpty)
+        if (rows.isNotEmpty)
           TextButton(
             onPressed: busy ? null : () => plan(rebuild: true),
             child: const Text('신청 전 미션 다시 고르기'),
           ),
-        if (m.isEmpty)
-          const ActivityInfo('아직 이번 주 미션이 없어요. 조건에 맞는 실제 프로그램이 있어야 미션이 만들어져요.'),
-        for (final mission in m)
+        if (rows.isEmpty) const ActivityInfo('조건에 맞는 실제 프로그램이 있어야 미션이 만들어져요.'),
+        for (final m in rows)
           program(
-            Map<String, dynamic>.from(mission['program']),
+            Map<String, dynamic>.from(m['program']),
             label:
-                '${mission['stage']}단계 · ${['익숙한 동네', '새로운 장소', '함께하는 활동'][(mission['stage'] as int) - 1]} · ${activityStatuses[mission['status']] ?? ''}',
+                '${m['stage']}단계 · ${['익숙한 동네', '새로운 장소', '함께하는 활동'][(m['stage'] as int) - 1]} · ${activityStatuses[m['status']] ?? ''}',
           ),
-        const SectionHeader(title: '내게 맞는 활동'),
-        const Text('내 활동 설정을 만족하는 활동이에요. 유효한 기관 후원이 있으면 먼저 보여드려요.'),
-        const SizedBox(height: 12),
-        if (activityRows(d['recommendations']).isEmpty)
-          const ActivityInfo('현재 설정에 맞는 모집 중 활동이 없어요.'),
-        for (final p in activityRows(
-          d['recommendations'],
-        ).where((p) => !m.any((v) => v['program_id'] == p['id'])))
-          program(p),
+        TextButton(
+          onPressed: () => section(ActivitySection.find),
+          child: const Text('추천 조건 확인하기'),
+        ),
       ],
-    ]);
+    ];
   }
 
-  Widget bank(ActivityData d) => list([
-    const Text(
-      '동네 경험 은행',
-      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-    ),
-    const SizedBox(height: 8),
-    const Text(
-      '평생 쌓아온 경험을 이웃과 나눠요. 기관이 활동 완료를 확인하면 30일간 유료 기관 프로그램 참여비 50% 혜택을 받아요.',
-    ),
-    const SizedBox(height: 12),
+  List<Widget> experiences(ActivityData d) => [
     FilledButton.icon(
       onPressed: () => open(ActivityExperiencePage(repository: repo)),
       icon: const Icon(Icons.add),
       label: const Text('나눌 경험 등록'),
     ),
-    const SectionHeader(title: '내가 나눌 경험'),
+    const SizedBox(height: 12),
+    const Text('내 경험은 나만 볼 수 있어요. 모집에 지원하면 해당 기관에 전달돼요.'),
+    const SizedBox(height: 12),
     if (activityRows(d['experiences']).isEmpty)
       const ActivityInfo('아직 등록한 경험이 없어요.'),
     for (final e in activityRows(d['experiences']))
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: SectionCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(e['title']),
-            subtitle: Text(
-              '${e['category']} · ${e['active'] == true ? '참여 가능' : '쉬는 중'}',
-            ),
-            trailing: const Icon(Icons.edit_outlined),
-            onTap: () =>
-                open(ActivityExperiencePage(existing: e, repository: repo)),
+      ActivityMenuLink(
+        title: e['title'],
+        subtitle:
+            '${e['category']} · ${e['active'] == true ? '참여 가능' : '쉬는 중'}',
+        icon: Icons.edit_outlined,
+        onTap: () =>
+            open(ActivityExperiencePage(existing: e, repository: repo)),
+      ),
+  ];
+  List<Widget> applications(ActivityData d, {bool supportOnly = false}) {
+    final all = activityRows(d['applications']);
+    final rows = all
+        .where(
+          (e) => supportOnly
+              ? e['program']['kind'] == 'experience'
+              : historyView == '참여 이력'
+              ? e['status'] == 'completed'
+              : e['status'] != 'completed',
+        )
+        .toList();
+    return [
+      if (!supportOnly)
+        activitySelect('보기', historyView, [
+          '신청 내역',
+          '참여 이력',
+          '혜택',
+        ], (value) => setState(() => historyView = value)),
+      if (!supportOnly && historyView == '혜택') ...[
+        ActivityInfo(
+          d['benefit_expires_at'] == null
+              ? '현재 적용 중인 혜택이 없어요.'
+              : '유료 기관 프로그램 참여비 50% 혜택\n${activityDate(d['benefit_expires_at'])}까지 새 신청에 적용돼요. 중복 합산되지 않아요.',
+        ),
+      ] else ...[
+        if (rows.isEmpty)
+          ActivityInfo(
+            supportOnly
+                ? '아직 지원한 경험 나눔이 없어요.'
+                : historyView == '참여 이력'
+                ? '아직 완료한 활동이 없어요.'
+                : '아직 신청한 활동이 없어요.',
           ),
+        for (final e in rows)
+          program(
+            Map<String, dynamic>.from(e['program']),
+            label:
+                '${activityStatuses[e['status']] ?? e['status']} · 확정 참여비 ${activityMoney(e['final_fee'])}',
+          ),
+      ],
+    ];
+  }
+
+  List<Widget> content(ActivityData d) => switch (widget.section) {
+    ActivitySection.find => find(d),
+    ActivitySection.missions => missions(d),
+    ActivitySection.mine => applications(d),
+    ActivitySection.support => applications(d, supportOnly: true),
+    ActivitySection.myExperiences => experiences(d),
+    ActivitySection.experience => [
+      for (final entry in const [
+        (
+          ActivitySection.myExperiences,
+          Icons.edit_outlined,
+          '나눌 경험 등록·수정과 참여 가능 상태',
         ),
+        (ActivitySection.recruitment, Icons.search, '기관이 모집하는 경험 나눔 찾기'),
+        (ActivitySection.support, Icons.assignment_outlined, '내 지원과 승인·완료 상태'),
+      ])
+        ActivityMenuLink(
+          title: activitySectionTitle(entry.$1),
+          subtitle: entry.$3,
+          icon: entry.$2,
+          onTap: () => section(entry.$1),
+        ),
+    ],
+    ActivitySection.programs || ActivitySection.recruitment => [
+      Text(
+        widget.place == null
+            ? '전체 지역의 모집 목록이에요. 장소와 시간을 확인해주세요.'
+            : '${widget.place!.name}에서 모집 중인 프로그램이에요.',
       ),
-    const SectionHeader(title: '기관의 경험 나눔 모집'),
-    const Text('전체 지역의 모집 목록이에요. 장소와 시간을 확인해주세요.'),
-    const SizedBox(height: 12),
-    if (!activityRows(d['programs']).any((p) => p['kind'] == 'experience'))
-      const ActivityInfo('현재 모집 중인 경험 나눔이 없어요.'),
-    for (final p in activityRows(
-      d['programs'],
-    ).where((p) => p['kind'] == 'experience'))
-      program(p),
-  ]);
-  Widget applications(ActivityData d) => list([
-    if (d['benefit_expires_at'] != null)
-      ActivityInfo(
-        '유료 기관 프로그램 50% 혜택\n${activityDate(d['benefit_expires_at'])}까지 새 신청에 적용돼요. 혜택은 중복 합산되지 않아요.',
-      ),
-    const SectionHeader(title: '내 신청·참여 이력'),
-    if (activityRows(d['applications']).isEmpty)
-      const ActivityInfo('아직 신청한 활동이 없어요.'),
-    for (final e in activityRows(d['applications']))
-      program(
-        Map<String, dynamic>.from(e['program']),
-        label:
-            '${activityStatuses[e['status']]} · 확정 참여비 ${activityMoney(e['final_fee'])}',
-      ),
-  ]);
+      const SizedBox(height: 12),
+      if (matchingPrograms(d).isEmpty)
+        const ActivityInfo('현재 모집 중인 프로그램이 없어요.'),
+      for (final p in matchingPrograms(d)) program(p),
+    ],
+  };
+  List<ActivityData> matchingPrograms(ActivityData d) =>
+      activityRows(d['programs']).where((p) {
+        final place = widget.place;
+        if (place != null) {
+          final lat = p['lat'], lng = p['lng'];
+          return p['place_name']?.toString().trim() == place.name.trim() &&
+              lat is num &&
+              lng is num &&
+              Geolocator.distanceBetween(
+                    place.lat,
+                    place.lng,
+                    lat.toDouble(),
+                    lng.toDouble(),
+                  ) <=
+                  100;
+        }
+        return p['kind'] ==
+            (widget.section == ActivitySection.programs
+                ? 'activity'
+                : 'experience');
+      }).toList();
   @override
-  Widget build(BuildContext context) => DefaultTabController(
-    length: 4,
-    initialIndex: widget.initialTab,
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('활동 미션 · 경험 은행'),
-        bottom: const TabBar(
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: [
-            Tab(text: '활동 미션'),
-            Tab(text: '경험 은행'),
-            Tab(text: '전체 활동'),
-            Tab(text: '내 신청'),
-          ],
-        ),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(
+        widget.place == null
+            ? activitySectionTitle(widget.section)
+            : '이 시설의 프로그램',
       ),
-      body: FutureBuilder<ActivityData>(
-        future: future,
-        builder: (c, s) {
-          if (s.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (s.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                ActivityInfo(
-                  '활동 서비스를 불러오지 못했어요. 신규 서비스가 아직 준비되지 않았거나 연결이 원활하지 않을 수 있어요.',
-                  onRetry: reload,
-                ),
-              ],
-            );
-          }
-          final d = s.data!;
-          final orgs = activityRows(d['organizations']);
-          return Column(
-            children: [
-              if (orgs.isNotEmpty)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => open(
-                      ActivityAgencyPage(organizations: orgs, repository: repo),
+    ),
+    body: FutureBuilder<ActivityData>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return RefreshIndicator(
+          onRefresh: reload,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: snapshot.hasError
+                ? [
+                    ActivityInfo(
+                      '활동 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
+                      onRetry: reload,
                     ),
-                    icon: const Icon(Icons.business_outlined),
-                    label: const Text('기관 운영'),
-                  ),
-                ),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    missions(d),
-                    bank(d),
-                    list([
-                      const Text(
-                        '전체 지역의 기관 프로그램이에요. 내 이동 가능 거리와 시간에 맞는지 확인해주세요.',
-                      ),
-                      const SizedBox(height: 12),
-                      if (!activityRows(d['programs'])
-                          .any((p) => p['kind'] == 'activity'))
-                        const ActivityInfo('현재 모집 중인 프로그램이 없어요.'),
-                      for (final p in activityRows(
-                        d['programs'],
-                      ).where((p) => p['kind'] == 'activity'))
-                        program(p),
-                    ]),
-                    applications(d),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                  ]
+                : content(snapshot.data!),
+          ),
+        );
+      },
     ),
   );
 }

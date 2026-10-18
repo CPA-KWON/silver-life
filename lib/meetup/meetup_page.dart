@@ -8,6 +8,7 @@ import '../app_theme.dart';
 import '../core/region_scope.dart';
 import '../ui/design_widgets.dart';
 import 'new_meetup_page.dart';
+import '../profile/my_post_list_page.dart';
 
 class MeetupPage extends StatefulWidget {
   const MeetupPage({super.key});
@@ -129,7 +130,21 @@ class _MeetupPageState extends State<MeetupPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PageTitle('모임'),
+          Row(
+            children: [
+              const Expanded(child: PageTitle('동네 모임')),
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const MyPostListPage(title: '내가 만든 모임', isMeetup: true),
+                  ),
+                ),
+                child: const Text('내가 만든 모임'),
+              ),
+            ],
+          ),
           RegionScopeBar(
             scope: _regionScope,
             mySido: _mySido,

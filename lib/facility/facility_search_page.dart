@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../activity/activity_hub_page.dart';
+
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -911,8 +914,9 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                   const SizedBox(height: 10),
                   _InfoRow(
                     icon: Icons.directions_walk,
-                    text:
-                        '약 ${(result.distanceMeters / 1000).toStringAsFixed(1)}km',
+                    text: result.distanceMeters.isFinite
+                        ? '약 ${(result.distanceMeters / 1000).toStringAsFixed(1)}km'
+                        : '거리는 지도에서 위치를 확인해주세요.',
                   ),
                   if (result.telephone.isNotEmpty) ...[
                     const SizedBox(height: 20),
@@ -964,6 +968,23 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                     ),
                 ],
               ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ActivitySectionPage(
+                    section: ActivitySection.programs,
+                    place: (
+                      name: result.name,
+                      lat: result.lat,
+                      lng: result.lng,
+                    ),
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.event_note),
+              label: const Text('이 시설의 프로그램'),
             ),
             if (_upcomingMeetups != null && _upcomingMeetups!.isNotEmpty) ...[
               const SizedBox(height: 12),

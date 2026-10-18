@@ -19,6 +19,10 @@ import 'package:silver_life/core/region_picker.dart';
 import 'package:silver_life/core/korea_regions.dart';
 
 import 'support/fake_backend.dart';
+import 'support/fake_activity_repository.dart';
+
+import 'package:silver_life/facility/nearby_facilities_page.dart';
+
 import 'support/widget_actions.dart';
 
 void main() {
@@ -30,28 +34,31 @@ void main() {
     await backend.signIn();
   });
   tearDownAll(() => Supabase.instance.dispose());
-  testWidgets('home keeps greeting when favorites fail and retry restores it', (
+  testWidgets(
+    'home keeps greeting when activities fail and retry restores summary',
+    (t) async {
+      final repo = FakeActivityRepository()..fail = true;
+      await mount(t, HomeTab(activityRepository: repo));
+      expect(find.textContaining('안녕하세요'), findsOneWidget);
+      expect(find.text('활동 현황을 불러오지 못했어요.'), findsOneWidget);
+      repo.fail = false;
+      await tap(t, find.text('다시 시도'));
+      expect(find.text('이번 주 활동 현황'), findsOneWidget);
+      expect(find.text('최근 커뮤니티 글'), findsNothing);
+      await finish(t);
+    },
+  );
+  testWidgets('home profile entry and activity shortcut return to summary', (
     t,
   ) async {
-    backend.failFavorites = true;
-    await mount(t, HomeTab(nearbyLoader: ({force = false}) async => []));
-    expect(find.textContaining('안녕하세요'), findsOneWidget);
-    expect(find.textContaining('즐겨찾는 시설 조회 실패'), findsOneWidget);
-    backend.failFavorites = false;
-    await tap(t, find.textContaining('조회 실패'));
-    await tap(t, find.text('즐겨찾는 시설'));
-    expect(find.text('아직 즐겨찾는 시설이 없어요.'), findsOneWidget);
-    await finish(t);
-  });
-  testWidgets('home new activity entry opens prepared error state and back', (
-    t,
-  ) async {
-    await mount(t, HomeTab(nearbyLoader: ({force = false}) async => []));
-    await tap(t, find.text('내 활동 미션 보기'));
-    expect(find.text('활동 미션 · 경험 은행'), findsOneWidget);
-    expect(find.text('다시 시도'), findsOneWidget);
+    final repo = FakeActivityRepository();
+    await mount(t, HomeTab(activityRepository: repo));
+    await tap(t, find.text('내 정보'));
+    await tap(t, find.text('나의 활동'));
+    expect(find.text('아직 신청한 활동이 없어요.'), findsOneWidget);
     await tap(t, find.byType(BackButton));
-    expect(find.text('내 활동 미션 보기'), findsOneWidget);
+    await tap(t, find.byType(BackButton));
+    expect(find.text('이번 주 활동 현황'), findsOneWidget);
     await finish(t);
   });
   testWidgets('community and meetup region failures have usable retry', (
@@ -192,10 +199,12 @@ void main() {
   testWidgets(
     'profile account settings return refreshes without async setState',
     (t) async {
-      await mount(t, const ProfilePage());
+      await mount(t, ProfilePage(activityRepository: FakeActivityRepository()));
       await tap(t, find.text('회원정보 관리'));
       backend.profile['nickname'] = '변경 닉네임';
       await tap(t, find.byType(BackButton));
+      await t.drag(find.byType(ListView).last, const Offset(0, 1500));
+      await t.pumpAndSettle();
       expect(find.text('변경 닉네임'), findsOneWidget);
       expect(t.takeException(), isNull);
       await finish(t);
@@ -273,7 +282,10 @@ void main() {
       await mount(
         t,
         AuthGate(
-          signedInPage: MainShell(nearbyLoader: ({force = false}) async => []),
+          signedInPage: MainShell(
+            activityRepository: FakeActivityRepository(),
+            nearbyLoader: ({force = false}) async => [],
+          ),
         ),
       );
       await tap(t, find.text('내 정보'));
@@ -299,18 +311,20 @@ void main() {
       MainShell(
         facilityPage: const Center(child: Text('테스트 지도')),
         nearbyLoader: ({force = false}) async => [],
+        activityRepository: FakeActivityRepository(),
       ),
     );
-    for (final label in ['시설찾기', '모임', '커뮤니티', '내 정보', '홈']) {
+    for (final label in ['시설 찾기', '활동', '동네 모임', '커뮤니티', '홈']) {
       await tap(t, find.widgetWithText(NavigationDestination, label));
     }
-    await mount(t, const ProfilePage());
+    await mount(t, ProfilePage(activityRepository: FakeActivityRepository()));
     for (final label in [
-      '내 게시글 관리',
-      '내 모임 관리',
+      '내가 쓴 게시글',
+      '내가 만든 모임',
       '회원정보 관리',
       '개인정보 처리방침',
-      '활동 미션 · 경험 은행',
+      '나의 활동',
+      '즐겨찾는 시설',
     ]) {
       await tap(t, find.text(label));
       expect(t.takeException(), isNull);
@@ -373,18 +387,19 @@ void main() {
       await finish(t);
     },
   );
-  testWidgets('home distinguishes failed post lookup from an empty board', (
-    t,
-  ) async {
-    backend.failPosts = true;
-    await mount(t, HomeTab(nearbyLoader: ({force = false}) async => []));
-    await tap(t, find.text('게시글을 불러오지 못했어요. 다시 시도'));
-    expect(find.text('아직 게시글이 없습니다.'), findsNothing);
-    backend.failPosts = false;
-    await tap(t, find.text('게시글을 불러오지 못했어요. 다시 시도'));
-    expect(find.text('아직 게시글이 없습니다.'), findsOneWidget);
-    await finish(t);
-  });
+  testWidgets(
+    'favorite list distinguishes a failed lookup from an empty list',
+    (t) async {
+      backend.failFavorites = true;
+      await mount(t, const FavoriteFacilitiesPage());
+      expect(find.text('즐겨찾는 시설을 불러오지 못했어요.'), findsOneWidget);
+      expect(find.text('아직 즐겨찾는 시설이 없어요.'), findsNothing);
+      backend.failFavorites = false;
+      await tap(t, find.text('다시 시도'));
+      expect(find.text('아직 즐겨찾는 시설이 없어요.'), findsOneWidget);
+      await finish(t);
+    },
+  );
   testWidgets(
     'changing province replaces district dropdown with a valid selection',
     (t) async {

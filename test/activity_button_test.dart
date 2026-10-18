@@ -10,28 +10,41 @@ import 'support/fake_activity_repository.dart';
 import 'support/widget_actions.dart';
 
 void main() {
-  testWidgets(
-    'service failure offers working retry and all tabs render empty states',
-    (t) async {
-      final r = FakeActivityRepository()..fail = true;
-      await mount(t, ActivityHubPage(repository: r));
-      expect(find.text('다시 시도'), findsOneWidget);
-      r.fail = false;
-      await tap(t, find.text('다시 시도'));
-      await tap(t, find.text('경험 은행'));
-      expect(find.text('아직 등록한 경험이 없어요.'), findsOneWidget);
-      await tap(t, find.text('전체 활동'));
-      expect(find.text('가벼운 산책'), findsOneWidget);
-      await tap(t, find.text('내 신청'));
-      expect(find.text('아직 신청한 활동이 없어요.'), findsOneWidget);
-      await finish(t);
-    },
-  );
+  testWidgets('independent activity pages offer retry and empty states', (
+    t,
+  ) async {
+    final r = FakeActivityRepository()..fail = true;
+    await mount(t, ActivityHubPage(repository: r));
+    expect(find.byType(TabBar), findsNothing);
+    await tap(t, find.text('맞춤 활동 찾기'));
+    expect(find.text('다시 시도'), findsOneWidget);
+    r.fail = false;
+    await tap(t, find.text('다시 시도'));
+    await tap(t, find.text('전체 프로그램 탐색'));
+    expect(find.text('가벼운 산책'), findsOneWidget);
+    await mount(
+      t,
+      ActivitySectionPage(
+        section: ActivitySection.myExperiences,
+        repository: r,
+      ),
+    );
+    expect(find.text('아직 등록한 경험이 없어요.'), findsOneWidget);
+    await mount(
+      t,
+      ActivitySectionPage(section: ActivitySection.mine, repository: r),
+    );
+    expect(find.text('아직 신청한 활동이 없어요.'), findsOneWidget);
+    await finish(t);
+  });
   testWidgets('mission create and safe rebuild buttons invoke repository', (
     t,
   ) async {
     final r = FakeActivityRepository()..pref = {'place_name': '동네'};
-    await mount(t, ActivityHubPage(repository: r));
+    await mount(
+      t,
+      ActivitySectionPage(section: ActivitySection.missions, repository: r),
+    );
     await tap(t, find.text('이번 주 미션 만들기'));
     expect(r.planCalls, 1);
     await tap(t, find.text('신청 전 미션 다시 고르기'));
@@ -215,6 +228,7 @@ void main() {
     await mount(
       t,
       ActivityAgencyPage(
+        section: AgencySection.applications,
         organizations: const [
           {'id': 'org', 'name': '복지관'},
         ],
@@ -230,6 +244,16 @@ void main() {
     await tap(t, find.text('실제 활동 완료 확인'));
     await tap(t, find.text('확인'));
     expect(r.lastAction, 'completed');
+    await mount(
+      t,
+      ActivityAgencyPage(
+        organizations: const [
+          {'id': 'org', 'name': '복지관'},
+        ],
+        repository: r,
+        section: AgencySection.programs,
+      ),
+    );
     await tap(t, find.text('가벼운 산책 모집 마감'));
     await tap(t, find.text('확인'));
     expect(r.closeCalls, 1);
@@ -284,7 +308,7 @@ void main() {
     addTearDown(() => t.binding.setSurfaceSize(null));
     final r = FakeActivityRepository()..pref = {'place_name': '동네'};
     await mount(t, ActivityHubPage(repository: r), scale: 2);
-    await tap(t, find.text('경험 은행'));
+    await tap(t, find.text('경험 나눔'));
     expect(t.takeException(), isNull);
     await mount(t, ActivityPreferencesPage(repository: r), scale: 2);
     await tap(t, find.byType(SwitchListTile));
@@ -354,6 +378,7 @@ void main() {
     await mount(
       t,
       ActivityAgencyPage(
+        section: AgencySection.applications,
         organizations: const [
           {'id': 'org', 'name': '복지관'},
         ],

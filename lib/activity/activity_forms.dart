@@ -334,8 +334,10 @@ class ActivityProgramForm extends StatefulWidget {
     this.repository,
     this.placePicker = pickActivityPlace,
     this.datePicker = pickActivityDate,
+    this.initialKind = 'activity',
   });
   final List<ActivityData> organizations;
+  final String initialKind;
   final ActivityRepository? repository;
   final ActivityPlacePicker placePicker;
   final Future<DateTime?> Function(BuildContext, DateTime?) datePicker;
@@ -349,9 +351,8 @@ class _ActivityProgramFormState extends State<ActivityProgramForm> {
       capacity = TextEditingController(text: '10'),
       fee = TextEditingController(text: '0');
   late String? org = widget.organizations.firstOrNull?['id'];
-  String kind = 'activity',
-      category = activityCategories.first,
-      participation = '혼자';
+  late String kind = widget.initialKind;
+  String category = activityCategories.first, participation = '혼자';
   int level = 1;
   final transports = {'도보', '대중교통', '자동차'};
   FacilityResult? place;

@@ -1,3 +1,5 @@
+import 'sign_out.dart';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -106,34 +108,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     );
   }
 
-  Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('로그아웃하시겠어요?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('로그아웃'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await Supabase.instance.client.auth.signOut();
-      // AuthGate swaps its built content to LoginPage once the auth state
-      // stream fires, but this page was pushed on top of it via the app's
-      // single shared Navigator — without popping back to that root route,
-      // it would keep covering the login screen underneath.
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-    }
-  }
+  Future<void> _confirmSignOut() => confirmAccountSignOut(context);
 
   @override
   Widget build(BuildContext context) {

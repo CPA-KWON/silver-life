@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
-import 'activity_hub_page.dart';
 
 Future<bool> activityConfirm(
   BuildContext context,
@@ -47,39 +46,6 @@ class ActivityInfo extends StatelessWidget {
         Text(message),
         if (onRetry != null)
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),
-      ],
-    ),
-  );
-}
-
-class ActivityHomeSection extends StatelessWidget {
-  const ActivityHomeSection({super.key});
-  @override
-  Widget build(BuildContext context) => SectionCard(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SectionHeader(title: '이번 주 나의 활동 미션'),
-        const Text('익숙한 동네에서, 내 속도에 맞게 시작해요.'),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ActivityHubPage()),
-          ),
-          icon: const Icon(Icons.explore_outlined),
-          label: const Text('내 활동 미션 보기'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ActivityHubPage(initialTab: 1),
-            ),
-          ),
-          child: const Text('동네 경험 은행 둘러보기'),
-        ),
       ],
     ),
   );

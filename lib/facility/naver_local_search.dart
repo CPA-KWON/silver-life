@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
@@ -122,12 +123,25 @@ class FacilitySearchService {
   final _pendingAreas = <String, Future<String>>{};
 
   static Future<String> _reverseGeocode(double lat, double lng) async {
-    final placemarks = await Geocoding().placemarkFromCoordinates(lat, lng);
+    final placemarks = await Geocoding().placemarkFromCoordinates(
+      lat,
+      lng,
+      locale: const Locale('ko', 'KR'),
+    );
     if (placemarks.isEmpty) return '';
     final place = placemarks.first;
-    return place.subLocality?.isNotEmpty == true
-        ? place.subLocality!
-        : (place.locality ?? '');
+    // Native geocoders otherwise inherit an English device locale, producing
+    // queries such as 'Sogong-dong 약국' with no NAVER matches. Keep the city
+    // and district as well, since multiple cities share neighbourhood names.
+    return {
+      for (final part in [
+        place.administrativeArea,
+        place.subAdministrativeArea,
+        place.locality,
+        place.subLocality,
+      ])
+        if (part?.trim().isNotEmpty == true) part!.trim(),
+    }.join(' ');
   }
 
   String _positionKey(double lat, double lng) =>

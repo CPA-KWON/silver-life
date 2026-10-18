@@ -51,6 +51,7 @@ dependencies:
   http: ^1.6.0
 
 dev_dependencies:
+  geocoding_platform_interface: ^5.0.0
   flutter_test:
     sdk: flutter
 

@@ -46,7 +46,14 @@ class _SessionNavigatorState extends State<_SessionNavigator> {
 
   @override
   Widget build(BuildContext context) => NavigatorPopHandler<Object?>(
-    onPopWithResult: (_) => navigatorKey.currentState!.pop(),
+    onPopWithResult: (_) {
+      // A child activity Navigator also handles Android back. Its navigation
+      // notification must not pop the signed-in root route at the same time.
+      final navigator = navigatorKey.currentState;
+      if (navigator != null) {
+        navigator.maybePop();
+      }
+    },
     child: Navigator(
       key: navigatorKey,
       onGenerateRoute: (_) =>
