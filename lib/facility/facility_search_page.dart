@@ -29,6 +29,7 @@ class FacilitySearchPage extends StatefulWidget {
     this.isActive = true,
     this.mapPlaceholder,
     this.enableRealtime = true,
+    this.showDetailBackButton = true,
   });
 
   /// Pause location tracking while the map tab is hidden.
@@ -45,6 +46,7 @@ class FacilitySearchPage extends StatefulWidget {
   final FacilityResult? initialFacility;
   final Widget? mapPlaceholder;
   final bool enableRealtime;
+  final bool showDetailBackButton;
 
   @override
   State<FacilitySearchPage> createState() => _FacilitySearchPageState();
@@ -73,6 +75,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   // Drives "이 위치에서 검색" and re-search after panning.
   String? _activeSearchTerm;
   bool _isSearching = false;
+  Object? _searchError;
   // Shown after the user manually pans/zooms the map (not after our own
   // post-search recenter), so they can re-search around wherever they
   // scrolled to instead of always their GPS location.
@@ -206,6 +209,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   }
 
   void _selectCategory(String category) {
+    if (_isSearching) return;
     // Picking a top-level category (e.g. re-tapping "병원") resets any
     // hospital specialty filter and searches the broad category again, and
     // clears any typed keyword search so the two don't mix.
@@ -218,12 +222,14 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   }
 
   void _selectSubcategory(String subcategory) {
+    if (_isSearching) return;
     _searchController.clear();
     setState(() => _subcategory = subcategory);
     _searchAtCamera(subcategory);
   }
 
   void _submitTextSearch() {
+    if (_isSearching) return;
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
     FocusScope.of(context).unfocus();
@@ -255,9 +261,16 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
       _isSearching = true;
       _showSearchHereButton = false;
       _activeSearchTerm = searchTerm;
+      _searchError = null;
     });
 
     try {
+      // A new category must never keep the previous category's markers,
+      // including when the next server request fails.
+      await controller
+          .clearOverlays(type: NOverlayType.marker)
+          .timeout(const Duration(seconds: 3));
+      if (!mounted || !identical(controller, _controller)) return;
       final position = await controller.getCameraPosition().timeout(
         const Duration(seconds: 3),
       );
@@ -286,7 +299,12 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
           caption: NOverlayCaption(text: result.name),
         );
         marker.setOnTapListener((_) {
-          if (!mounted || !widget.isActive) return;
+          if (!mounted ||
+              !widget.isActive ||
+              _isSearching ||
+              _activeSearchTerm != searchTerm) {
+            return;
+          }
           if (_placeResult != null) {
             _pickedInPlace(result);
           } else if (widget.onPicked != null) {
@@ -298,10 +316,6 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
         markers.add(marker);
       }
 
-      await controller
-          .clearOverlays(type: NOverlayType.marker)
-          .timeout(const Duration(seconds: 3));
-      if (!mounted || !identical(controller, _controller)) return;
       if (markers.isNotEmpty) {
         await controller
             .addOverlayAll(markers)
@@ -325,30 +339,8 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
             SnackBar(content: Text('주변에서 "$searchTerm"를 찾지 못했습니다.')),
           );
       }
-    } on TimeoutException {
-      if (mounted && widget.isActive) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('검색 응답이 늦어지고 있어요. 잠시 후 다시 시도해 주세요.')),
-        );
-      }
-    } on FacilityRateLimitException {
-      if (mounted && widget.isActive) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(content: Text('오늘은 검색이 많아 잠시 후 다시 시도해주세요.')),
-          );
-      }
-    } catch (_) {
-      if (mounted && widget.isActive) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text('시설을 검색하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'),
-            ),
-          );
-      }
+    } catch (error) {
+      if (mounted) setState(() => _searchError = error);
     } finally {
       if (mounted) setState(() => _isSearching = false);
     }
@@ -480,6 +472,45 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
               ],
             ),
           ),
+          if (_searchError != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: _placeResult == null ? 16 : 96,
+              child: Material(
+                borderRadius: BorderRadius.circular(16),
+                color: AppColors.surface,
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(facilitySearchErrorMessage(_searchError!)),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _isSearching
+                            ? null
+                            : () {
+                                if (_searchError
+                                    is FacilitySearchNotReadyException) {
+                                  _selectCategory('경로당');
+                                } else {
+                                  _searchAtCamera(_activeSearchTerm!);
+                                }
+                              },
+                        child: Text(
+                          _searchError is FacilitySearchNotReadyException
+                              ? '경로당 보기'
+                              : '다시 시도',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           if (_selectedFacility != null)
             Positioned.fill(
               child: Offstage(
@@ -493,6 +524,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
                   }),
                   enableRealtime: widget.enableRealtime,
                   refreshVersion: _detailVersion,
+                  showBackButton: widget.showDetailBackButton,
                 ),
               ),
             ),
@@ -551,12 +583,14 @@ class FacilityDetailPage extends StatefulWidget {
     this.onOpenPost,
     this.enableRealtime = true,
     this.refreshVersion = 0,
+    this.showBackButton = true,
   });
 
   final FacilityResult result;
   final ValueChanged<String>? onOpenPost;
   final bool enableRealtime;
   final int refreshVersion;
+  final bool showBackButton;
 
   /// Called instead of a Navigator pop — this page is shown as an in-place
   /// overlay over [FacilitySearchPage], not a pushed route (see
@@ -820,10 +854,13 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: widget.onClose,
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: widget.onClose,
+              )
+            : null,
         title: Text(result.name),
         actions: [
           IconButton(

@@ -151,7 +151,10 @@ class _HomeTabState extends State<HomeTab> {
       MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('시설찾기')),
-          body: FacilitySearchPage(initialFacility: r),
+          body: FacilitySearchPage(
+            initialFacility: r,
+            showDetailBackButton: false,
+          ),
         ),
       ),
     );

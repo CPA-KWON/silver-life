@@ -16,6 +16,41 @@ class FacilityRateLimitException implements Exception {
   const FacilityRateLimitException();
 }
 
+class FacilitySearchNotReadyException implements Exception {
+  const FacilitySearchNotReadyException();
+}
+
+class FacilitySearchAuthException implements Exception {
+  const FacilitySearchAuthException();
+}
+
+class FacilitySearchServerException implements Exception {
+  const FacilitySearchServerException(this.statusCode);
+  final int statusCode;
+
+  @override
+  String toString() => 'FacilitySearchServerException($statusCode)';
+}
+
+String facilitySearchErrorMessage(Object error) {
+  if (error is FacilitySearchNotReadyException) {
+    return '병원·약국·복지관 검색을 준비 중이에요. 지금은 경로당을 찾아볼 수 있어요.';
+  }
+  if (error is FacilitySearchAuthException) {
+    return '로그인 상태를 확인하지 못했어요. 다시 로그인한 뒤 검색해주세요.';
+  }
+  if (error is FacilityRateLimitException) {
+    return '검색 요청이 많아요. 잠시 후 다시 시도해주세요.';
+  }
+  if (error is TimeoutException) {
+    return '검색 응답이 늦어지고 있어요. 잠시 후 다시 시도해주세요.';
+  }
+  if (error is http.ClientException) {
+    return '시설 검색에 연결하지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해주세요.';
+  }
+  return '시설 검색이 원활하지 않아요. 잠시 후 다시 시도해주세요.';
+}
+
 class _CacheEntry<T> {
   _CacheEntry(this.value, this.fetchedAt);
   final T value;
@@ -165,11 +200,11 @@ class FacilitySearchService {
     double lng,
   ) async {
     final token = _accessToken();
-    if (token == null ||
-        token.isEmpty ||
-        supabaseUrl.isEmpty ||
-        supabaseAnonKey.isEmpty) {
-      throw StateError('시설 검색 연결 설정과 로그인을 확인해 주세요.');
+    if (token == null || token.isEmpty) {
+      throw const FacilitySearchAuthException();
+    }
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      throw const FacilitySearchNotReadyException();
     }
     final area = await _area(lat, lng);
     final uri = Uri.parse('$supabaseUrl/functions/v1/facility-search');
@@ -200,10 +235,28 @@ class FacilitySearchService {
       if (!abort.isCompleted) abort.complete();
     }
     if (response.statusCode == 429) throw const FacilityRateLimitException();
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw const FacilitySearchAuthException();
+    }
+    if (response.statusCode == 404) {
+      throw const FacilitySearchNotReadyException();
+    }
+    if (response.statusCode == 503) {
+      try {
+        final error = jsonDecode(utf8.decode(response.bodyBytes));
+        if (error is Map &&
+            (error['code'] == 'SEARCH_NOT_CONFIGURED' ||
+                error['error'] == '시설 검색을 준비 중입니다.')) {
+          throw const FacilitySearchNotReadyException();
+        }
+      } on FormatException {
+        // Non-JSON outage pages are server failures, not setup notices.
+      }
+    }
     if (response.statusCode != 200) {
       // Server response bodies may contain technical information. Keep the
       // status for diagnosis without displaying the raw body to users.
-      throw http.ClientException('지역검색 API 오류 (${response.statusCode})', uri);
+      throw FacilitySearchServerException(response.statusCode);
     }
     final body =
         jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;

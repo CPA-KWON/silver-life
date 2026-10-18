@@ -207,6 +207,84 @@ void main() {
     expect(await search(service), hasLength(2));
   });
 
+  test(
+    'missing server setup is distinct from network and server outages',
+    () async {
+      for (final response in [
+        http.Response(
+          jsonEncode({'error': '시설 검색을 준비 중입니다.'}),
+          503,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+        http.Response(jsonEncode({'code': 'SEARCH_NOT_CONFIGURED'}), 503),
+        http.Response('', 404),
+      ]) {
+        final service = testService(
+          resolveArea: (_, _) async => '중구',
+          client: MockClient((_) async => response),
+        );
+        addTearDown(service.close);
+        await expectLater(
+          search(service),
+          throwsA(isA<FacilitySearchNotReadyException>()),
+        );
+      }
+      expect(
+        facilitySearchErrorMessage(const FacilitySearchNotReadyException()),
+        contains('경로당'),
+      );
+      expect(
+        facilitySearchErrorMessage(const FacilitySearchNotReadyException()),
+        isNot(contains('인터넷')),
+      );
+    },
+  );
+  test(
+    'expired login is not reported as an internet connection failure',
+    () async {
+      for (final status in [401, 403]) {
+        final service = testService(
+          resolveArea: (_, _) async => '중구',
+          client: MockClient((_) async => http.Response('', status)),
+        );
+        addTearDown(service.close);
+        await expectLater(
+          search(service),
+          throwsA(isA<FacilitySearchAuthException>()),
+        );
+      }
+      expect(
+        facilitySearchErrorMessage(const FacilitySearchAuthException()),
+        contains('로그인'),
+      );
+    },
+  );
+  test(
+    'unavailable server responses keep diagnostics private and permit retry',
+    () async {
+      var calls = 0;
+      final service = testService(
+        resolveArea: (_, _) async => '중구',
+        client: MockClient(
+          (_) async => ++calls == 1
+              ? http.Response('<html>private upstream details</html>', 503)
+              : results(),
+        ),
+      );
+      addTearDown(service.close);
+      await expectLater(
+        search(service),
+        throwsA(isA<FacilitySearchServerException>()),
+      );
+      expect(await search(service), hasLength(2));
+      expect(calls, 2);
+      expect(
+        facilitySearchErrorMessage(http.ClientException('offline')),
+        contains('인터넷'),
+      );
+    },
+  );
+
   test('raw error bodies are not displayed to users', () async {
     final service = testService(
       resolveArea: (_, _) async => '중구',
@@ -219,7 +297,8 @@ void main() {
       await search(service);
       fail('503 should fail');
     } catch (error) {
-      expect(error, isA<http.ClientException>());
+      expect(error, isA<FacilitySearchServerException>());
+      expect(facilitySearchErrorMessage(error), isNot(contains('인터넷')));
       expect(error.toString(), isNot(contains('internal diagnostic data')));
     }
   });

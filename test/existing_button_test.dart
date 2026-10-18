@@ -106,6 +106,41 @@ void main() {
     expect(t.takeException(), isNull);
     await finish(t);
   });
+  testWidgets('home facility page keeps only its outer back arrow', (t) async {
+    await mount(
+      t,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => Scaffold(
+                appBar: AppBar(title: const Text('시설찾기')),
+                body: const FacilitySearchPage(
+                  initialFacility: testPlace,
+                  showDetailBackButton: false,
+                  mapPlaceholder: ColoredBox(color: Colors.blue),
+                  enableRealtime: false,
+                ),
+              ),
+            ),
+          ),
+          child: const Text('시설 열기'),
+        ),
+      ),
+    );
+    await tap(t, find.text('시설 열기'));
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    expect(find.text('테스트 복지관'), findsWidgets);
+    expect(find.byTooltip('즐겨찾기'), findsOneWidget);
+    await tap(t, find.byType(BackButton));
+    expect(find.byType(FacilityDetailPage), findsNothing);
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    await tap(t, find.byType(BackButton));
+    expect(find.text('시설 열기'), findsOneWidget);
+    await finish(t);
+  });
+
   testWidgets('map facility favorite and presence buttons work', (t) async {
     await mount(
       t,
@@ -115,6 +150,7 @@ void main() {
         enableRealtime: false,
       ),
     );
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
     await tap(t, find.byTooltip('즐겨찾기'));
     expect(backend.favorites.length, 1);
     await tap(t, find.text('나 여기 있음'));
