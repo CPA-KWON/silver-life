@@ -2,6 +2,98 @@ import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
 
+/// The mockup's ring uses actual mission counts; an empty week is not 0/3.
+class WeeklyActivitySummary extends StatelessWidget {
+  const WeeklyActivitySummary({
+    super.key,
+    required this.completed,
+    required this.total,
+    required this.upcoming,
+    required this.onOpen,
+  });
+  final int completed, total, upcoming;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      children: [
+        Text(
+          '이번 주 활동 현황',
+          style: text.titleLarge?.copyWith(color: Colors.white),
+        ),
+        const SizedBox(height: 12),
+        SizedBox.square(
+          dimension: MediaQuery.textScalerOf(context)
+              .scale(180)
+              .clamp(180, 240),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    center: Alignment(-0.4, -0.5),
+                    colors: [AppColors.primary, AppColors.heroCircle],
+                  ),
+                ),
+              ),
+              ExcludeSemantics(
+                child: CircularProgressIndicator(
+                  value: total == 0 ? 0 : (completed / total).clamp(0, 1),
+                  strokeWidth: 3,
+                  backgroundColor: AppColors.heroTrack,
+                  color: AppColors.heroProgress,
+                  strokeCap: StrokeCap.round,
+                ),
+              ),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      total == 0 ? '시작 전' : '$completed',
+                      style: text.displayLarge?.copyWith(
+                        fontSize: total == 0 ? 28 : 56,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (total != 0)
+                      Text(
+                        '개 완료',
+                        style: text.bodyLarge?.copyWith(color: Colors.white),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '예정 활동 $upcoming개 · ${total == 0 ? '미션 미생성' : '미션 $completed/$total개 완료'}',
+          textAlign: TextAlign.center,
+          style: text.bodyLarge?.copyWith(color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: AppColors.heroCircle,
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            shape: const StadiumBorder(),
+          ),
+          onPressed: onOpen,
+          child: const Text('나의 활동 보기'),
+        ),
+      ],
+    );
+  }
+}
+
 /// Section title row with an optional trailing widget (e.g. "see all").
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, this.trailing});
@@ -25,7 +117,7 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Circular lavender badge holding a single icon.
+/// Circular blue badge holding a single icon.
 class IconBadge extends StatelessWidget {
   const IconBadge({
     super.key,
@@ -84,10 +176,7 @@ class StatusPill extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: ShapeDecoration(
-        color: bg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      ),
+      decoration: ShapeDecoration(color: bg, shape: const StadiumBorder()),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(color: fg),
@@ -118,17 +207,19 @@ class SectionCard extends StatelessWidget {
     this.header,
     required this.child,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    this.color = AppColors.surface,
   });
 
   final Widget? header;
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
+      color: color,
+      borderRadius: BorderRadius.circular(26),
       child: Padding(
         padding: padding,
         child: Column(
@@ -232,10 +323,7 @@ class TagBadge extends StatelessWidget {
       TagTone.neutral => (AppColors.neutralTint, AppColors.scheduleText),
     };
     return DecoratedBox(
-      decoration: ShapeDecoration(
-        color: bg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      ),
+      decoration: ShapeDecoration(color: bg, shape: const StadiumBorder()),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         child: Text(

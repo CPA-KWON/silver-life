@@ -3,40 +3,45 @@ import 'package:flutter/material.dart';
 /// Brand palette shared by the theme and by widgets that need a raw color.
 /// [primary] is dark enough (~6:1) for white text to sit directly on it.
 abstract final class AppColors {
-  static const primary = Color(0xFF4F46E5);
+  static const primary = Color(0xFF086FA9);
 
-  /// Hero gradient (lavender wash); large areas only, never text-bearing controls.
-  static const gradientStart = Color(0xFFEEF0FF);
-  static const gradientEnd = Color(0xFFF2EEFF);
+  /// Approved blue mockup. Text-bearing hero content uses the darker top.
+  static const gradientStart = Color(0xFF087BBC);
+  static const gradientEnd = Color(0xFF9BCBE7);
+  static const heroCircle = Color(0xFF176A9E);
+  static const heroTrack = Color(0xFF508AB1);
+  static const heroProgress = Color(0xFFADFFE2);
+  static const navigation = Color(0xFF111D29);
+  static const navigationMuted = Color(0xFFCDD7E0);
 
-  /// Lavender wash for chip/icon backgrounds and the selected nav pill.
-  static const tint = Color(0xFFEEF0FF);
-  static const blueTint = Color(0xFFEAF3FF);
-  static const blueText = Color(0xFF1E5BC6);
+  /// Quiet blue surfaces for categories and icons.
+  static const tint = Color(0xFFE7F2FA);
+  static const blueTint = Color(0xFFE7F2FA);
+  static const blueText = Color(0xFF086FA9);
   static const mintTint = Color(0xFFE8F7F1);
   static const mintText = Color(0xFF0F7A55);
-  static const neutralTint = Color(0xFFF2F3F5);
+  static const neutralTint = Color(0xFFEEF3F7);
 
-  static const background = Color(0xFFF4F5F8);
+  static const background = Color(0xFFF0F5F9);
   static const surface = Color(0xFFFFFFFF);
 
-  static const textPrimary = Color(0xFF111827);
-  static const scheduleText = Color(0xFF4B5563);
-  static const textSecondary = Color(0xFF666D7A);
+  static const textPrimary = Color(0xFF152B3E);
+  static const scheduleText = Color(0xFF435C70);
+  static const textSecondary = Color(0xFF52677A);
 
   /// Icons and chevrons only; too light for text.
   static const textTertiary = Color(0xFF9CA3AF);
-  static const border = Color(0xFFE6E8F0);
-  static const segmentTrack = Color(0xFFE9EBF0);
-  static const navBorder = Color(0xFFECEEF1);
-  static const divider = Color(0xFFF1F2F4);
+  static const border = Color(0xFFD9E5EE);
+  static const segmentTrack = Color(0xFFE3ECF3);
+  static const navBorder = Color(0xFFD9E5EE);
+  static const divider = Color(0xFFE8EFF5);
 
   static const danger = Color(0xFFDC2626);
   static const success = Color(0xFF15803D);
 
-  /// Very soft indigo-tinted shadow (legacy; v5 cards use no shadow).
+  /// Soft blue shadow for elevated controls only.
   static const cardShadow = <BoxShadow>[
-    BoxShadow(color: Color(0x144F46E5), blurRadius: 16, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x14086FA9), blurRadius: 16, offset: Offset(0, 4)),
   ];
 }
 
@@ -78,18 +83,17 @@ final TextTheme _textTheme = TextTheme(
 );
 
 final RoundedRectangleBorder _buttonShape = RoundedRectangleBorder(
-  borderRadius: BorderRadius.circular(16),
+  borderRadius: BorderRadius.circular(24),
 );
 
 OutlineInputBorder _inputBorder(Color color, double width) =>
     OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(20),
       borderSide: BorderSide(color: color, width: width),
     );
 
-/// Retuned to the approved "v5" design: indigo accent, lavender tints, white
-/// borderless cards on a light gray page, compact-but-tappable controls.
-/// Pretendard everywhere.
+/// Blue mockup applied across existing screens; retain senior-sized type and
+/// touch targets instead of copying the reference's small labels.
 final ThemeData seniorFriendlyTheme = ThemeData(
   useMaterial3: true,
   fontFamily: _fontFamily,
@@ -126,22 +130,22 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     backgroundColor: AppColors.surface,
     foregroundColor: AppColors.textPrimary,
     elevation: 0,
-    scrolledUnderElevation: 0.5,
+    scrolledUnderElevation: 0,
     shadowColor: AppColors.border,
     surfaceTintColor: Colors.transparent,
     centerTitle: false,
-    toolbarHeight: 56,
+    toolbarHeight: 64,
     titleTextStyle: _style(22, FontWeight.w600, _textPrimary),
     iconTheme: const IconThemeData(size: 24, color: AppColors.textPrimary),
   ),
 
   navigationBarTheme: NavigationBarThemeData(
-    height: 72,
-    backgroundColor: AppColors.surface,
+    height: 104,
+    backgroundColor: AppColors.navigation,
     surfaceTintColor: Colors.transparent,
     elevation: 0,
     shadowColor: Colors.transparent,
-    indicatorColor: AppColors.tint,
+    indicatorColor: AppColors.navigation,
     indicatorShape: const StadiumBorder(),
     labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
     labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -149,14 +153,15 @@ final ThemeData seniorFriendlyTheme = ThemeData(
       return _style(
         18,
         selected ? FontWeight.w600 : FontWeight.w500,
-        selected ? AppColors.primary : AppColors.textSecondary,
+        selected ? Colors.white : AppColors.navigationMuted,
+        height: 1.2,
       );
     }),
     iconTheme: WidgetStateProperty.resolveWith((states) {
       final selected = states.contains(WidgetState.selected);
       return IconThemeData(
         size: 24,
-        color: selected ? AppColors.primary : AppColors.textSecondary,
+        color: selected ? Colors.white : AppColors.navigationMuted,
       );
     }),
   ),
@@ -223,14 +228,14 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     elevation: 0,
     margin: EdgeInsets.zero,
     surfaceTintColor: Colors.transparent,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
   ),
 
   listTileTheme: ListTileThemeData(
     minVerticalPadding: 10,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
     titleTextStyle: _style(22, FontWeight.w600, _textPrimary),
-    subtitleTextStyle: _style(22, FontWeight.w500, _textSecondary),
+    subtitleTextStyle: _style(18, FontWeight.w400, _textSecondary),
     iconColor: AppColors.primary,
     minLeadingWidth: 40,
   ),
@@ -275,7 +280,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
   dialogTheme: DialogThemeData(
     backgroundColor: AppColors.surface,
     surfaceTintColor: Colors.transparent,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     titleTextStyle: _style(22, FontWeight.w600, _textPrimary),
     contentTextStyle: _style(18, FontWeight.w400, _textPrimary, height: 1.4),
   ),
@@ -284,7 +289,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     behavior: SnackBarBehavior.floating,
     backgroundColor: AppColors.textPrimary,
     contentTextStyle: _style(18, FontWeight.w500, Colors.white),
-    actionTextColor: const Color(0xFFC7CBFF),
+    actionTextColor: AppColors.heroProgress,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
   ),
 
@@ -292,7 +297,7 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     backgroundColor: AppColors.surface,
     surfaceTintColor: Colors.transparent,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
     ),
   ),
 

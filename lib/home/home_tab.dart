@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../app_theme.dart';
 import '../activity/activity_repository.dart';
 import '../activity/activity_hub_page.dart';
 import '../activity/activity_detail_page.dart';
@@ -82,7 +83,7 @@ class _HomeTabState extends State<HomeTab> {
 
   DateTime? date(dynamic value) => DateTime.tryParse('$value')?.toLocal();
 
-  List<Widget> summary(ActivityData d) {
+  Widget dashboard(String nickname, ActivityData? d) {
     final now = DateTime.now();
     final monday = DateTime(
       now.year,
@@ -90,9 +91,9 @@ class _HomeTabState extends State<HomeTab> {
       now.day,
     ).subtract(Duration(days: now.weekday - 1));
     final nextMonday = monday.add(const Duration(days: 7));
-    final missions = activityRows(d['missions']);
+    final missions = activityRows(d?['missions']);
     final upcoming =
-        activityRows(d['applications'])
+        activityRows(d?['applications'])
             .where(
               (e) =>
                   e['status'] == 'approved' &&
@@ -107,107 +108,169 @@ class _HomeTabState extends State<HomeTab> {
     final weekly = upcoming
         .where((e) => date(e['program']['starts_at'])!.isBefore(nextMonday))
         .length;
-    final recommendations = activityRows(d['recommendations'])
+    final recommendations = activityRows(d?['recommendations'])
         .where((p) => p['kind'] == 'activity')
         .take(2);
-    return [
-      SectionCard(
-        header: const SectionHeader(title: '이번 주 활동 현황'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '예정 활동 $weekly개 · ${missions.isEmpty ? '미션 미생성' : '미션 ${missions.where((m) => m['status'] == 'completed').length}/${missions.length}개 완료'}',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.gradientStart,
+                AppColors.gradientStart,
+                d == null ? AppColors.gradientStart : AppColors.gradientEnd,
+              ],
+              stops: const [0, 0.4, 1],
             ),
-            TextButton(
-              onPressed: () => section(ActivitySection.mine),
-              child: const Text('나의 활동 보기'),
-            ),
-          ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$nickname님, 안녕하세요',
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(color: Colors.white),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${now.month}월 ${now.day}일',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.heroCircle,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () =>
+                        open(ProfilePage(activityRepository: repo)),
+                    icon: const Icon(Icons.person_outline),
+                    label: const Text('내 정보'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (d != null)
+                WeeklyActivitySummary(
+                  completed: missions
+                      .where((m) => m['status'] == 'completed')
+                      .length,
+                  total: missions.length,
+                  upcoming: weekly,
+                  onOpen: () => section(ActivitySection.mine),
+                ),
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-      const SectionHeader(title: '가장 가까운 예정 활동'),
-      if (upcoming.isEmpty)
-        const ActivityInfo('아직 확정된 예정 활동이 없어요.')
-      else
-        ActivityProgramCard(
-          program: Map<String, dynamic>.from(upcoming.first['program']),
-          label: '참여 예정',
-          onTap: () => program(upcoming.first['program']['id']),
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: d == null
+                ? [ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload)]
+                : [
+                    const SectionHeader(title: '가장 가까운 예정 활동'),
+                    if (upcoming.isEmpty)
+                      const ActivityInfo(
+                        '아직 확정된 예정 활동이 없어요.',
+                        color: AppColors.background,
+                      )
+                    else
+                      ActivityProgramCard(
+                        program: Map<String, dynamic>.from(
+                          upcoming.first['program'],
+                        ),
+                        label: '참여 예정',
+                        color: AppColors.background,
+                        onTap: () => program(upcoming.first['program']['id']),
+                      ),
+                    const SizedBox(height: 16),
+                    SectionHeader(
+                      title: '맞춤 추천 활동',
+                      trailing: TextButton(
+                        onPressed: () => section(ActivitySection.find),
+                        child: const Text('더 보기'),
+                      ),
+                    ),
+                    if (d['preferences'] == null)
+                      ActivityMenuLink(
+                        title: '추천 조건 설정',
+                        subtitle: '기준 장소와 관심 분야를 알려주세요',
+                        icon: Icons.tune,
+                        color: AppColors.background,
+                        onTap: () => section(ActivitySection.find),
+                      )
+                    else if (recommendations.isEmpty)
+                      const ActivityInfo(
+                        '현재 조건에 맞는 활동이 없어요.',
+                        color: AppColors.background,
+                      )
+                    else
+                      for (final p in recommendations)
+                        ActivityProgramCard(
+                          program: p,
+                          color: AppColors.background,
+                          onTap: () => program(p['id']),
+                        ),
+                  ],
+          ),
         ),
-      const SizedBox(height: 16),
-      SectionHeader(
-        title: '맞춤 추천 활동',
-        trailing: TextButton(
-          onPressed: () => section(ActivitySection.find),
-          child: const Text('더 보기'),
-        ),
-      ),
-      if (d['preferences'] == null)
-        ActivityMenuLink(
-          title: '추천 조건 설정',
-          subtitle: '기준 장소와 관심 분야를 알려주세요',
-          icon: Icons.tune,
-          onTap: () => section(ActivitySection.find),
-        )
-      else if (recommendations.isEmpty)
-        const ActivityInfo('현재 조건에 맞는 활동이 없어요.')
-      else
-        for (final p in recommendations)
-          ActivityProgramCard(program: p, onTap: () => program(p['id'])),
-    ];
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) => RefreshIndicator(
     onRefresh: reload,
-    child: ListView(
-      padding: const EdgeInsets.all(16),
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${DateTime.now().month}월 ${DateTime.now().day}일',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => open(ProfilePage(activityRepository: repo)),
-              icon: const Icon(Icons.person_outline),
-              label: const Text('내 정보'),
-            ),
-          ],
-        ),
-        FutureBuilder<({String nickname, ActivityData? activity})>(
-          future: future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return ActivityInfo('홈 정보를 불러오지 못했어요.', onRetry: reload);
-            }
-            final data = snapshot.data!;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '${data.nickname}님, 안녕하세요',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 20),
-                if (data.activity == null)
-                  ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload)
-                else
-                  ...summary(data.activity!),
-              ],
-            );
-          },
-        ),
-      ],
+    child: DecoratedBox(
+      decoration: const BoxDecoration(color: AppColors.gradientEnd),
+      child: ListView(
+        padding: EdgeInsets.zero,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          FutureBuilder<({String nickname, ActivityData? activity})>(
+            future: future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                );
+              }
+              if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: ActivityInfo('홈 정보를 불러오지 못했어요.', onRetry: reload),
+                );
+              }
+              final data = snapshot.data!;
+              return dashboard(data.nickname, data.activity);
+            },
+          ),
+        ],
+      ),
     ),
   );
 }

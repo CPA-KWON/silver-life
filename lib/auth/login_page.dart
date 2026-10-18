@@ -78,15 +78,38 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Center(
-                    child: IconBadge(icon: Icons.favorite_rounded, size: 64),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '실버라이프',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(fontSize: 24, fontWeight: FontWeight.w600),
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.gradientStart, AppColors.heroCircle],
+                      ),
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.wb_sunny_outlined,
+                          size: 40,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          '실버라이프',
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(color: Colors.white),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '내 주변에서 찾는\n새로운 하루',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: Colors.white),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                   SectionCard(

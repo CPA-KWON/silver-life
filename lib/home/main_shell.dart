@@ -106,6 +106,9 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _index == 0
+          ? AppColors.gradientStart
+          : AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RetainedMapTab(
@@ -163,17 +166,23 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
       ),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.navBorder)),
-        ),
-        child: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() {
-            _index = i;
-            if (i == 2) _activityVisited = true;
-          }),
-          destinations: _destinations,
+      bottomNavigationBar: ColoredBox(
+        color: AppColors.background,
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: NavigationBar(
+              selectedIndex: _index,
+              onDestinationSelected: (i) => setState(() {
+                _index = i;
+                if (i == 2) _activityVisited = true;
+              }),
+              labelPadding: EdgeInsets.zero,
+              destinations: _destinations,
+            ),
+          ),
         ),
       ),
     );

@@ -34,11 +34,18 @@ void activityMessage(BuildContext context, String text) {
 }
 
 class ActivityInfo extends StatelessWidget {
-  const ActivityInfo(this.message, {super.key, this.onRetry});
+  const ActivityInfo(
+    this.message, {
+    super.key,
+    this.onRetry,
+    this.color = AppColors.surface,
+  });
   final String message;
   final VoidCallback? onRetry;
+  final Color color;
   @override
   Widget build(BuildContext context) => SectionCard(
+    color: color,
     padding: const EdgeInsets.all(20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,17 +64,20 @@ class ActivityProgramCard extends StatelessWidget {
     required this.program,
     required this.onTap,
     this.label,
+    this.color = AppColors.surface,
   });
   final ActivityData program;
   final VoidCallback onTap;
   final String? label;
+  final Color color;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: SectionCard(
+      color: color,
       padding: EdgeInsets.zero,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(26),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),

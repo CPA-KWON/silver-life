@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../app_theme.dart';
 import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
@@ -76,21 +77,46 @@ class ActivityMenuLink extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.color = AppColors.surface,
   });
   final String title, subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final Color color;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: SectionCard(
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
+      color: color,
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(26),
         onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              IconBadge(icon: icon, size: 48),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, color: AppColors.primary),
+            ],
+          ),
+        ),
       ),
     ),
   );

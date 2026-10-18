@@ -252,8 +252,16 @@ class _ProfileCard extends StatelessWidget {
         ? ''
         : String.fromCharCode(nickname.runes.first);
 
-    return SectionCard(
-      padding: const EdgeInsets.all(16),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.gradientStart, AppColors.heroCircle],
+        ),
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: Row(
         children: [
           Container(
@@ -261,14 +269,14 @@ class _ProfileCard extends StatelessWidget {
             height: 56,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: AppColors.tint,
+              color: AppColors.heroCircle,
               shape: BoxShape.circle,
             ),
             child: Text(
               initial,
               style: textTheme.titleLarge?.copyWith(
                 fontSize: 22,
-                color: AppColors.primary,
+                color: Colors.white,
               ),
             ),
           ),
@@ -279,7 +287,7 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 Text(
                   nickname,
-                  style: textTheme.titleLarge?.copyWith(fontSize: 18),
+                  style: textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
                 if (region.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -291,12 +299,17 @@ class _ProfileCard extends StatelessWidget {
                         child: Icon(
                           Icons.location_on_outlined,
                           size: 16,
-                          color: AppColors.textSecondary,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(region, style: textTheme.bodyMedium),
+                        child: Text(
+                          region,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ],
                   ),
