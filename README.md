@@ -6,11 +6,12 @@ Android 앱 ID: `com.silverlife.app`.
 
 ## 현재 코드
 
-2026-10-19 사용자의 main 반영 승인 대상입니다. `fix/integrate-branches-and-security`에서
+사용자가 지정한 main 반영 저장소는 **[CPA-KWON/silver-life](https://github.com/CPA-KWON/silver-life)**입니다.
+`fix/integrate-branches-and-security`에서
 기존 main의 신고 기능, 지도 안정화 브랜치, 활동 미션·경험 은행 브랜치를 통합했습니다.
 충돌 파일의 신고 버튼·지도 유지·시설 위 게시글/편집/장소 선택 화면을 함께 보존했습니다.
 운영 서버 반영과 Android 에뮬레이터 검증 결과는 아래 실사용 보완 및 docs/integration_status.md에 정리했습니다.
-이전 main 대비 추가 기능과 후속 보완 순서는 [main 변경 비교](docs/main_changes_2026_10_19.md)를 참고하세요.
+이전 팀 main 대비 추가 기능과 후속 보완 순서는 [main 변경 비교](docs/main_changes_2026_10_19.md)를 참고하세요.
 
 ## 2026-10-18 기능 배치 개편
 

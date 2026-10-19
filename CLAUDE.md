@@ -3,9 +3,10 @@
 > 이 파일은 Claude Code가 작업을 시작할 때마다 자동으로 읽는 안내서입니다.
 > 프로젝트 폴더 맨 위(pubspec.yaml 파일과 같은 위치)에 두세요.
 
-## 통합 작업 현황 (2026-10-19)
+## 통합 작업 현황 (2026-10-20)
 
 - 현재 기준: `main`. 사용자가 2026-10-19 main push를 명시 승인. `fix/integrate-branches-and-security`의 신고 기능 보존·지도 안정화·활동 기능·IA·블루 디자인을 main으로 fast-forward 통합. 비교 기준과 후속 개선은 docs/main_changes_2026_10_19.md 참조.
+- 사용자가 지정한 main 대상은 `CPA-KWON/silver-life` 팀 저장소입니다. 기본 `origin`은 `https://github.com/CPA-KWON/silver-life.git`, `main`은 `origin/main`을 추적합니다. 기존 개인 저장소는 `personal`로 보존하며 별도 지시 없이 업로드하지 않습니다.
 - 최신 실행·SQL·검색 서버·서명 안내는 README.md를 기준으로 합니다.
 - 검색 비밀키는 앱에서 제거했고 Python 도구는 환경 변수를 사용합니다. 과거 노출 키 교체는 별도입니다.
 - 검증 프로젝트 통합 보안/활동 SQL 및 ins 검증 기관 연결 적용 완료. 2026-10-18 사용자가 검색키 작업 보류를 명시 해제하고 기존 키 서버 사용을 승인했습니다. 기존 키를 Supabase Secrets에 등록하고 운영 검색 200·5개 반환 확인. 앱·Git에는 검색키를 넣지 않습니다. 다른 프로젝트는 별도 확인이 필요합니다.
