@@ -26,3 +26,27 @@ Future<String> ensureFacility(FacilityResult result) async {
       .timeout(const Duration(seconds: 10));
   return id as String;
 }
+
+/// The signed-in user's favorites, newest first. `favorites` rows are copies
+/// without facility_id, so results have no [FacilityResult.id].
+Future<List<FacilityResult>> loadFavoriteFacilities({int? limit}) async {
+  final client = Supabase.instance.client;
+  var query = client
+      .from('favorites')
+      .select('name,address,telephone,lat,lng,category')
+      .eq('user_id', client.auth.currentUser!.id)
+      .order('created_at', ascending: false);
+  final rows = limit == null ? await query : await query.limit(limit);
+  return [
+    for (final p in rows)
+      FacilityResult(
+        name: p['name'] as String,
+        address: p['address'] as String? ?? '',
+        telephone: p['telephone'] as String? ?? '',
+        lat: (p['lat'] as num).toDouble(),
+        lng: (p['lng'] as num).toDouble(),
+        category: p['category'] as String? ?? '',
+        distanceMeters: double.nan,
+      ),
+  ];
+}

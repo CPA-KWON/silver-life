@@ -6,8 +6,17 @@ import '../activity/activity_repository.dart';
 import '../activity/activity_hub_page.dart';
 import '../activity/activity_detail_page.dart';
 import '../activity/activity_widgets.dart';
+import '../facility/facility_repository.dart';
+import '../facility/naver_local_search.dart';
+import '../facility/nearby_facilities_page.dart';
 import '../profile/profile_page.dart';
 import '../ui/design_widgets.dart';
+
+typedef HomeData = ({
+  String nickname,
+  ActivityData? activity,
+  List<FacilityResult>? favorites,
+});
 
 class HomeTab extends StatefulWidget {
   const HomeTab({
@@ -25,21 +34,27 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   late final repo = widget.activityRepository ?? ActivityRepository();
-  late Future<({String nickname, ActivityData? activity})> future = load();
-  Future<({String nickname, ActivityData? activity})> load() async {
+  late Future<HomeData> future = load();
+  Future<HomeData> load() async {
     final client = Supabase.instance.client;
     final profile = await client
         .from('profiles')
         .select('nickname')
         .eq('id', client.auth.currentUser!.id)
         .single();
+    final favorites = loadFavoriteFacilities(limit: 3)
+        .then<List<FacilityResult>?>((v) => v, onError: (_) => null);
     ActivityData? data;
     try {
       data = await repo.home();
     } catch (_) {
       /* Keep profile usable. */
     }
-    return (nickname: profile['nickname'] as String, activity: data);
+    return (
+      nickname: profile['nickname'] as String,
+      activity: data,
+      favorites: await favorites,
+    );
   }
 
   Future<void> reload() async {
@@ -83,7 +98,46 @@ class _HomeTabState extends State<HomeTab> {
 
   DateTime? date(dynamic value) => DateTime.tryParse('$value')?.toLocal();
 
-  Widget dashboard(String nickname, ActivityData? d) {
+  List<Widget> favoriteSection(List<FacilityResult>? favorites) => [
+    SectionHeader(
+      title: '즐겨찾는 시설',
+      trailing: favorites == null || favorites.isEmpty
+          ? null
+          : TextButton(
+              onPressed: () => open(const FavoriteFacilitiesPage()),
+              child: const Text('더 보기'),
+            ),
+    ),
+    if (favorites == null)
+      ActivityInfo(
+        '즐겨찾는 시설을 불러오지 못했어요.',
+        color: AppColors.background,
+        onRetry: reload,
+      )
+    else if (favorites.isEmpty)
+      const ActivityInfo(
+        '아직 즐겨찾는 시설이 없어요.\n시설 찾기에서 별 모양 버튼으로 저장할 수 있어요.',
+        color: AppColors.background,
+      )
+    else
+      for (final f in favorites)
+        ActivityMenuLink(
+          title: f.name,
+          subtitle: f.address,
+          icon: Icons.star_outline,
+          color: AppColors.background,
+          onTap: () async {
+            await openSavedFacility(context, f);
+            if (mounted) await reload();
+          },
+        ),
+  ];
+
+  Widget dashboard(
+    String nickname,
+    ActivityData? d,
+    List<FacilityResult>? favorites,
+  ) {
     final now = DateTime.now();
     final monday = DateTime(
       now.year,
@@ -186,53 +240,57 @@ class _HomeTabState extends State<HomeTab> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: d == null
-                ? [ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload)]
-                : [
-                    const SectionHeader(title: '가장 가까운 예정 활동'),
-                    if (upcoming.isEmpty)
-                      const ActivityInfo(
-                        '아직 확정된 예정 활동이 없어요.',
-                        color: AppColors.background,
-                      )
-                    else
-                      ActivityProgramCard(
-                        program: Map<String, dynamic>.from(
-                          upcoming.first['program'],
-                        ),
-                        label: '참여 예정',
-                        color: AppColors.background,
-                        onTap: () => program(upcoming.first['program']['id']),
-                      ),
-                    const SizedBox(height: 16),
-                    SectionHeader(
-                      title: '맞춤 추천 활동',
-                      trailing: TextButton(
-                        onPressed: () => section(ActivitySection.find),
-                        child: const Text('더 보기'),
-                      ),
-                    ),
-                    if (d['preferences'] == null)
-                      ActivityMenuLink(
-                        title: '추천 조건 설정',
-                        subtitle: '기준 장소와 관심 분야를 알려주세요',
-                        icon: Icons.tune,
-                        color: AppColors.background,
-                        onTap: () => section(ActivitySection.find),
-                      )
-                    else if (recommendations.isEmpty)
-                      const ActivityInfo(
-                        '현재 조건에 맞는 활동이 없어요.',
-                        color: AppColors.background,
-                      )
-                    else
-                      for (final p in recommendations)
-                        ActivityProgramCard(
-                          program: p,
+            children: [
+              ...d == null
+                  ? [ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload)]
+                  : [
+                      const SectionHeader(title: '가장 가까운 예정 활동'),
+                      if (upcoming.isEmpty)
+                        const ActivityInfo(
+                          '아직 확정된 예정 활동이 없어요.',
                           color: AppColors.background,
-                          onTap: () => program(p['id']),
+                        )
+                      else
+                        ActivityProgramCard(
+                          program: Map<String, dynamic>.from(
+                            upcoming.first['program'],
+                          ),
+                          label: '참여 예정',
+                          color: AppColors.background,
+                          onTap: () => program(upcoming.first['program']['id']),
                         ),
-                  ],
+                      const SizedBox(height: 16),
+                      SectionHeader(
+                        title: '맞춤 추천 활동',
+                        trailing: TextButton(
+                          onPressed: () => section(ActivitySection.find),
+                          child: const Text('더 보기'),
+                        ),
+                      ),
+                      if (d['preferences'] == null)
+                        ActivityMenuLink(
+                          title: '추천 조건 설정',
+                          subtitle: '기준 장소와 관심 분야를 알려주세요',
+                          icon: Icons.tune,
+                          color: AppColors.background,
+                          onTap: () => section(ActivitySection.find),
+                        )
+                      else if (recommendations.isEmpty)
+                        const ActivityInfo(
+                          '현재 조건에 맞는 활동이 없어요.',
+                          color: AppColors.background,
+                        )
+                      else
+                        for (final p in recommendations)
+                          ActivityProgramCard(
+                            program: p,
+                            color: AppColors.background,
+                            onTap: () => program(p['id']),
+                          ),
+                    ],
+              const SizedBox(height: 16),
+              ...favoriteSection(favorites),
+            ],
           ),
         ),
       ],
@@ -248,7 +306,7 @@ class _HomeTabState extends State<HomeTab> {
         padding: EdgeInsets.zero,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          FutureBuilder<({String nickname, ActivityData? activity})>(
+          FutureBuilder<HomeData>(
             future: future,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
@@ -266,7 +324,7 @@ class _HomeTabState extends State<HomeTab> {
                 );
               }
               final data = snapshot.data!;
-              return dashboard(data.nickname, data.activity);
+              return dashboard(data.nickname, data.activity, data.favorites);
             },
           ),
         ],

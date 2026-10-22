@@ -48,6 +48,29 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets('home lists favorite facilities and links to the full list', (
+    t,
+  ) async {
+    await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
+    expect(find.textContaining('아직 즐겨찾는 시설이 없어요.'), findsOneWidget);
+    backend.favorites.add({
+      'id': 'fav',
+      'user_id': FakeBackend.user,
+      'name': '행복경로당',
+      'address': '서울특별시 강남구 역삼동 1',
+      'telephone': '',
+      'lat': 37.5,
+      'lng': 127.0,
+      'category': '경로당',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
+    expect(find.text('행복경로당'), findsOneWidget);
+    await tap(t, find.text('더 보기').last);
+    expect(find.text('즐겨찾는 시설'), findsWidgets);
+    expect(find.text('행복경로당'), findsOneWidget);
+    await finish(t);
+  });
   testWidgets('home profile entry and activity shortcut return to summary', (
     t,
   ) async {

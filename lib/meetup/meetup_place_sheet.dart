@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../facility/facility_repository.dart';
 
 import '../app_theme.dart';
 import '../facility/naver_local_search.dart';
@@ -32,28 +33,7 @@ class _MeetupPlaceSheet extends StatefulWidget {
 }
 
 class _MeetupPlaceSheetState extends State<_MeetupPlaceSheet> {
-  late Future<List<FacilityResult>> _future = _load();
-
-  Future<List<FacilityResult>> _load() async {
-    final client = Supabase.instance.client;
-    final rows = await client
-        .from('favorites')
-        .select('name,address,telephone,lat,lng,category')
-        .eq('user_id', client.auth.currentUser!.id)
-        .order('created_at', ascending: false);
-    return [
-      for (final p in rows)
-        FacilityResult(
-          name: p['name'] as String,
-          address: p['address'] as String? ?? '',
-          telephone: p['telephone'] as String? ?? '',
-          lat: (p['lat'] as num).toDouble(),
-          lng: (p['lng'] as num).toDouble(),
-          category: p['category'] as String? ?? '',
-          distanceMeters: double.nan,
-        ),
-    ];
-  }
+  late Future<List<FacilityResult>> _future = loadFavoriteFacilities();
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +78,8 @@ class _MeetupPlaceSheetState extends State<_MeetupPlaceSheet> {
                     if (s.hasError) {
                       return _Message(
                         '즐겨찾는 시설을 불러오지 못했어요. 다시 시도해 주세요.',
-                        onRetry: () => setState(() => _future = _load()),
+                        onRetry: () =>
+                            setState(() => _future = loadFavoriteFacilities()),
                       );
                     }
                     final items = s.data!;
