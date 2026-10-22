@@ -186,6 +186,7 @@ void main() {
       await tap(t, find.text('수정'));
       await fill(t, '모임 제목', '보존할 제목');
       await tap(t, find.text('테스트 복지관').last);
+      await tap(t, find.text('지도에서 장소 찾기'));
       await tap(t, find.text('장소 선택 취소'));
       expect(find.text('보존할 제목'), findsOneWidget);
       await tap(t, find.byType(BackButton).last);
@@ -351,6 +352,8 @@ void main() {
     await tap(t, find.text('시간 선택'));
     await tap(t, find.text('확인'));
     await tap(t, find.text('장소 선택'));
+    expect(find.textContaining('아직 즐겨찾는 시설이 없어요.'), findsOneWidget);
+    await tap(t, find.text('지도에서 장소 찾기'));
     await fill(t, '모임 제목', '새 모임');
     await fill(t, '내용', '같이 만나요');
     await tap(t, find.text('등록하기'));
@@ -366,6 +369,53 @@ void main() {
     await tap(t, find.text('등록하기'));
     expect(backend.postWrites, 1);
     expect(backend.posts.single['facility_id'], 'facility');
+    await finish(t);
+  });
+  testWidgets('meetup place can be chosen from favorite facilities', (t) async {
+    backend.favorites.add({
+      'id': 'fav',
+      'user_id': FakeBackend.user,
+      'name': '행복경로당',
+      'address': '서울특별시 강남구 역삼동 1',
+      'telephone': '',
+      'lat': 37.5,
+      'lng': 127.0,
+      'category': '경로당',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    var mapOpened = false;
+    await mount(
+      t,
+      NewMeetupPage(
+        facilityPicker: () async {
+          mapOpened = true;
+          return testPlace;
+        },
+      ),
+    );
+    await tap(t, find.text('장소 선택'));
+    expect(find.text('내가 즐겨찾는 시설'), findsOneWidget);
+    await tap(t, find.text('행복경로당'));
+    expect(mapOpened, isFalse);
+    expect(find.text('행복경로당'), findsOneWidget);
+    final target = DateTime.now().add(const Duration(days: 2));
+    await tap(t, find.text('날짜 선택'));
+    if (target.month != DateTime.now().month) {
+      await tap(t, find.byTooltip('다음 달'));
+    }
+    await tap(t, find.text('${target.day}').last);
+    await tap(t, find.text('확인'));
+    await tap(t, find.text('시간 선택'));
+    await tap(t, find.text('확인'));
+    await fill(t, '모임 제목', '경로당 모임');
+    await fill(t, '내용', '같이 만나요');
+    await tap(t, find.text('등록하기'));
+    expect(backend.postWrites, 1);
+    final placeId = backend.posts.single['facility_id'];
+    expect(
+      backend.facilities.singleWhere((f) => f['id'] == placeId)['name'],
+      '행복경로당',
+    );
     await finish(t);
   });
   testWidgets(

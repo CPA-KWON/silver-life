@@ -5,6 +5,7 @@ import '../facility/facility_repository.dart';
 import '../facility/facility_search_page.dart';
 import '../facility/naver_local_search.dart';
 import '../core/meetup_category.dart';
+import 'meetup_place_sheet.dart';
 import '../ui/design_widgets.dart';
 import '../app_theme.dart';
 
@@ -103,6 +104,13 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   }
 
   Future<void> _pickFacility() async {
+    // Favorites first; "지도에서 장소 찾기" falls through to the map picker.
+    final choice = await showMeetupPlaceSheet(context);
+    if (!mounted || choice == null) return;
+    if (choice.favorite != null) {
+      setState(() => _eventFacility = choice.favorite);
+      return;
+    }
     // No transition animation: FacilityPickerPage contains a NaverMap
     // (native PlatformView), and animating it in/out during a route
     // transition is known to corrupt Flutter's render tree.
