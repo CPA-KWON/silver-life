@@ -136,6 +136,7 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                         month: _month!,
                         today: status.today,
                         days: s.data ?? const [],
+                        upcoming: upcomingMilestones(status),
                         loading: s.connectionState != ConnectionState.done,
                         failed: s.hasError,
                         onRetry: () => _showMonth(_month!),
@@ -197,6 +198,8 @@ class _Summary extends StatelessWidget {
       fontWeight: FontWeight.w700,
       color: AppColors.textPrimary,
     );
+    final upcoming = upcomingMilestones(status);
+    final next = upcoming.isEmpty ? null : upcoming.first;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -219,6 +222,26 @@ class _Summary extends StatelessWidget {
             textAlign: TextAlign.center,
             style: style?.copyWith(color: AppColors.blueText),
           ),
+          if (next != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.rewardTint,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                next.stampsNeeded == 1 && !status.attendedToday
+                    ? '오늘 출석하면 ⭐ ${next.streak}일 연속 달성! '
+                          '(${next.points}포인트)'
+                    : '앞으로 ${next.stampsNeeded}번 더 출석하면 '
+                          '${next.date.month}월 ${next.date.day}일에 '
+                          '⭐ ${next.streak}일 연속 달성! (${next.points}포인트)',
+                textAlign: TextAlign.center,
+                style: style?.copyWith(color: AppColors.rewardText),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -286,6 +309,7 @@ class AttendanceCalendar extends StatelessWidget {
     required this.month,
     required this.today,
     required this.days,
+    this.upcoming = const [],
     this.loading = false,
     this.failed = false,
     this.onRetry,
@@ -293,6 +317,7 @@ class AttendanceCalendar extends StatelessWidget {
   final DateTime month;
   final DateTime today;
   final List<AttendanceDay> days;
+  final List<UpcomingMilestone> upcoming;
   final bool loading;
   final bool failed;
   final VoidCallback? onRetry;
@@ -300,6 +325,11 @@ class AttendanceCalendar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final byDay = {for (final d in days) d.date.day: d};
+    final ahead = {
+      for (final u in upcoming)
+        if (u.date.year == month.year && u.date.month == month.month)
+          u.date.day: u,
+    };
     final first = DateTime(month.year, month.month);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final leading = first.weekday % 7; // 일요일 시작
@@ -346,6 +376,7 @@ class AttendanceCalendar extends StatelessWidget {
                         day: day,
                         record: byDay[day],
                         isToday: date == today,
+                        upcoming: ahead[day],
                         style: dayStyle,
                       );
                     },
@@ -379,18 +410,25 @@ class _DayCell extends StatelessWidget {
     required this.record,
     required this.isToday,
     required this.style,
+    this.upcoming,
   });
   final int day;
   final AttendanceDay? record;
   final bool isToday;
   final TextStyle? style;
 
+  /// Streak this day will reach if the user keeps stamping (faint star).
+  final UpcomingMilestone? upcoming;
+
   @override
   Widget build(BuildContext context) {
     final milestone = record?.isMilestone == true;
     final attended = record != null;
+    final future = !attended && upcoming != null;
     final label = attended
         ? '$day일 출석${milestone ? ', ${record!.streak}일 연속 달성' : ''}'
+        : future
+        ? '$day일, 계속 출석하면 ${upcoming!.streak}일 연속 달성 예정'
         : '$day일';
     return Semantics(
       label: isToday ? '오늘, $label' : label,
@@ -403,6 +441,8 @@ class _DayCell extends StatelessWidget {
               ? AppColors.rewardTint
               : attended
               ? AppColors.tint
+              : future
+              ? AppColors.rewardFaintTint
               : null,
           borderRadius: BorderRadius.circular(12),
           border: isToday
@@ -429,6 +469,12 @@ class _DayCell extends StatelessWidget {
                   Icons.check_circle,
                   size: 20,
                   color: AppColors.primary,
+                )
+              else if (future)
+                const Icon(
+                  Icons.star_border,
+                  size: 20,
+                  color: AppColors.rewardFaintText,
                 )
               else
                 const SizedBox(height: 20),
@@ -478,6 +524,16 @@ class _Legend extends StatelessWidget {
           const Icon(Icons.star, size: 22, color: AppColors.rewardText),
           '7일·14일·30일 연속으로 출석한 날이에요. '
           '이날은 포인트를 더 많이 받아요!',
+        ),
+        const SizedBox(height: 10),
+        item(
+          AppColors.rewardFaintTint,
+          const Icon(
+            Icons.star_border,
+            size: 22,
+            color: AppColors.rewardFaintText,
+          ),
+          '하루도 빠지지 않고 출석하면 별을 받을 수 있는 날이에요.',
         ),
       ],
     );

@@ -42,6 +42,10 @@ abstract final class AppColors {
   /// Attendance streak rewards (7/14/30일) and the point badge coin.
   static const rewardTint = Color(0xFFFFF1CC);
   static const rewardText = Color(0xFF8A4B00);
+
+  /// Faint version for streak-reward days still ahead (decorative preview).
+  static const rewardFaintTint = Color(0xFFFFF8E6);
+  static const rewardFaintText = Color(0xFFC9974D);
   static const dangerTint = Color(0xFFFDECEC);
 
   /// Soft blue shadow for elevated controls only.

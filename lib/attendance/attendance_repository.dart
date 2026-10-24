@@ -1,7 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Streak days that pay a special reward (see supabase/attendance_points.sql).
-const attendanceMilestones = {7, 14, 30};
+/// Streak day → total points paid that day (see supabase/attendance_points.sql).
+const attendanceMilestonePoints = {7: 3, 14: 5, 30: 10};
+final attendanceMilestones = attendanceMilestonePoints.keys.toSet();
 
 /// The attendance date is the KST calendar date decided by the server
 /// (`attendance_today()`), so it is kept as a plain date without a time zone.
@@ -68,6 +69,42 @@ String attendanceRewardMessage(int streak, int points) =>
     attendanceMilestones.contains(streak)
     ? '🎉 $streak일 연속 출석 달성! $points포인트 획득!'
     : '출석 완료! $points포인트를 획득했어요!';
+
+/// A future day that pays a streak reward if the user stamps every day.
+class UpcomingMilestone {
+  const UpcomingMilestone({
+    required this.date,
+    required this.streak,
+    required this.stampsNeeded,
+  });
+  final DateTime date;
+  final int streak;
+
+  /// Stamps still needed, counting today (if not stamped yet) and [date].
+  final int stampsNeeded;
+  int get points => attendanceMilestonePoints[streak]!;
+}
+
+/// Milestone days still ahead of the current streak, nearest first.
+List<UpcomingMilestone> upcomingMilestones(AttendanceStatus status) {
+  // Streak the next stamp would reach: today's if not stamped yet,
+  // otherwise tomorrow's.
+  final firstDay = status.attendedToday ? 1 : 0;
+  final nextStreak = status.streak + 1;
+  return [
+    for (final m in attendanceMilestones.toList()..sort())
+      if (m >= nextStreak)
+        UpcomingMilestone(
+          date: DateTime(
+            status.today.year,
+            status.today.month,
+            status.today.day + firstDay + (m - nextStreak),
+          ),
+          streak: m,
+          stampsNeeded: m - nextStreak + 1,
+        ),
+  ];
+}
 
 class AttendanceRepository {
   AttendanceRepository({this._client});

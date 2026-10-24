@@ -39,6 +39,50 @@ void main() {
     expect(attendanceRewardMessage(31, 1), '출석 완료! 1포인트를 획득했어요!');
   });
 
+  test('upcoming milestones count today only before it is stamped', () {
+    AttendanceStatus status(int streak, bool attendedToday) => AttendanceStatus(
+      today: DateTime(2026, 10, 24),
+      attendedToday: attendedToday,
+      streak: streak,
+      balance: 0,
+      totalEarned: 0,
+    );
+    final fresh = upcomingMilestones(status(0, false));
+    expect(fresh.map((u) => u.date), [
+      DateTime(2026, 10, 30),
+      DateTime(2026, 11, 6),
+      DateTime(2026, 11, 22),
+    ]);
+    expect(fresh.first.stampsNeeded, 7);
+    final stamped = upcomingMilestones(status(3, true)).first;
+    expect(stamped.date, DateTime(2026, 10, 28));
+    expect(stamped.stampsNeeded, 4);
+    final dueToday = upcomingMilestones(status(6, false)).first;
+    expect(dueToday.date, DateTime(2026, 10, 24));
+    expect(dueToday.stampsNeeded, 1);
+    expect(upcomingMilestones(status(30, true)), isEmpty);
+  });
+
+  testWidgets('calendar previews the next star day faintly with a hint', (
+    t,
+  ) async {
+    final repo = FakeAttendanceRepository()..attendedBefore(4);
+    await shell(t, repo);
+    expect(
+      find.text('앞으로 3번 더 출석하면 10월 26일에 ⭐ 7일 연속 달성! (3포인트)'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('26일, 계속 출석하면 7일 연속 달성 예정'), findsOneWidget);
+    await tap(t, find.text('출석도장 찍기'));
+    expect(
+      find.text('앞으로 2번 더 출석하면 10월 26일에 ⭐ 7일 연속 달성! (3포인트)'),
+      findsOneWidget,
+    );
+    await tap(t, find.text('다음 달 ›'));
+    expect(find.bySemanticsLabel('2일, 계속 출석하면 14일 연속 달성 예정'), findsOneWidget);
+    await finish(t);
+  });
+
   testWidgets('popup opens on launch and closing it records nothing', (
     t,
   ) async {
@@ -93,8 +137,13 @@ void main() {
     final repo = FakeAttendanceRepository()..attendedBefore(6);
     await shell(t, repo);
     expect(find.text('🔥 6일 연속 출석 달성!'), findsOneWidget);
+    expect(find.text('오늘 출석하면 ⭐ 7일 연속 달성! (3포인트)'), findsOneWidget);
     await tap(t, find.text('출석도장 찍기'));
     expect(find.text('🎉 7일 연속 출석 달성! 3포인트 획득!'), findsOneWidget);
+    expect(
+      find.text('앞으로 7번 더 출석하면 10월 31일에 ⭐ 14일 연속 달성! (5포인트)'),
+      findsOneWidget,
+    );
     expect(find.text('보유 포인트  🪙 9 P'), findsOneWidget);
     expect(find.bySemanticsLabel('오늘, 24일 출석, 7일 연속 달성'), findsOneWidget);
     expect(find.bySemanticsLabel('18일 출석'), findsOneWidget);
