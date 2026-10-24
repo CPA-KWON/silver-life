@@ -438,37 +438,37 @@ class _Legend extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyMedium
         ?.copyWith(fontSize: 18, color: AppColors.textPrimary);
-    Widget item(Widget mark, String text) => Row(
-      mainAxisSize: MainAxisSize.min,
+    // Each sample looks like the calendar cell it explains.
+    Widget item(Color background, Icon icon, String text) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        mark,
-        const SizedBox(width: 4),
-        Flexible(child: Text(text, style: style)),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: icon,
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(text, style: style)),
       ],
     );
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 16,
-      runSpacing: 4,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         item(
-          const Icon(Icons.check_circle, size: 20, color: AppColors.primary),
-          '출석',
+          AppColors.tint,
+          const Icon(Icons.check_circle, size: 22, color: AppColors.primary),
+          '출석도장을 찍은 날이에요.',
         ),
+        const SizedBox(height: 10),
         item(
-          const Icon(Icons.star, size: 20, color: AppColors.rewardText),
-          '7·14·30일 연속',
-        ),
-        item(
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primary, width: 2.5),
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          '오늘',
+          AppColors.rewardTint,
+          const Icon(Icons.star, size: 22, color: AppColors.rewardText),
+          '7일·14일·30일 연속으로 출석한 날이에요. '
+          '이날은 포인트를 더 많이 받아요!',
         ),
       ],
     );
