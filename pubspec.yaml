@@ -49,6 +49,8 @@ dependencies:
   geocoding: ^5.0.0
   url_launcher: ^6.3.2
   http: ^1.6.0
+  model_viewer_plus: ^1.10.0
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   geocoding_platform_interface: ^5.0.0
@@ -86,6 +88,8 @@ flutter:
     - assets/pet/adult/
     - assets/pet/items/
     - assets/pet/motion/
+    - assets/pet/models/
+    - assets/pet/scene/
 
   fonts:
     - family: Pretendard

@@ -377,7 +377,7 @@ class _PetHomePageState extends State<PetHomePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _title(c, '다른 각도에서 만나요'),
-          const Text('드래그하거나 각도를 눌러보세요. 실제 3D가 아닌 각도별 이미지 미리보기예요.'),
+          const Text('손가락으로 자유롭게 돌려보세요. 앞·옆·뒤 버튼으로 원하는 방향을 바로 볼 수도 있어요.'),
           PetCharacter(pet: widget.pet),
           TextButton(
             onPressed: () => Navigator.pop(c),
@@ -438,7 +438,8 @@ class _PetHomePageState extends State<PetHomePage> {
                       pet: pet,
                       motion: motion,
                       height: 210,
-                      interactive: false,
+                      interactive: true,
+                      showControls: false,
                     ),
                     for (final action in actions)
                       Padding(
@@ -463,7 +464,8 @@ class _PetHomePageState extends State<PetHomePage> {
                         pet: pet,
                         motion: motion,
                         height: 270,
-                        interactive: false,
+                        interactive: true,
+                        showControls: false,
                       ),
                     ),
                     for (var i = 0; i < actions.length; i++)
@@ -512,7 +514,7 @@ class _PetHomePageState extends State<PetHomePage> {
           TextButton.icon(
             onPressed: angles,
             icon: const Icon(Icons.rotate_right),
-            label: const Text('다른 각도 보기'),
+            label: const Text('3D로 돌려보기'),
           ),
           const SizedBox(height: 8),
           _Panel(
