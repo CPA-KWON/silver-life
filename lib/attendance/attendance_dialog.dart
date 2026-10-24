@@ -137,6 +137,9 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                         today: status.today,
                         days: s.data ?? const [],
                         upcoming: upcomingMilestones(status),
+                        onTapToday: status.attendedToday || _busy
+                            ? null
+                            : _stamp,
                         loading: s.connectionState != ConnectionState.done,
                         failed: s.hasError,
                         onRetry: () => _showMonth(_month!),
@@ -199,7 +202,7 @@ class _Summary extends StatelessWidget {
     final upcoming = upcomingMilestones(status);
     final next = upcoming.isEmpty ? null : upcoming.first;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.tint,
         borderRadius: BorderRadius.circular(20),
@@ -207,37 +210,35 @@ class _Summary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            status.streak > 0
-                ? '🔥 ${status.streak}일 연속 출석 달성!'
-                : '🔥 오늘부터 연속 출석을 시작해 보세요',
-            textAlign: TextAlign.center,
-            style: style?.copyWith(fontSize: 20),
+          // Line 1: streak and points side by side (wraps on narrow phones).
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 14,
+            children: [
+              Text(
+                status.streak > 0
+                    ? '🔥 ${status.streak}일 연속 출석 달성!'
+                    : '🔥 연속 출석을 시작해요',
+                style: style,
+              ),
+              Text(
+                '🪙 ${status.balance} P',
+                style: style?.copyWith(color: AppColors.blueText),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '보유 포인트  🪙 ${status.balance} P',
-            textAlign: TextAlign.center,
-            style: style?.copyWith(color: AppColors.blueText),
-          ),
+          // Line 2: next star day.
           if (next != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.rewardTint,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                next.stampsNeeded == 1 && !status.attendedToday
-                    ? '오늘 출석하면 ⭐ ${next.streak}일 연속 달성! '
-                          '(${next.points}포인트)'
-                    : '앞으로 ${next.stampsNeeded}번 더 출석하면 '
-                          '${next.date.month}월 ${next.date.day}일에 '
-                          '⭐ ${next.streak}일 연속 달성! (${next.points}포인트)',
-                textAlign: TextAlign.center,
-                style: style?.copyWith(color: AppColors.rewardText),
-              ),
+            const SizedBox(height: 6),
+            Text(
+              next.stampsNeeded == 1 && !status.attendedToday
+                  ? '오늘 출석하면 ⭐ ${next.streak}일 연속 달성! '
+                        '(${next.points}포인트)'
+                  : '앞으로 ${next.stampsNeeded}번 더 출석하면 '
+                        '${next.date.month}월 ${next.date.day}일에 '
+                        '⭐ ${next.streak}일 연속 달성! (${next.points}포인트)',
+              textAlign: TextAlign.center,
+              style: style?.copyWith(color: AppColors.rewardText),
             ),
           ],
         ],
@@ -309,6 +310,7 @@ class AttendanceCalendar extends StatelessWidget {
     required this.today,
     required this.days,
     this.upcoming = const [],
+    this.onTapToday,
     this.loading = false,
     this.failed = false,
     this.onRetry,
@@ -317,6 +319,9 @@ class AttendanceCalendar extends StatelessWidget {
   final DateTime today;
   final List<AttendanceDay> days;
   final List<UpcomingMilestone> upcoming;
+
+  /// Set while today is not stamped: tapping today's cell stamps it.
+  final VoidCallback? onTapToday;
   final bool loading;
   final bool failed;
   final VoidCallback? onRetry;
@@ -376,6 +381,7 @@ class AttendanceCalendar extends StatelessWidget {
                         record: byDay[day],
                         isToday: date == today,
                         upcoming: ahead[day],
+                        onTap: date == today ? onTapToday : null,
                         style: dayStyle,
                       );
                     },
@@ -410,6 +416,7 @@ class _DayCell extends StatelessWidget {
     required this.isToday,
     required this.style,
     this.upcoming,
+    this.onTap,
   });
   final int day;
   final AttendanceDay? record;
@@ -418,6 +425,7 @@ class _DayCell extends StatelessWidget {
 
   /// Streak this day will reach if the user keeps stamping (faint star).
   final UpcomingMilestone? upcoming;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -429,58 +437,66 @@ class _DayCell extends StatelessWidget {
         : future
         ? '$day일, 계속 출석하면 ${upcoming!.streak}일 연속 달성 예정'
         : '$day일';
-    return Semantics(
-      label: isToday ? '오늘, $label' : label,
-      excludeSemantics: true,
-      child: Container(
-        height: 60,
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: milestone
-              ? AppColors.rewardTint
-              : attended
-              ? AppColors.tint
-              : future
-              ? AppColors.rewardFaintTint
-              : null,
-          borderRadius: BorderRadius.circular(12),
-          border: isToday
-              ? Border.all(color: AppColors.primary, width: 2.5)
-              : null,
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$day',
-                style: style?.copyWith(
-                  fontWeight: isToday || attended
-                      ? FontWeight.w800
-                      : FontWeight.w500,
-                ),
+    final cell = Container(
+      height: 60,
+      margin: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: milestone
+            ? AppColors.rewardTint
+            : attended
+            ? AppColors.tint
+            : future
+            ? AppColors.rewardFaintTint
+            : null,
+        borderRadius: BorderRadius.circular(12),
+        border: isToday
+            ? Border.all(color: AppColors.primary, width: 2.5)
+            : null,
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$day',
+              style: style?.copyWith(
+                fontWeight: isToday || attended
+                    ? FontWeight.w800
+                    : FontWeight.w500,
               ),
-              if (milestone)
-                const Icon(Icons.star, size: 20, color: AppColors.rewardText)
-              else if (attended)
-                const Icon(
-                  Icons.check_circle,
-                  size: 20,
-                  color: AppColors.primary,
-                )
-              else if (future)
-                const Icon(
-                  Icons.star_border,
-                  size: 20,
-                  color: AppColors.rewardFaintText,
-                )
-              else
-                const SizedBox(height: 20),
-            ],
-          ),
+            ),
+            if (milestone)
+              const Icon(Icons.star, size: 20, color: AppColors.rewardText)
+            else if (attended)
+              const Icon(Icons.check_circle, size: 20, color: AppColors.primary)
+            else if (future)
+              const Icon(
+                Icons.star_border,
+                size: 20,
+                color: AppColors.rewardFaintText,
+              )
+            else if (onTap != null)
+              const Icon(Icons.approval, size: 20, color: AppColors.primary)
+            else
+              const SizedBox(height: 20),
+          ],
         ),
       ),
+    );
+    return Semantics(
+      label: isToday
+          ? '오늘, $label${onTap != null ? ', 눌러서 출석도장 찍기' : ''}'
+          : label,
+      button: onTap != null,
+      excludeSemantics: true,
+      child: onTap == null
+          ? cell
+          : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: cell,
+            ),
     );
   }
 }

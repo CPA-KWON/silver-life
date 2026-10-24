@@ -148,7 +148,13 @@ void main() {
       find.text('앞으로 7번 더 출석하면 10월 31일에 ⭐ 14일 연속 달성! (5포인트)'),
       findsOneWidget,
     );
-    expect(find.text('보유 포인트  🪙 9 P'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('🪙 9 P'),
+      ),
+      findsOneWidget,
+    );
     expect(find.bySemanticsLabel('오늘, 24일 출석, 7일 연속 달성'), findsOneWidget);
     expect(find.bySemanticsLabel('18일 출석'), findsOneWidget);
     await finish(t);
@@ -187,6 +193,17 @@ void main() {
     expect(find.text('연결이 잠시 끊겼지만 오늘 출석은 정상 처리됐어요. (1포인트)'), findsOneWidget);
     expect(find.text('오늘 출석 완료!'), findsOneWidget);
     expect(repo.paidCount, 1);
+    await finish(t);
+  });
+
+  testWidgets('tapping today in the calendar stamps attendance', (t) async {
+    final repo = FakeAttendanceRepository();
+    await shell(t, repo);
+    await tap(t, find.bySemanticsLabel('오늘, 24일, 눌러서 출석도장 찍기'));
+    expect(repo.paidCount, 1);
+    expect(find.text('출석 완료! 1포인트를 획득했어요!'), findsOneWidget);
+    expect(find.text('오늘 출석 완료!'), findsOneWidget);
+    expect(find.bySemanticsLabel('오늘, 24일 출석'), findsOneWidget);
     await finish(t);
   });
 
