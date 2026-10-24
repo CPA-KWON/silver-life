@@ -30,6 +30,7 @@ android {
 
     defaultConfig {
         applicationId = "com.silverlife.app"
+        manifestPlaceholders["admobAppId"] = System.getenv("SILVER_LIFE_ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // flutter_naver_map requires Android 6.0 (API 23) or higher.

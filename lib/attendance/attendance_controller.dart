@@ -10,6 +10,12 @@ class AttendanceController extends ChangeNotifier {
 
   final AttendanceRepository repository;
   AttendanceStatus? status;
+  bool _disposed = false;
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   /// Returns null (keeping the last known status) when the server is
   /// unreachable or the attendance SQL is not installed yet.
@@ -17,7 +23,7 @@ class AttendanceController extends ChangeNotifier {
     try {
       final next = await repository.status();
       status = next;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
       return next;
     } catch (_) {
       return null;
@@ -29,7 +35,7 @@ class AttendanceController extends ChangeNotifier {
   Future<AttendanceCheckInResult> checkIn() async {
     final result = await repository.checkIn();
     status = result.status;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
     return result;
   }
 }

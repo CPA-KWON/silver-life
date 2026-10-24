@@ -13,6 +13,14 @@ import '../activity/activity_repository.dart';
 import '../activity/activity_detail_page.dart';
 import '../facility/nearby_facilities_page.dart';
 import '../pet/pet_preview_controller.dart';
+import '../pet/pet_repository.dart';
+import '../pet/pet_walk_service.dart';
+import '../pet/pet_design.dart';
+
+import 'dart:async';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../pet/pet_preview_pages.dart';
 import 'home_tab.dart';
 import 'retained_map_tab.dart';
@@ -25,8 +33,10 @@ class MainShell extends StatefulWidget {
     this.nearbyLoader,
     this.activityRepository,
     this.attendanceRepository,
+    this.petController,
   });
   final Widget? facilityPage;
+  final PetPreviewController? petController;
   final AttendanceRepository? attendanceRepository;
   final NearbyLoader? nearbyLoader;
   final ActivityRepository? activityRepository;
@@ -37,7 +47,10 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _index = 0;
-  final _petPreview = PetPreviewController();
+  late final _petPreview =
+      widget.petController ?? PetPreviewController(repository: PetRepository());
+  StreamSubscription<AuthState>? _petAuth;
+  Timer? _petClock;
   final _homeRefresh = ValueNotifier<int>(0);
   final _homeNavigator = GlobalKey<NavigatorState>();
   late final _attendance = AttendanceController(
@@ -50,14 +63,28 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _petPreview.addListener(_refreshPoints);
+    unawaited(_petPreview.load());
+    final owner = Supabase.instance.client.auth.currentUser?.id;
+    _petAuth = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.session?.user.id != owner) unawaited(PetWalkService().stop());
+    });
+    _petClock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(_petPreview.load());
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _promptAttendance());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _petPreview.removeListener(_refreshPoints);
     _attendance.dispose();
-    _petPreview.dispose();
+    _petClock?.cancel();
+    _petAuth?.cancel();
+    if (widget.petController == null) _petPreview.dispose();
     _homeRefresh.dispose();
     super.dispose();
   }
@@ -65,7 +92,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   // A new KST day may start while the app sits in the background.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _promptAttendance();
+    if (state == AppLifecycleState.resumed) {
+      _promptAttendance();
+      unawaited(_petPreview.load());
+    }
   }
 
   /// Opens the attendance popup once per server day until the user stamps.
@@ -82,7 +112,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _attendancePromptedFor = status.today;
     _attendanceOpen = true;
     await showAttendanceDialog(context, _attendance);
+    if (mounted) unawaited(_petPreview.load());
     _attendanceOpen = false;
+  }
+
+  void _refreshPoints() {
+    if (!_petPreview.isPreview && _petPreview.ready && !_petPreview.busy) {
+      unawaited(_attendance.refresh());
+    }
   }
 
   bool _activityVisited = false;
@@ -149,15 +186,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return AttendanceScope(
       controller: _attendance,
-      child: _buildScaffold(context),
+      child: PetNavigationScope(
+        navigator: Navigator.of(context),
+        child: _buildScaffold(context),
+      ),
     );
   }
 
   Widget _buildScaffold(BuildContext context) {
     return Scaffold(
-      backgroundColor: _index == 0
-          ? AppColors.gradientStart
-          : AppColors.background,
+      backgroundColor: _index == 0 ? PetColors.sky : AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RetainedMapTab(
@@ -210,7 +248,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             petPreview: _petPreview,
                             onOpenPet: () => _homeNavigator.currentState!.push(
                               MaterialPageRoute<void>(
-                                builder: (_) => _petPreview.adopted
+                                builder: (_) => !_petPreview.ready
+                                    ? PetConnectionPage(pet: _petPreview)
+                                    : _petPreview.adopted
                                     ? PetHomePage(pet: _petPreview)
                                     : PetAdoptionPage(pet: _petPreview),
                               ),
@@ -270,6 +310,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(32),
             child: NavigationBar(
+              height: 82,
               selectedIndex: _index,
               onDestinationSelected: (i) => setState(() {
                 if (i == 0 && _index != 0) _homeRefresh.value++;

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {verifyCallback} from '../supabase/functions/pet-admob-ssv/verify.ts';
+const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+const b64=b=>Buffer.from(b).toString('base64url');
+const keys=[{keyId:1,base64:b64(await crypto.subtle.exportKey('spki',pair.publicKey))}];
+const data=`ad_unit=123&custom_data=11111111-1111-4111-8111-111111111111&timestamp=${Date.now()}&transaction_id=unique`;
+const raw=new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},pair.privateKey,new TextEncoder().encode(data)));
+const integer=a=>{while(a[0]===0&&a.length>1)a=a.slice(1);if(a[0]&128)a=Uint8Array.of(0,...a);return Uint8Array.of(2,a.length,...a);};
+const r=integer(raw.slice(0,32)),s=integer(raw.slice(32));const der=Uint8Array.of(0x30,r.length+s.length,...r,...s);
+const url=new URL(`https://example.test/?${data}&signature=${b64(der)}&key_id=1`);
+assert.equal((await verifyCallback(url,keys)).unit,'123');
+await assert.rejects(()=>verifyCallback(new URL(url.href.replace('ad_unit=123','ad_unit=999')),keys));
+await assert.rejects(()=>verifyCallback(new URL(url.href+'&custom_data=forged'),keys));
+await assert.rejects(()=>verifyCallback(url,keys,Date.now()+7200000));
+console.log('PASS: authentic ECDSA callback, tampering, duplicate parameters, expiration');

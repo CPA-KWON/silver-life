@@ -2,3 +2,6 @@
 # The handler verifies the session with Supabase Auth, supporting both current
 # signing keys and legacy JWTs instead of relying on the gateway's JWT format.
 verify_jwt = false
+
+[functions.pet-admob-ssv]
+verify_jwt = false

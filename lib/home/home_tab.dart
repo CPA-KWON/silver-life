@@ -13,6 +13,7 @@ import '../profile/profile_page.dart';
 import '../ui/design_widgets.dart';
 import '../attendance/point_badge.dart';
 import '../pet/pet_preview_controller.dart';
+import '../pet/pet_design.dart';
 import '../pet/pet_preview_pages.dart';
 
 typedef HomeData = ({
@@ -160,6 +161,8 @@ class _HomeTabState extends State<HomeTab> {
     List<FacilityResult>? favorites,
   ) {
     final now = DateTime.now();
+    final petHome = widget.petPreview != null;
+    final heroInk = petHome ? PetColors.ink : Colors.white;
     final monday = DateTime(
       now.year,
       now.month,
@@ -196,9 +199,13 @@ class _HomeTabState extends State<HomeTab> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                AppColors.gradientStart,
-                AppColors.gradientStart,
-                d == null ? AppColors.gradientStart : AppColors.gradientEnd,
+                petHome ? PetColors.background : AppColors.gradientStart,
+                petHome ? PetColors.background : AppColors.gradientStart,
+                petHome
+                    ? PetColors.background
+                    : d == null
+                    ? AppColors.gradientStart
+                    : AppColors.gradientEnd,
               ],
               stops: const [0, 0.4, 1],
             ),
@@ -215,13 +222,13 @@ class _HomeTabState extends State<HomeTab> {
                         Text(
                           '$nickname님, 안녕하세요',
                           style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: heroInk),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           '${now.month}월 ${now.day}일',
                           style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: heroInk),
                         ),
                       ],
                     ),
@@ -230,11 +237,13 @@ class _HomeTabState extends State<HomeTab> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      const PointBadge(onDark: true),
+                      PointBadge(onDark: !petHome),
                       TextButton.icon(
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: AppColors.heroCircle,
+                          foregroundColor: heroInk,
+                          backgroundColor: petHome
+                              ? Colors.white
+                              : AppColors.heroCircle,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           shape: const StadiumBorder(),
                         ),
@@ -249,16 +258,16 @@ class _HomeTabState extends State<HomeTab> {
               ),
               const SizedBox(height: 20),
               if (d != null && widget.petPreview != null)
-                const Text(
+                Text(
                   '이번 주 활동 현황',
-                  style: TextStyle(color: Colors.white, fontSize: 22),
+                  style: TextStyle(color: heroInk, fontSize: 22),
                 ),
               if (d != null && widget.petPreview != null && missions.isEmpty)
-                const Text('시작 전', style: TextStyle(color: Colors.white)),
+                Text('시작 전', style: TextStyle(color: heroInk)),
               if (d != null && widget.petPreview != null)
                 TextButton(
                   onPressed: () => section(ActivitySection.mine),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  style: TextButton.styleFrom(foregroundColor: heroInk),
                   child: Text(
                     missions.isEmpty
                         ? '미션 미생성 · 이번 주 예정 $weekly개'

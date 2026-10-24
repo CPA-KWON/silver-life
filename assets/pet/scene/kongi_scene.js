@@ -16,7 +16,7 @@
     for (const material of viewer.model.materials) {
       if (material.name === 'belly') {
         const color = colors.get(material.name).slice();
-        color[3] = selected.has('knit') ? 0 : 1;
+        color[3] = selected.has('knit') || selected.has('winter') ? 0 : 1;
         material.pbrMetallicRoughness.setBaseColorFactor(color);
         continue;
       }
@@ -24,7 +24,10 @@
       const id = {hat: 'hat', knit: 'knit', flower: 'flower'}[category];
       if (!id) continue;
       const color = colors.get(material.name).slice();
-      color[3] = selected.has(id) ? 1 : 0;
+      color[3] = selected.has(id) || id === 'knit' && selected.has('winter') ? 1 : 0;
+      if (material.name === 'knit_green' && selected.has('winter')) {
+        color[0] = .46; color[1] = .28; color[2] = .60;
+      }
       material.pbrMetallicRoughness.setBaseColorFactor(color);
     }
     viewer.cameraControls = !!config.interactive;
