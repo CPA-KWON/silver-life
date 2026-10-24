@@ -249,25 +249,30 @@ class _MonthHeader extends StatelessWidget {
       ),
       const SizedBox(height: 8),
       Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: onPrevious,
-              child: const Text('‹ 이전 달'),
-            ),
+          OutlinedButton(
+            style: _monthButtonStyle,
+            onPressed: onPrevious,
+            child: const Text('‹ 이전 달'),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton(
-              onPressed: onNext,
-              child: const Text('다음 달 ›'),
-            ),
+          OutlinedButton(
+            style: _monthButtonStyle,
+            onPressed: onNext,
+            child: const Text('다음 달 ›'),
           ),
         ],
       ),
     ],
   );
 }
+
+// Compact month buttons, still a 48dp touch target.
+final _monthButtonStyle = OutlinedButton.styleFrom(
+  minimumSize: const Size(0, 48),
+  padding: const EdgeInsets.symmetric(horizontal: 14),
+  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+);
 
 /// Month grid: stamped days, 7/14/30-day streak days and today are each
 /// visually distinct. Dates are plain KST calendar dates.
