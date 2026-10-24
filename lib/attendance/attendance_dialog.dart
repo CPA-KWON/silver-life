@@ -259,46 +259,47 @@ class _MonthHeader extends StatelessWidget {
   final VoidCallback onNext;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => Row(
     children: [
-      Text(
-        '${month.year}년 ${month.month}월',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+      Flexible(
+        child: OutlinedButton(
+          style: _monthButtonStyle,
+          onPressed: onPrevious,
+          child: const FittedBox(fit: BoxFit.scaleDown, child: Text('‹ 이전 달')),
         ),
       ),
-      const SizedBox(height: 8),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Flexible(
-            child: OutlinedButton(
-              style: _monthButtonStyle,
-              onPressed: onPrevious,
-              child: FittedBox(fit: BoxFit.scaleDown, child: Text('‹ 이전 달')),
+      Expanded(
+        flex: 2,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              '${month.year}년 ${month.month}월',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
-          Flexible(
-            child: OutlinedButton(
-              style: _monthButtonStyle,
-              onPressed: onNext,
-              child: FittedBox(fit: BoxFit.scaleDown, child: Text('다음 달 ›')),
-            ),
-          ),
-        ],
+        ),
+      ),
+      Flexible(
+        child: OutlinedButton(
+          style: _monthButtonStyle,
+          onPressed: onNext,
+          child: const FittedBox(fit: BoxFit.scaleDown, child: Text('다음 달 ›')),
+        ),
       ),
     ],
   );
 }
 
-// Compact month buttons, still a 48dp touch target.
+// Compact month buttons beside the title, still a 48dp touch target.
 final _monthButtonStyle = OutlinedButton.styleFrom(
   minimumSize: const Size(0, 48),
-  padding: const EdgeInsets.symmetric(horizontal: 14),
-  textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+  padding: const EdgeInsets.symmetric(horizontal: 8),
+  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
 );
 
 /// Month grid: stamped days, 7/14/30-day streak days and today are each
