@@ -121,7 +121,9 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                     )
                   else ...[
                     _Summary(status: status),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    ..._stampSection(status),
+                    const SizedBox(height: 20),
                     _MonthHeader(
                       month: _month!,
                       onPrevious: () =>
@@ -144,34 +146,8 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                     ),
                     const SizedBox(height: 12),
                     const _Legend(),
-                    const SizedBox(height: 16),
-                    if (_message != null) ...[
-                      _MessageCard(text: _message!, isError: _messageIsError),
-                      const SizedBox(height: 12),
-                    ],
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        disabledBackgroundColor: AppColors.mintTint,
-                        disabledForegroundColor: AppColors.mintText,
-                      ),
-                      onPressed: status.attendedToday || _busy ? null : _stamp,
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              status.attendedToday
-                                  ? Icons.check_circle
-                                  : Icons.approval,
-                            ),
-                      label: Text(
-                        status.attendedToday ? '오늘 출석 완료!' : '출석도장 찍기',
-                      ),
-                    ),
                   ],
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('닫기'),
@@ -184,6 +160,30 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
       ),
     );
   }
+
+  /// Stamp button (or "오늘 출석 완료!") right under the summary, so it is
+  /// visible without scrolling past the calendar.
+  List<Widget> _stampSection(AttendanceStatus status) => [
+    if (_message != null) ...[
+      _MessageCard(text: _message!, isError: _messageIsError),
+      const SizedBox(height: 12),
+    ],
+    FilledButton.icon(
+      style: FilledButton.styleFrom(
+        disabledBackgroundColor: AppColors.mintTint,
+        disabledForegroundColor: AppColors.mintText,
+      ),
+      onPressed: status.attendedToday || _busy ? null : _stamp,
+      icon: _busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(status.attendedToday ? Icons.check_circle : Icons.approval),
+      label: Text(status.attendedToday ? '오늘 출석 완료!' : '출석도장 찍기'),
+    ),
+  ];
 }
 
 class _Summary extends StatelessWidget {
