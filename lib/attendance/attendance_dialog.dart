@@ -144,8 +144,6 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                         onRetry: () => _showMonth(_month!),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    const _Legend(),
                   ],
                   const SizedBox(height: 16),
                   OutlinedButton(
@@ -483,60 +481,6 @@ class _DayCell extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Legend extends StatelessWidget {
-  const _Legend();
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyMedium
-        ?.copyWith(fontSize: 18, color: AppColors.textPrimary);
-    // Each sample looks like the calendar cell it explains.
-    Widget item(Color background, Icon icon, String text) => Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: icon,
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: style)),
-      ],
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        item(
-          AppColors.tint,
-          const Icon(Icons.check_circle, size: 22, color: AppColors.primary),
-          '출석도장을 찍은 날이에요.',
-        ),
-        const SizedBox(height: 10),
-        item(
-          AppColors.rewardTint,
-          const Icon(Icons.star, size: 22, color: AppColors.rewardText),
-          '7일·14일·30일 연속으로 출석한 날이에요. '
-          '이날은 포인트를 더 많이 받아요!',
-        ),
-        const SizedBox(height: 10),
-        item(
-          AppColors.rewardFaintTint,
-          const Icon(
-            Icons.star_border,
-            size: 22,
-            color: AppColors.rewardFaintText,
-          ),
-          '하루도 빠지지 않고 출석하면 별을 받을 수 있는 날이에요.',
-        ),
-      ],
     );
   }
 }
