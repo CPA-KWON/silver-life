@@ -251,15 +251,19 @@ class _MonthHeader extends StatelessWidget {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          OutlinedButton(
-            style: _monthButtonStyle,
-            onPressed: onPrevious,
-            child: const Text('‹ 이전 달'),
+          Flexible(
+            child: OutlinedButton(
+              style: _monthButtonStyle,
+              onPressed: onPrevious,
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text('‹ 이전 달')),
+            ),
           ),
-          OutlinedButton(
-            style: _monthButtonStyle,
-            onPressed: onNext,
-            child: const Text('다음 달 ›'),
+          Flexible(
+            child: OutlinedButton(
+              style: _monthButtonStyle,
+              onPressed: onNext,
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text('다음 달 ›')),
+            ),
           ),
         ],
       ),
