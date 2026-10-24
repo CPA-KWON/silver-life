@@ -121,9 +121,7 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                     )
                   else ...[
                     _Summary(status: status),
-                    const SizedBox(height: 12),
-                    ..._stampSection(status),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _MonthHeader(
                       month: _month!,
                       onPrevious: () =>
@@ -144,6 +142,8 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                         onRetry: () => _showMonth(_month!),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    ..._stampSection(status),
                   ],
                   const SizedBox(height: 16),
                   OutlinedButton(
@@ -159,8 +159,8 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
     );
   }
 
-  /// Stamp button (or "오늘 출석 완료!") right under the summary, so it is
-  /// visible without scrolling past the calendar.
+  /// Stamp button (or "오늘 출석 완료!") with its result message, under the
+  /// calendar.
   List<Widget> _stampSection(AttendanceStatus status) => [
     if (_message != null) ...[
       _MessageCard(text: _message!, isError: _messageIsError),

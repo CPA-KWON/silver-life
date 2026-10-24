@@ -92,7 +92,7 @@ void main() {
     expect(find.text('2026년 10월'), findsOneWidget);
     expect(
       t.getTopLeft(find.text('출석도장 찍기')).dy,
-      lessThan(t.getTopLeft(find.text('2026년 10월')).dy),
+      greaterThan(t.getTopLeft(find.text('2026년 10월')).dy),
     );
     await tap(t, find.text('닫기'));
     expect(find.text('매일매일 출석체크'), findsNothing);
