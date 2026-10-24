@@ -15,6 +15,7 @@
 - 공개 프로필 관계로 닉네임·지역만 공유합니다. 개인 profiles 조회는 본인에게만 허용합니다.
 - 체크인 조회는 facility_presence, 외부 시설 등록은 ensure_facility를 사용합니다.
 - 활동 기본 SQL은 중복 실행용이 아닙니다. 기관 설정은 tool/prepare_institution_setup.py로 만든 institution_setup.sql, 기존 함수 보완은 activity_usability_fix.sql을 검토합니다.
+- 2026-10-24 사용자가 운영 Supabase에 attendance_points.sql 실행 완료. 함수·표 생성과 비로그인 차단(42501) 확인. 로그인 상태 출석은 기기에서 확인 필요.
 
 ## 1. 우리 팀과 작업 방식 (가장 중요)
 
