@@ -212,7 +212,7 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
               ModelViewer(
                 key: ValueKey('${widget.stage}-$_attempt'),
                 src: 'assets/pet/models/${widget.stage}.glb',
-                alt: '콩이 입체 모델. 손가락으로 돌려볼 수 있어요.',
+                alt: '콩이 입체 모델. 손가락을 좌우로 움직여 돌려보세요.',
                 ar: false,
                 loading: Loading.eager,
                 autoPlay: false,
@@ -224,8 +224,9 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
                 cameraOrbit: '25deg 80deg 5.4m',
                 cameraTarget: '0m 1.25m 0m',
                 fieldOfView: '32deg',
-                minCameraOrbit: 'auto 35deg 5.4m',
-                maxCameraOrbit: 'auto 125deg 5.4m',
+                // Keep the same viewing height while allowing a full horizontal turn.
+                minCameraOrbit: 'auto 80deg 5.4m',
+                maxCameraOrbit: 'auto 80deg 5.4m',
                 environmentImage: 'neutral',
                 exposure: 1.1,
                 shadowIntensity: .6,

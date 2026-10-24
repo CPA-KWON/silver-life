@@ -376,8 +376,8 @@ class _PetHomePageState extends State<PetHomePage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _title(c, '다른 각도에서 만나요'),
-          const Text('손가락으로 자유롭게 돌려보세요. 앞·옆·뒤 버튼으로 원하는 방향을 바로 볼 수도 있어요.'),
+          _title(c, '좌우로 돌려보세요'),
+          const Text('손가락을 좌우로 움직여 돌려보세요. 앞·옆·뒤 버튼으로도 볼 수 있어요.'),
           PetCharacter(pet: widget.pet),
           TextButton(
             onPressed: () => Navigator.pop(c),
@@ -514,7 +514,7 @@ class _PetHomePageState extends State<PetHomePage> {
           TextButton.icon(
             onPressed: angles,
             icon: const Icon(Icons.rotate_right),
-            label: const Text('3D로 돌려보기'),
+            label: const Text('좌우로 돌리기'),
           ),
           const SizedBox(height: 8),
           _Panel(
