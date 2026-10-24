@@ -12,6 +12,8 @@ import '../facility/nearby_facilities_page.dart';
 import '../profile/profile_page.dart';
 import '../ui/design_widgets.dart';
 import '../attendance/point_badge.dart';
+import '../pet/pet_preview_controller.dart';
+import '../pet/pet_preview_pages.dart';
 
 typedef HomeData = ({
   String nickname,
@@ -25,8 +27,14 @@ class HomeTab extends StatefulWidget {
     this.activityRepository,
     this.onOpenActivity,
     this.onOpenProgram,
+    this.petPreview,
+    this.onOpenPet,
+    this.refreshListenable,
   });
   final ActivityRepository? activityRepository;
+  final PetPreviewController? petPreview;
+  final VoidCallback? onOpenPet;
+  final Listenable? refreshListenable;
   final ValueChanged<ActivitySection>? onOpenActivity;
   final ValueChanged<String>? onOpenProgram;
   @override
@@ -36,6 +44,18 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   late final repo = widget.activityRepository ?? ActivityRepository();
   late Future<HomeData> future = load();
+  @override
+  void initState() {
+    super.initState();
+    widget.refreshListenable?.addListener(reload);
+  }
+
+  @override
+  void dispose() {
+    widget.refreshListenable?.removeListener(reload);
+    super.dispose();
+  }
+
   Future<HomeData> load() async {
     final client = Supabase.instance.client;
     final profile = await client
@@ -228,7 +248,24 @@ class _HomeTabState extends State<HomeTab> {
                 ],
               ),
               const SizedBox(height: 20),
-              if (d != null)
+              if (d != null && widget.petPreview != null)
+                const Text(
+                  '이번 주 활동 현황',
+                  style: TextStyle(color: Colors.white, fontSize: 22),
+                ),
+              if (d != null && widget.petPreview != null && missions.isEmpty)
+                const Text('시작 전', style: TextStyle(color: Colors.white)),
+              if (d != null && widget.petPreview != null)
+                TextButton(
+                  onPressed: () => section(ActivitySection.mine),
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  child: Text(
+                    missions.isEmpty
+                        ? '미션 미생성 · 이번 주 예정 $weekly개'
+                        : '미션 ${missions.where((m) => m["status"] == "completed").length}/${missions.length}개 완료 · 이번 주 예정 $weekly개',
+                  ),
+                ),
+              if (d != null && widget.petPreview == null)
                 WeeklyActivitySummary(
                   completed: missions
                       .where((m) => m['status'] == 'completed')
@@ -249,6 +286,11 @@ class _HomeTabState extends State<HomeTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.petPreview != null && widget.onOpenPet != null)
+                PetPreviewEntry(
+                  pet: widget.petPreview!,
+                  onTap: widget.onOpenPet!,
+                ),
               ...d == null
                   ? [ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload)]
                   : [

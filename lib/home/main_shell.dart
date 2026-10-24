@@ -12,6 +12,8 @@ import '../activity/activity_hub_page.dart';
 import '../activity/activity_repository.dart';
 import '../activity/activity_detail_page.dart';
 import '../facility/nearby_facilities_page.dart';
+import '../pet/pet_preview_controller.dart';
+import '../pet/pet_preview_pages.dart';
 import 'home_tab.dart';
 import 'retained_map_tab.dart';
 import 'nearby_facilities.dart';
@@ -35,6 +37,9 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _index = 0;
+  final _petPreview = PetPreviewController();
+  final _homeRefresh = ValueNotifier<int>(0);
+  final _homeNavigator = GlobalKey<NavigatorState>();
   late final _attendance = AttendanceController(
     repository: widget.attendanceRepository,
   );
@@ -52,6 +57,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _attendance.dispose();
+    _petPreview.dispose();
+    _homeRefresh.dispose();
     super.dispose();
   }
 
@@ -98,21 +105,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Widget _buildPage() {
     switch (_index) {
       case 0:
-        return HomeTab(
-          activityRepository: widget.activityRepository,
-          onOpenActivity: (section) => _openActivity(
-            ActivitySectionPage(
-              section: section,
-              repository: widget.activityRepository,
-            ),
-          ),
-          onOpenProgram: (id) => _openActivity(
-            ActivityDetailPage(
-              programId: id,
-              repository: widget.activityRepository,
-            ),
-          ),
-        );
+        return const SizedBox.shrink();
       case 1:
         return const SizedBox.shrink();
       case 2:
@@ -195,7 +188,52 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               ),
           child: Stack(
             children: [
-              Offstage(offstage: _index == 2, child: _buildPage()),
+              if (_index != 0 && _index != 2) _buildPage(),
+              Offstage(
+                offstage: _index != 0,
+                child: TickerMode(
+                  enabled: _index == 0,
+                  child: NavigatorPopHandler<Object?>(
+                    enabled: _index == 0,
+                    onPopWithResult: (_) {
+                      if (_index == 0) _homeNavigator.currentState?.maybePop();
+                    },
+                    child: Navigator(
+                      key: _homeNavigator,
+                      onGenerateRoute: (_) => MaterialPageRoute<void>(
+                        builder: (_) {
+                          // Always construct the home entry, even if another tab
+                          // was selected before this navigator finished building.
+                          return HomeTab(
+                            activityRepository: widget.activityRepository,
+                            refreshListenable: _homeRefresh,
+                            petPreview: _petPreview,
+                            onOpenPet: () => _homeNavigator.currentState!.push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => _petPreview.adopted
+                                    ? PetHomePage(pet: _petPreview)
+                                    : PetAdoptionPage(pet: _petPreview),
+                              ),
+                            ),
+                            onOpenActivity: (section) => _openActivity(
+                              ActivitySectionPage(
+                                section: section,
+                                repository: widget.activityRepository,
+                              ),
+                            ),
+                            onOpenProgram: (id) => _openActivity(
+                              ActivityDetailPage(
+                                programId: id,
+                                repository: widget.activityRepository,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               if (_activityVisited)
                 Offstage(
                   offstage: _index != 2,
@@ -234,6 +272,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             child: NavigationBar(
               selectedIndex: _index,
               onDestinationSelected: (i) => setState(() {
+                if (i == 0 && _index != 0) _homeRefresh.value++;
                 _index = i;
                 if (i == 2) _activityVisited = true;
               }),

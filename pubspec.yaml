@@ -80,6 +80,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  assets:
+    - assets/pet/baby/
+    - assets/pet/junior/
+    - assets/pet/adult/
+    - assets/pet/items/
+    - assets/pet/motion/
+
   fonts:
     - family: Pretendard
       fonts:
