@@ -97,12 +97,16 @@ lib/ 밖의 중요한 파일
 | `favorites` | 즐겨찾기 | id, user_id, name, address, telephone, lat, lng, category, created_at — ⚠️ `facility_id`가 **없고** 시설 정보를 통째로 복사해 저장 |
 | `checkins` | "나 여기 있음" 체크인 | id, user_id, facility_id, checked_in_at — 한 사람당 시설별 1개, 앱에서 3시간 지나면 안 셈 |
 | `reports` | 게시글·모임·댓글 신고 | id, reporter_id, post_id 또는 comment_id(둘 중 하나만), reason(욕설·비방/광고/사기 의심/기타), created_at — 같은 사람이 같은 대상 1번만 |
+| `point_wallets` | 포인트 지갑 (`attendance_points.sql`) | user_id, balance(보유), total_earned(누적 획득), last_attended_on, current_streak, updated_at |
+| `attendance_days` | 날짜별 출석 이력 | user_id, attended_on(한국 날짜), streak, points — 사람·날짜당 1줄 |
+| `point_ledger` | 포인트 변동 내역 | id, user_id, amount, reason(현재 attendance만), ref_date — 나중에 다른 보상·사용을 reason으로 확장 |
 
 - `posts.category` 값은 `자유게시판`, `건강정보`, `나눔·도움요청`, `동네모임` 4가지만 허용됩니다(DB에서 막음).
 - 동네모임은 별도 테이블이 아니라 `posts`에 `category = '동네모임'`으로 저장되고, `event_at`(모임 일시)과 `facility_id`(모임 장소)를 씁니다. 모임은 장소가 반드시 있어야 합니다(DB 규칙 `meetup_requires_facility`).
 - 커뮤니티 글은 **글쓴이의 사는 지역**(`profiles.region_*`)으로, 모임은 **모임 장소의 지역**(`facilities.region_*`)으로 걸러서 보여줍니다.
 - 신고 3건 이상인 글·댓글은 DB 읽기 권한(RLS)에서 숨겨집니다(글쓴이 본인에게만 보임). 팀은 대시보드 Table Editor의 `report_summary`(신고 모아보기)에서 확인합니다.
 - 기타 DB 기능: `email_exists(check_email)` 함수(회원가입 이메일 중복확인), `handle_new_user` 트리거(가입하면 `profiles` 줄을 자동 생성), `checkins` 실시간 알림(체크인 인원 자동 갱신).
+- 출석체크: 앱은 `attendance_status()`·`attendance_check_in()` 함수만 부르고 포인트 표 3개는 읽기만 합니다. 출석일은 서버 시간 기준 한국시간 0시에 바뀌고, 연속 7·14·30일째에 3·5·10포인트(그 외 1포인트)를 줍니다.
 - DB 설계 기록은 `supabase/` 폴더의 SQL 파일에 있습니다. 실행 순서: `schema.sql` → `community_schema.sql` → `facilities_schema.sql` → `realtime_setup.sql` → `facilities_rls_fix.sql` → `region_split.sql` → `facility_region.sql` → `email_exists_function.sql` → `reports.sql` → (데이터) `delete_old_gyeongrodang.sql` → `import_gyeongrodang.sql`
 - ⚠️ 위 표는 2026-10-14에 코드와 `supabase/*.sql`을 읽고 정리한 것입니다. 대시보드에서 SQL 파일 없이 직접 바꾼 내용이 있다면 실제 DB와 다를 수 있습니다(특히 `profiles` 읽기 권한 — 8번 아래 "점검 메모" 참고).
 - DB 구조를 바꿔야 할 때는 Supabase 대시보드 **SQL Editor에 붙여넣을 SQL**을 만들어주고, 붙여넣는 방법을 단계별로 알려주세요. 우리가 실행한 뒤 "완료"라고 하면 이어서 진행하세요.
@@ -126,6 +130,8 @@ lib/ 밖의 중요한 파일
 - 동네모임 만들기·수정, 시설을 모임 장소로 지정, 예정/지난 모임
 - 홈(다가오는 모임, 최근 글), 내 정보, 내 글 관리, 개인정보처리방침
 - 게시글·모임·댓글 신고하기(사유 4가지, 중복 신고 불가, 3건 이상 숨김)
+- 출석체크(하루 1번 출석도장, 연속 출석 보상, 월별 달력)와 포인트 배지(모든 탭 상단 오른쪽 🪙 P)
+- 홈에 즐겨찾는 시설 3개, 모임 장소를 즐겨찾기에서 고르기
 
 ### 남은 할 일 (우선순위 순)
 1. [x] 네이버 지역검색 서버 연결 (사용자 승인한 기존 키를 비공개 서버 설정에 등록 완료)

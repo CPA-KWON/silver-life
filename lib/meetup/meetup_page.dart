@@ -7,6 +7,7 @@ import '../core/meetup_category.dart';
 import '../app_theme.dart';
 import '../core/region_scope.dart';
 import '../ui/design_widgets.dart';
+import '../attendance/point_badge.dart';
 import 'new_meetup_page.dart';
 import '../profile/my_post_list_page.dart';
 
@@ -143,6 +144,8 @@ class _MeetupPageState extends State<MeetupPage> {
                 ),
                 child: const Text('내가 만든 모임'),
               ),
+              const PointBadge(),
+              const SizedBox(width: 12),
             ],
           ),
           RegionScopeBar(

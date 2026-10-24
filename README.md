@@ -95,6 +95,8 @@ Supabase 설정이 없으면 앱은 설정 안내 화면을 표시합니다.
 3. 활동 기능이 아직 없다면 `supabase/activity_expansion.sql`을 별도 New query에서 적용합니다.
    이 파일은 한 번만 실행합니다. 이미 activity_* 테이블이 있다면 재실행하지 마세요.
 4. 아래 설명대로 검색 서버 함수와 새 검색 키를 배포합니다.
+4-1. 출석체크·포인트를 쓰려면 `supabase/attendance_points.sql`을 별도 New query에서 실행합니다.
+     다시 실행해도 안전합니다. 실행 전에는 앱에 포인트 배지와 출석 팝업이 나타나지 않습니다.
 5. 앱을 새 설정으로 빌드하고 일반 회원 2명과 기관 담당자로 기능을 확인합니다.
 
 `integration_security.sql`은 다른 사람의 이름·출생연도를 공개하지 않고
@@ -177,6 +179,7 @@ Node.js 24 이상과 별도 설치한 `@electric-sql/pglite`가 필요합니다.
 ```bash
 PGLITE_MODULE=/ABSOLUTE/PATH/node_modules/@electric-sql/pglite/dist/index.js node test/integration_security_test.mjs
 PGLITE_MODULE=/ABSOLUTE/PATH/node_modules/@electric-sql/pglite/dist/index.js node test/activity_database_test.mjs
+PGLITE_MODULE=/ABSOLUTE/PATH/node_modules/@electric-sql/pglite/dist/index.js node test/attendance_database_test.mjs
 node --test test/facility_search_edge_test.mjs
 ```
 

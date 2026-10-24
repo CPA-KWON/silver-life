@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
+import '../attendance/attendance_controller.dart';
+import '../attendance/attendance_dialog.dart';
+import '../attendance/attendance_repository.dart';
+import '../attendance/point_badge.dart';
 import '../community/community_page.dart';
 import '../facility/facility_search_page.dart';
 import '../meetup/meetup_page.dart';
@@ -18,8 +22,10 @@ class MainShell extends StatefulWidget {
     this.facilityPage,
     this.nearbyLoader,
     this.activityRepository,
+    this.attendanceRepository,
   });
   final Widget? facilityPage;
+  final AttendanceRepository? attendanceRepository;
   final NearbyLoader? nearbyLoader;
   final ActivityRepository? activityRepository;
 
@@ -27,8 +33,51 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _index = 0;
+  late final _attendance = AttendanceController(
+    repository: widget.attendanceRepository,
+  );
+  DateTime? _attendancePromptedFor;
+  bool _attendanceOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _promptAttendance());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _attendance.dispose();
+    super.dispose();
+  }
+
+  // A new KST day may start while the app sits in the background.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _promptAttendance();
+  }
+
+  /// Opens the attendance popup once per server day until the user stamps.
+  /// Closing it records nothing, so the next app start asks again.
+  Future<void> _promptAttendance() async {
+    final status = await _attendance.refresh();
+    if (!mounted ||
+        status == null ||
+        status.attendedToday ||
+        _attendanceOpen ||
+        _attendancePromptedFor == status.today) {
+      return;
+    }
+    _attendancePromptedFor = status.today;
+    _attendanceOpen = true;
+    await showAttendanceDialog(context, _attendance);
+    _attendanceOpen = false;
+  }
+
   bool _activityVisited = false;
   final _activityNavigator = GlobalKey<NavigatorState>();
 
@@ -105,6 +154,13 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    return AttendanceScope(
+      controller: _attendance,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: _index == 0
           ? AppColors.gradientStart
@@ -128,6 +184,8 @@ class _MainShellState extends State<MainShell> {
                       ),
                       child: const Text('주변 시설'),
                     ),
+                    const PointBadge(),
+                    const SizedBox(width: 8),
                   ],
                 ),
                 body: FacilitySearchPage(

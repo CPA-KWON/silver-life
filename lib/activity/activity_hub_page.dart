@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
+import '../attendance/point_badge.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
 import 'activity_forms.dart';
@@ -37,7 +38,10 @@ class ActivityHubPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('활동')),
+    appBar: AppBar(
+      title: const Text('활동'),
+      actions: const [PointBadge(), SizedBox(width: 8)],
+    ),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [

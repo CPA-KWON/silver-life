@@ -6,6 +6,7 @@ import '../core/region_scope.dart';
 import '../core/meetup_category.dart';
 import '../core/time_ago.dart';
 import '../ui/design_widgets.dart';
+import '../attendance/point_badge.dart';
 import 'new_post_page.dart';
 import 'post_detail_page.dart';
 
@@ -171,7 +172,14 @@ class _CommunityPageState extends State<CommunityPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PageTitle('커뮤니티'),
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: PageTitle('커뮤니티')),
+              PointBadge(),
+              SizedBox(width: 12),
+            ],
+          ),
           RegionScopeBar(
             scope: _regionScope,
             mySido: _mySido,

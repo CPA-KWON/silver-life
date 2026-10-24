@@ -39,6 +39,11 @@ abstract final class AppColors {
   static const danger = Color(0xFFDC2626);
   static const success = Color(0xFF15803D);
 
+  /// Attendance streak rewards (7/14/30일) and the point badge coin.
+  static const rewardTint = Color(0xFFFFF1CC);
+  static const rewardText = Color(0xFF8A4B00);
+  static const dangerTint = Color(0xFFFDECEC);
+
   /// Soft blue shadow for elevated controls only.
   static const cardShadow = <BoxShadow>[
     BoxShadow(color: Color(0x14086FA9), blurRadius: 16, offset: Offset(0, 4)),

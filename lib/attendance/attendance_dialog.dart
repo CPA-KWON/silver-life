@@ -1,0 +1,526 @@
+import 'package:flutter/material.dart';
+
+import '../app_theme.dart';
+import 'attendance_controller.dart';
+import 'attendance_repository.dart';
+
+/// "매일매일 출석체크" popup. Closing it never records attendance; only the
+/// stamp button does (server-side, once per KST day).
+Future<void> showAttendanceDialog(
+  BuildContext context,
+  AttendanceController controller,
+) => showDialog<void>(
+  context: context,
+  builder: (_) => AttendanceDialog(controller: controller),
+);
+
+class AttendanceDialog extends StatefulWidget {
+  const AttendanceDialog({super.key, required this.controller});
+  final AttendanceController controller;
+
+  @override
+  State<AttendanceDialog> createState() => _AttendanceDialogState();
+}
+
+class _AttendanceDialogState extends State<AttendanceDialog> {
+  AttendanceController get controller => widget.controller;
+  DateTime? _month;
+  Future<List<AttendanceDay>>? _days;
+  bool _busy = false;
+  bool _loadingStatus = false;
+  String? _message;
+  bool _messageIsError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (controller.status == null) {
+      _reloadStatus();
+    } else {
+      _showMonth(controller.status!.today);
+    }
+  }
+
+  Future<void> _reloadStatus() async {
+    setState(() => _loadingStatus = true);
+    final status = await controller.refresh();
+    if (!mounted) return;
+    setState(() => _loadingStatus = false);
+    if (status != null) _showMonth(_month ?? status.today);
+  }
+
+  void _showMonth(DateTime month) {
+    setState(() {
+      _month = DateTime(month.year, month.month);
+      _days = controller.repository.month(_month!);
+    });
+  }
+
+  Future<void> _stamp() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      final result = await controller.checkIn();
+      _message = result.already
+          ? '오늘 출석은 이미 완료됐어요.'
+          : attendanceRewardMessage(result.status.streak, result.points ?? 1);
+      _messageIsError = false;
+    } catch (_) {
+      // The request may have reached the server before the connection
+      // dropped, so ask the server what actually happened.
+      final status = await controller.refresh();
+      if (status?.attendedToday == true) {
+        _message =
+            '연결이 잠시 끊겼지만 오늘 출석은 정상 처리됐어요.'
+            '${status!.todayPoints == null ? '' : ' (${status.todayPoints}포인트)'}';
+        _messageIsError = false;
+      } else {
+        _message = '출석을 처리하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.';
+        _messageIsError = true;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    final today = controller.status?.today;
+    if (today != null) _showMonth(today);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) {
+            final status = controller.status;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '매일매일 출석체크',
+                    textAlign: TextAlign.center,
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (status == null)
+                    _StatusError(
+                      loading: _loadingStatus,
+                      onRetry: _reloadStatus,
+                    )
+                  else ...[
+                    _Summary(status: status),
+                    const SizedBox(height: 16),
+                    _MonthHeader(
+                      month: _month!,
+                      onPrevious: () =>
+                          _showMonth(DateTime(_month!.year, _month!.month - 1)),
+                      onNext: () =>
+                          _showMonth(DateTime(_month!.year, _month!.month + 1)),
+                    ),
+                    const SizedBox(height: 8),
+                    FutureBuilder<List<AttendanceDay>>(
+                      future: _days,
+                      builder: (context, s) => AttendanceCalendar(
+                        month: _month!,
+                        today: status.today,
+                        days: s.data ?? const [],
+                        loading: s.connectionState != ConnectionState.done,
+                        failed: s.hasError,
+                        onRetry: () => _showMonth(_month!),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const _Legend(),
+                    const SizedBox(height: 16),
+                    if (_message != null) ...[
+                      _MessageCard(text: _message!, isError: _messageIsError),
+                      const SizedBox(height: 12),
+                    ],
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        disabledBackgroundColor: AppColors.mintTint,
+                        disabledForegroundColor: AppColors.mintText,
+                      ),
+                      onPressed: status.attendedToday || _busy ? null : _stamp,
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              status.attendedToday
+                                  ? Icons.check_circle
+                                  : Icons.approval,
+                            ),
+                      label: Text(
+                        status.attendedToday ? '오늘 출석 완료!' : '출석도장 찍기',
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('닫기'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _Summary extends StatelessWidget {
+  const _Summary({required this.status});
+  final AttendanceStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final style = textTheme.bodyLarge?.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.tint,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            status.streak > 0
+                ? '🔥 ${status.streak}일 연속 출석 달성!'
+                : '🔥 오늘부터 연속 출석을 시작해 보세요',
+            textAlign: TextAlign.center,
+            style: style?.copyWith(fontSize: 20),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '보유 포인트  🪙 ${status.balance} P',
+            textAlign: TextAlign.center,
+            style: style?.copyWith(color: AppColors.blueText),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthHeader extends StatelessWidget {
+  const _MonthHeader({
+    required this.month,
+    required this.onPrevious,
+    required this.onNext,
+  });
+  final DateTime month;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        '${month.year}년 ${month.month}월',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onPrevious,
+              child: const Text('‹ 이전 달'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onNext,
+              child: const Text('다음 달 ›'),
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+/// Month grid: stamped days, 7/14/30-day streak days and today are each
+/// visually distinct. Dates are plain KST calendar dates.
+class AttendanceCalendar extends StatelessWidget {
+  const AttendanceCalendar({
+    super.key,
+    required this.month,
+    required this.today,
+    required this.days,
+    this.loading = false,
+    this.failed = false,
+    this.onRetry,
+  });
+  final DateTime month;
+  final DateTime today;
+  final List<AttendanceDay> days;
+  final bool loading;
+  final bool failed;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final byDay = {for (final d in days) d.date.day: d};
+    final first = DateTime(month.year, month.month);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final leading = first.weekday % 7; // 일요일 시작
+    final cells = leading + daysInMonth;
+    final rows = (cells / 7).ceil();
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    final textTheme = Theme.of(context).textTheme;
+    final dayStyle = textTheme.bodyLarge?.copyWith(
+      fontSize: 18,
+      color: AppColors.textPrimary,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < 7; i++)
+              Expanded(
+                child: Text(
+                  weekdays[i],
+                  textAlign: TextAlign.center,
+                  style: dayStyle?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: i == 0 ? AppColors.danger : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        for (var r = 0; r < rows; r++)
+          Row(
+            children: [
+              for (var c = 0; c < 7; c++)
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      final day = r * 7 + c - leading + 1;
+                      if (day < 1 || day > daysInMonth) {
+                        return const SizedBox(height: 60);
+                      }
+                      final date = DateTime(month.year, month.month, day);
+                      return _DayCell(
+                        day: day,
+                        record: byDay[day],
+                        isToday: date == today,
+                        style: dayStyle,
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        if (loading)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(),
+          )
+        else if (failed)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Expanded(child: Text('출석 기록을 불러오지 못했어요.', style: dayStyle)),
+                TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.day,
+    required this.record,
+    required this.isToday,
+    required this.style,
+  });
+  final int day;
+  final AttendanceDay? record;
+  final bool isToday;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final milestone = record?.isMilestone == true;
+    final attended = record != null;
+    final label = attended
+        ? '$day일 출석${milestone ? ', ${record!.streak}일 연속 달성' : ''}'
+        : '$day일';
+    return Semantics(
+      label: isToday ? '오늘, $label' : label,
+      excludeSemantics: true,
+      child: Container(
+        height: 60,
+        margin: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: milestone
+              ? AppColors.rewardTint
+              : attended
+              ? AppColors.tint
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          border: isToday
+              ? Border.all(color: AppColors.primary, width: 2.5)
+              : null,
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$day',
+                style: style?.copyWith(
+                  fontWeight: isToday || attended
+                      ? FontWeight.w800
+                      : FontWeight.w500,
+                ),
+              ),
+              if (milestone)
+                const Icon(Icons.star, size: 20, color: AppColors.rewardText)
+              else if (attended)
+                const Icon(
+                  Icons.check_circle,
+                  size: 20,
+                  color: AppColors.primary,
+                )
+              else
+                const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Legend extends StatelessWidget {
+  const _Legend();
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(fontSize: 18, color: AppColors.textPrimary);
+    Widget item(Widget mark, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        mark,
+        const SizedBox(width: 4),
+        Flexible(child: Text(text, style: style)),
+      ],
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 16,
+      runSpacing: 4,
+      children: [
+        item(
+          const Icon(Icons.check_circle, size: 20, color: AppColors.primary),
+          '출석',
+        ),
+        item(
+          const Icon(Icons.star, size: 20, color: AppColors.rewardText),
+          '7·14·30일 연속',
+        ),
+        item(
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.primary, width: 2.5),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          '오늘',
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageCard extends StatelessWidget {
+  const _MessageCard({required this.text, required this.isError});
+  final String text;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isError ? AppColors.dangerTint : AppColors.rewardTint,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: isError ? AppColors.danger : AppColors.rewardText,
+      ),
+    ),
+  );
+}
+
+class _StatusError extends StatelessWidget {
+  const _StatusError({required this.loading, required this.onRetry});
+  final bool loading;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => loading
+      ? const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        )
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '출석 정보를 불러오지 못했어요. 다시 시도해 주세요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge
+                  ?.copyWith(fontSize: 18, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: onRetry, child: const Text('다시 시도')),
+          ],
+        );
+}

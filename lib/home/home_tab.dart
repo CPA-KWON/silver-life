@@ -11,6 +11,7 @@ import '../facility/naver_local_search.dart';
 import '../facility/nearby_facilities_page.dart';
 import '../profile/profile_page.dart';
 import '../ui/design_widgets.dart';
+import '../attendance/point_badge.dart';
 
 typedef HomeData = ({
   String nickname,
@@ -205,17 +206,24 @@ class _HomeTabState extends State<HomeTab> {
                       ],
                     ),
                   ),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: AppColors.heroCircle,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: const StadiumBorder(),
-                    ),
-                    onPressed: () =>
-                        open(ProfilePage(activityRepository: repo)),
-                    icon: const Icon(Icons.person_outline),
-                    label: const Text('내 정보'),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const PointBadge(onDark: true),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: AppColors.heroCircle,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: const StadiumBorder(),
+                        ),
+                        onPressed: () =>
+                            open(ProfilePage(activityRepository: repo)),
+                        icon: const Icon(Icons.person_outline),
+                        label: const Text('내 정보'),
+                      ),
+                    ],
                   ),
                 ],
               ),
