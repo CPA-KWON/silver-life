@@ -194,6 +194,31 @@ void main() {
     expect(backend.favorites, isEmpty);
     await finish(t);
   });
+  testWidgets('returning to the map tab starts a fresh search', (t) async {
+    var active = true;
+    late StateSetter setActive;
+    await mount(
+      t,
+      StatefulBuilder(
+        builder: (context, setState) {
+          setActive = setState;
+          return FacilitySearchPage(
+            isActive: active,
+            mapPlaceholder: const ColoredBox(color: Colors.blue),
+            enableRealtime: false,
+          );
+        },
+      ),
+    );
+    await t.enterText(find.byType(TextField).first, '서울대학교병원');
+    expect(find.text('서울대학교병원'), findsOneWidget);
+    setActive(() => active = false);
+    await t.pump();
+    setActive(() => active = true);
+    await t.pump();
+    expect(find.text('서울대학교병원'), findsNothing);
+    await finish(t);
+  });
   testWidgets(
     'map post and editor overlays preserve map element and unsaved form',
     (t) async {

@@ -70,6 +70,9 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   );
   NLocationTrackingMode _resumeTrackingMode = NLocationTrackingMode.none;
   bool _trackingConfigured = false;
+  // Bumped when leaving the tab so a search still in flight cannot bring
+  // back markers or errors after the reset.
+  int _searchSession = 0;
   bool _checkingPermission = false;
   final _searchController = TextEditingController();
   String? _category;
@@ -161,6 +164,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
       _postId = null;
       _pickedInPlace(null);
       _finishEditor(false);
+      _resetSearch();
     }
     final controller = _controller;
     _locationTracker.setActive(widget.isActive);
@@ -172,10 +176,36 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
         unawaited(_startInitialTracking());
       }
     } else {
-      _resumeTrackingMode = controller.locationTrackingMode;
+      // A search may have moved the camera off the user; follow them again
+      // on return when location was allowed.
+      if (_resumeTrackingMode != NLocationTrackingMode.none ||
+          controller.locationTrackingMode != NLocationTrackingMode.none) {
+        _resumeTrackingMode = NLocationTrackingMode.follow;
+      }
       controller.setLocationTrackingMode(NLocationTrackingMode.none);
     }
   }
+
+  // Leaving the tab starts the next visit fresh: no old markers, keyword,
+  // category or error.
+  void _resetSearch() {
+    _searchSession++;
+    _searchController.clear();
+    _category = null;
+    _subcategory = null;
+    _activeSearchTerm = null;
+    _searchError = null;
+    _showSearchHereButton = false;
+    _isSearching = false;
+    _controller
+        ?.clearOverlays(type: NOverlayType.marker)
+        .then((_) {}, onError: (Object _) {});
+  }
+
+  bool _stale(NaverMapController controller, int session) =>
+      !mounted ||
+      !identical(controller, _controller) ||
+      session != _searchSession;
 
   Future<void> _startInitialTracking() async {
     final controller = _controller;
@@ -260,6 +290,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
   Future<void> _searchAtCamera(String searchTerm) async {
     final controller = _controller;
     if (controller == null || _isSearching || !widget.isActive) return;
+    final session = _searchSession;
 
     setState(() {
       _isSearching = true;
@@ -274,11 +305,11 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
       await controller
           .clearOverlays(type: NOverlayType.marker)
           .timeout(const Duration(seconds: 3));
-      if (!mounted || !identical(controller, _controller)) return;
+      if (_stale(controller, session)) return;
       final position = await controller.getCameraPosition().timeout(
         const Duration(seconds: 3),
       );
-      if (!mounted || !identical(controller, _controller)) return;
+      if (_stale(controller, session)) return;
       final lat = position.target.latitude;
       final lng = position.target.longitude;
       final results = kLocallySourcedCategories.contains(nearbyTerm(searchTerm))
@@ -293,10 +324,10 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
               lng: lng,
             );
 
-      if (!mounted || !identical(controller, _controller)) return;
+      if (_stale(controller, session)) return;
       final markers = <NMarker>{};
       for (final result in results) {
-        if (!mounted || _controller != controller) return;
+        if (_stale(controller, session)) return;
         final marker = NMarker(
           id: '${result.lat},${result.lng},${result.name}',
           position: NLatLng(result.lat, result.lng),
@@ -325,7 +356,7 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
             .addOverlayAll(markers)
             .timeout(const Duration(seconds: 3));
       }
-      if (!mounted || !identical(controller, _controller)) return;
+      if (_stale(controller, session)) return;
 
       if (results.isNotEmpty && mounted) {
         await controller
@@ -350,9 +381,11 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
           );
       }
     } catch (error) {
-      if (mounted) setState(() => _searchError = error);
+      if (!_stale(controller, session)) setState(() => _searchError = error);
     } finally {
-      if (mounted) setState(() => _isSearching = false);
+      if (mounted && session == _searchSession) {
+        setState(() => _isSearching = false);
+      }
     }
   }
 
