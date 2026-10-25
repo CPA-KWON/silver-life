@@ -21,6 +21,7 @@ class SafeMapLocationTracker extends NDefaultMyLocationTracker {
     if (!_active) return null;
     try {
       final location = await super.startLocationService();
+      if (location != null) _lastLocation = location;
       return _active && generation == _generation ? location : null;
     } catch (_) {
       if (_active && generation == _generation) onLocationUnavailable?.call();
@@ -46,12 +47,28 @@ class SafeMapLocationTracker extends NDefaultMyLocationTracker {
     return super.getCurrentPositionOnce().timeout(const Duration(seconds: 10));
   }
 
+  // The native stream only reports moves of 3m or more, so a standing user
+  // pressing the location button (noFollow -> follow) would wait forever.
+  // The map resubscribes on every mode change; replaying the last fix first
+  // lets the camera return to the user at once.
+  NLatLng? _lastLocation;
+
   @override
   Stream<NLatLng> get locationStream {
     final generation = _generation;
-    return super.locationStream.where(
-      (_) => _active && generation == _generation,
-    );
+    final live = super.locationStream
+        .where((_) => _active && generation == _generation)
+        .map((location) => _lastLocation = location);
+    return _replayLast(_lastLocation, generation, live);
+  }
+
+  Stream<NLatLng> _replayLast(
+    NLatLng? last,
+    int generation,
+    Stream<NLatLng> live,
+  ) async* {
+    if (last != null && _active && generation == _generation) yield last;
+    yield* live;
   }
 
   @override
