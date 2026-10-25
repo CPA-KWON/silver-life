@@ -88,3 +88,12 @@ test('invalid nearby values never reach Kakao', async () => {
     assert(!calls.some(c => c.url.startsWith('https://dapi.kakao.com/')));
   }
 });
+test('category searches stay within 5km while typed names rank by accuracy', async () => {
+  const sent = async nearby => { const { handler, calls } = kakaoFixture(); await handler(request({ query: '약국', nearby })); return new URL(calls[1].url).searchParams; };
+  const near = await sent({ keyword: '약국', lat: 37.56, lng: 126.97 });
+  assert.equal(near.get('sort'), 'distance'); assert.equal(near.get('radius'), '5000');
+  const typed = await sent({ keyword: '서울대학교병원', lat: 37.56, lng: 126.97, mode: 'accuracy' });
+  assert.equal(typed.get('sort'), 'accuracy'); assert.equal(typed.get('radius'), null); assert.equal(typed.get('x'), '126.97');
+  const { handler, calls } = kakaoFixture(); await handler(request({ query: '약국', nearby: { keyword: '약국', lat: 37.5, lng: 126.9, mode: 'random' } }));
+  assert(!calls.some(c => c.url.startsWith('https://dapi.kakao.com/')));
+});

@@ -54,6 +54,7 @@ void main() {
             'lat': 37.5665,
             'lng': 126.978,
             'group': 'HP8',
+            'mode': 'nearby',
           });
           expect(request.headers['Authorization'], 'Bearer offline-session');
           expect(request.headers, isNot(contains('X-NCP-APIGW-API-KEY')));
@@ -411,6 +412,34 @@ void main() {
       service.findStorable(place),
       throwsA(isA<FacilityNotStorableException>()),
     );
+  });
+
+  test('kind-of-place words search nearby, typed names by accuracy', () {
+    expect(nearbyTerm('약국'), '약국');
+    expect(nearbyTerm('근처 치과'), '치과');
+    expect(nearbyTerm('경로당 주변'), '경로당');
+    expect(nearbyTerm('서울대학교병원'), isNull);
+  });
+
+  test('typed names skip the neighbourhood and keep Kakao order', () async {
+    var geocodes = 0;
+    Map? sent;
+    final service = testService(
+      resolveArea: (_, _) async {
+        geocodes++;
+        return '중구';
+      },
+      client: MockClient((request) async {
+        sent = jsonDecode(request.body) as Map;
+        return kakao();
+      }),
+    );
+    addTearDown(service.close);
+    final list = await search(service, '서울대학교병원');
+    expect(geocodes, 0);
+    expect(sent!['query'], '서울대학교병원');
+    expect((sent!['nearby'] as Map)['mode'], 'accuracy');
+    expect(list.map((r) => r.name), ['먼약국', '가까운약국']);
   });
 }
 

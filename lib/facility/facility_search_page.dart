@@ -281,9 +281,9 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
       if (!mounted || !identical(controller, _controller)) return;
       final lat = position.target.latitude;
       final lng = position.target.longitude;
-      final results = kLocallySourcedCategories.contains(searchTerm)
+      final results = kLocallySourcedCategories.contains(nearbyTerm(searchTerm))
           ? await searchOwnFacilities(
-              category: searchTerm,
+              category: nearbyTerm(searchTerm)!,
               lat: lat,
               lng: lng,
             ).timeout(const Duration(seconds: 10))
@@ -340,7 +340,13 @@ class _FacilitySearchPageState extends State<FacilitySearchPage> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(content: Text('주변에서 "$searchTerm"를 찾지 못했습니다.')),
+            SnackBar(
+              content: Text(
+                nearbyTerm(searchTerm) == null
+                    ? '"$searchTerm"을(를) 찾지 못했어요. 이름을 다시 확인해 주세요.'
+                    : '주변 5km 안에서 "$searchTerm"을(를) 찾지 못했어요. 지도를 옮긴 뒤 "이 위치에서 검색"을 눌러 보세요.',
+              ),
+            ),
           );
       }
     } catch (error) {

@@ -3,28 +3,35 @@ type Dependencies = {
   fetch: typeof fetch;
 };
 
-type Nearby = { keyword: string; lat: number; lng: number; group?: string };
+// 'nearby' (category buttons, generic words): nearest-first within 5km.
+// 'accuracy' (typed names): best match nationwide, x/y only for distances.
+type Nearby = { keyword: string; lat: number; lng: number; group?: string; mode: 'nearby' | 'accuracy' };
 
 // Only Korean coordinates and the hospital/pharmacy group codes are accepted.
 function parseNearby(value: unknown): Nearby | null {
   if (!value || typeof value !== 'object') return null;
-  const { keyword, lat, lng, group } = value as Record<string, unknown>;
+  const { keyword, lat, lng, group, mode = 'nearby' } = value as Record<string, unknown>;
   if (typeof keyword !== 'string' || !keyword.trim() || keyword.length > 60) return null;
   if (typeof lat !== 'number' || !(lat >= 33 && lat <= 39)) return null;
   if (typeof lng !== 'number' || !(lng >= 124 && lng <= 132)) return null;
   if (group !== undefined && group !== 'HP8' && group !== 'PM9') return null;
-  return { keyword: keyword.trim(), lat, lng, group };
+  if (mode !== 'nearby' && mode !== 'accuracy') return null;
+  return { keyword: keyword.trim(), lat, lng, group, mode };
 }
 
-// Nearest-first places, or null so the caller falls back to NAVER.
+// Kakao places in the requested order, or null so the caller falls back to NAVER.
 async function kakaoNearby(fetcher: typeof fetch, key: string, nearby: Nearby) {
   try {
     const upstream = new URL('https://dapi.kakao.com/v2/local/search/keyword.json');
     upstream.searchParams.set('query', nearby.keyword);
     upstream.searchParams.set('x', String(nearby.lng));
     upstream.searchParams.set('y', String(nearby.lat));
-    upstream.searchParams.set('radius', '20000');
-    upstream.searchParams.set('sort', 'distance');
+    if (nearby.mode === 'nearby') {
+      upstream.searchParams.set('radius', '5000');
+      upstream.searchParams.set('sort', 'distance');
+    } else {
+      upstream.searchParams.set('sort', 'accuracy');
+    }
     upstream.searchParams.set('size', '15');
     if (nearby.group) upstream.searchParams.set('category_group_code', nearby.group);
     const result = await fetcher(upstream, {

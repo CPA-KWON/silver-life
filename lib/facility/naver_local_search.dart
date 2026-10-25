@@ -100,12 +100,29 @@ class FacilityNotStorableException implements Exception {
 
 String _stripTags(String html) => html.replaceAll(RegExp('<[^>]*>'), '');
 
+const _hospitalTerms = [
+  '병원', '의원', '한의원', '요양병원', '내과', '정형외과', '안과', '치과', //
+  '이비인후과', '피부과', '신경과', '비뇨기과', '산부인과', '가정의학과', '재활의학과',
+];
+
 // Kakao category group codes: HP8 hospitals (incl. specialties), PM9 pharmacy.
 final _kakaoGroups = {
   '약국': 'PM9',
-  for (final term in ['병원', '내과', '정형외과', '안과', '치과', '이비인후과', '피부과'])
-    term: 'HP8',
+  for (final term in _hospitalTerms) term: 'HP8',
 };
+
+// Kind-of-place words: like map apps, these search around the map nearest
+// first, while anything else typed (a name) is matched by accuracy.
+final _nearbyTerms = {
+  ..._kakaoGroups.keys,
+  '경로당', '복지관', '노인복지관', '사회복지관', '종합사회복지관', '보건소', //
+};
+
+/// "약국", "근처 치과" -> the word to search nearest-first; null for names.
+String? nearbyTerm(String query) {
+  final word = query.replaceAll(RegExp(r'(근처|주변|가까운)'), '').replaceAll(' ', '');
+  return _nearbyTerms.contains(word) ? word : null;
+}
 
 String _compact(String name) => name.replaceAll(RegExp(r'[\s()·]'), '');
 
@@ -243,47 +260,55 @@ class FacilitySearchService {
     double lng,
   ) async {
     _checkReady();
-    final area = await _area(lat, lng);
-    // The server answers nearest-first from Kakao when it can, and otherwise
-    // falls back to the NAVER text query below.
+    final term = nearbyTerm(category);
+    final keyword = term ?? category.trim();
+    // Only kind-of-place searches are tied to the neighbourhood; a typed name
+    // is looked up nationwide so that distant places can still be found.
+    final area = term == null ? '' : await _area(lat, lng);
+    // The server answers from Kakao when it can, and otherwise falls back to
+    // the NAVER text query below.
     final body = await _post({
-      'query': area.isEmpty ? category : '$area $category',
+      'query': area.isEmpty ? keyword : '$area $keyword',
       'nearby': {
-        'keyword': category,
+        'keyword': keyword,
         'lat': lat,
         'lng': lng,
-        if (_kakaoGroups[category] != null) 'group': _kakaoGroups[category],
+        if (_kakaoGroups[keyword] != null) 'group': _kakaoGroups[keyword],
+        'mode': term == null ? 'accuracy' : 'nearby',
       },
     });
     if (body['source'] == 'kakao') {
-      // Live-only data is never cached, in line with Kakao's storage terms.
-      return List<FacilityResult>.unmodifiable(
-        [
-          for (final place in (body['places'] as List).cast<Map>())
-            FacilityResult(
-              name: place['name'] as String,
-              category: place['category'] as String,
-              address: place['address'] as String,
-              telephone: place['telephone'] as String,
-              lat: (place['lat'] as num).toDouble(),
-              lng: (place['lng'] as num).toDouble(),
-              distanceMeters: Geolocator.distanceBetween(
-                lat,
-                lng,
-                (place['lat'] as num).toDouble(),
-                (place['lng'] as num).toDouble(),
-              ),
-              liveOnly: true,
+      final places = [
+        for (final place in (body['places'] as List).cast<Map>())
+          FacilityResult(
+            name: place['name'] as String,
+            category: place['category'] as String,
+            address: place['address'] as String,
+            telephone: place['telephone'] as String,
+            lat: (place['lat'] as num).toDouble(),
+            lng: (place['lng'] as num).toDouble(),
+            distanceMeters: Geolocator.distanceBetween(
+              lat,
+              lng,
+              (place['lat'] as num).toDouble(),
+              (place['lng'] as num).toDouble(),
             ),
-        ]..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters)),
-      );
+            liveOnly: true,
+          ),
+      ];
+      if (term != null) {
+        places.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+      }
+      // Live-only data is never cached, in line with Kakao's storage terms.
+      return List<FacilityResult>.unmodifiable(places);
     }
     final immutable = List<FacilityResult>.unmodifiable(
-      _naverResults(body, lat, lng),
+      _naverResults(body, lat, lng, byDistance: term != null),
     );
     // A failed address lookup should not cache a nationwide fallback for five
     // minutes when a later retry could find the intended neighbourhood.
-    if (area.isNotEmpty) {
+    // Typed names are nationwide on purpose and may be cached.
+    if (term == null || area.isNotEmpty) {
       _remember(_results, '$category:${_positionKey(lat, lng)}', immutable);
     }
     return immutable;
@@ -330,10 +355,11 @@ class FacilitySearchService {
   List<FacilityResult> _naverResults(
     Map<String, dynamic> body,
     double lat,
-    double lng,
-  ) {
+    double lng, {
+    bool byDistance = true,
+  }) {
     final items = (body['items'] as List).cast<Map<String, dynamic>>();
-    return items.map((item) {
+    final results = items.map((item) {
       final itemLng = int.parse(item['mapx'] as String) / 10000000;
       final itemLat = int.parse(item['mapy'] as String) / 10000000;
       return FacilityResult(
@@ -347,7 +373,11 @@ class FacilitySearchService {
         lng: itemLng,
         distanceMeters: Geolocator.distanceBetween(lat, lng, itemLat, itemLng),
       );
-    }).toList()..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    }).toList();
+    if (byDistance) {
+      results.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    }
+    return results;
   }
 
   Future<Map<String, dynamic>> _post(Map<String, Object?> payload) async {
