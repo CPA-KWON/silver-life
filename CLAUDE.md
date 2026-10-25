@@ -135,6 +135,7 @@ lib/ 밖의 중요한 파일
 | `favorites` | 즐겨찾기 | id, user_id, name, address, telephone, lat, lng, category, created_at — ⚠️ `facility_id`가 **없고** 시설 정보를 통째로 복사해 저장 |
 | `checkins` | "나 여기 있음" 체크인 | id, user_id, facility_id, checked_in_at — 한 사람당 시설별 1개, 앱에서 3시간 지나면 안 셈 |
 | `reports` | 게시글·모임·댓글 신고 | id, reporter_id, post_id 또는 comment_id(둘 중 하나만), reason(욕설·비방/광고/사기 의심/기타), created_at — 같은 사람이 같은 대상 1번만 |
+| `welfare_programs` | 복지관 정기 프로그램 (안내용, 신청은 전화·방문) | facility_name, title, category, schedule, target, fee, capacity 등 — 원본 표 `welfare_programs (sangdo)`, `welfare_programs (heuksuk)`에서 `supabase/welfare_programs.sql`로 다시 채움. 로그인한 사람만 읽기. 시설 상세 화면이 시설 **이름**으로 연결(띄어쓰기·"어르신"·"노인"·"시립" 등은 빼고 비교) |
 | `point_wallets` | 포인트 지갑 (`attendance_points.sql`) | user_id, balance(보유), total_earned(누적 획득), last_attended_on, current_streak, updated_at |
 | `attendance_days` | 날짜별 출석 이력 | user_id, attended_on(한국 날짜), streak, points — 사람·날짜당 1줄 |
 | `point_ledger` | 포인트 변동 내역 | id, user_id, amount, reason(현재 attendance만), ref_date — 나중에 다른 보상·사용을 reason으로 확장 |

@@ -20,6 +20,7 @@ import '../ui/design_widgets.dart';
 import 'local_facility_search.dart';
 import 'naver_local_search.dart';
 import 'safe_map_location_tracker.dart';
+import 'welfare_programs.dart';
 
 const kFacilityCategories = ['병원', '약국', '경로당', '복지관'];
 const kHospitalSubcategories = ['내과', '정형외과', '안과', '치과', '이비인후과', '피부과'];
@@ -984,7 +985,11 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                 ),
               ),
               icon: const Icon(Icons.event_note),
-              label: const Text('이 시설의 프로그램'),
+              label: const Text('앱으로 신청하는 활동'),
+            ),
+            WelfareProgramsSection(
+              facilityName: result.name,
+              telephone: result.telephone,
             ),
             if (_upcomingMeetups != null && _upcomingMeetups!.isNotEmpty) ...[
               const SizedBox(height: 12),

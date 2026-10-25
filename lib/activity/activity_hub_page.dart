@@ -378,7 +378,7 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
       title: Text(
         widget.place == null
             ? activitySectionTitle(widget.section)
-            : '이 시설의 프로그램',
+            : '앱으로 신청하는 활동',
       ),
     ),
     body: FutureBuilder<ActivityData>(
