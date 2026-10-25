@@ -3,6 +3,12 @@
 > 이 파일은 Claude Code가 작업을 시작할 때마다 자동으로 읽는 안내서입니다.
 > 프로젝트 폴더 맨 위(pubspec.yaml 파일과 같은 위치)에 두세요.
 
+## 최신 main 반영 승인 (2026-10-25)
+
+- 사용자가 “지금까지 개발한 사항 전체 main에 push”를 명시 승인했다. 대상은 팀 저장소 `CPA-KWON/silver-life`의 `origin/main`.
+- `feat/pet-companion-v3`의 반려동물·실제 저장·새 홈·기관 공지·후속 안정화 개발을 모두 포함한다. 아래의 과거 ‘main 병합/push하지 않음’ 기록은 이번 승인 이전의 작업 상태다.
+- 비교 기준은 원격 main `2950ae9`. 반영 범위와 남은 운영 설정은 docs/main_changes_2026_10_25.md 참조. 로컬 키·서명 파일·APK는 제외한다.
+
 ## 통합 작업 현황 (2026-10-20)
 
 - 현재 기준: `main`. 사용자가 2026-10-19 main push를 명시 승인. `fix/integrate-branches-and-security`의 신고 기능 보존·지도 안정화·활동 기능·IA·블루 디자인을 main으로 fast-forward 통합. 비교 기준과 후속 개선은 docs/main_changes_2026_10_19.md 참조.

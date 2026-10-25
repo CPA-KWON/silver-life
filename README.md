@@ -6,6 +6,20 @@ Android 앱 ID: `com.silverlife.app`.
 
 ## 현재 코드
 
+### 2026-10-25 최신 통합
+
+사용자가 지금까지 개발한 내용을 팀 저장소 main에 반영하도록 승인했습니다.
+
+- 새 홈: 상단 포인트·프로필, 실제 출석 카드/월별 달력, 콩이 카드, 모임·동네 소식·탐색 카드.
+- 콩이: 입양·돌봄·의상·3단계 성장·기록, 기존 출석 지갑/경험치 연결, 실제 Supabase 저장 및 좌우 3D 보기.
+- Android 산책 기록 서비스와 보상 검증, 보상형 광고 SDK 및 서버 서명 검증 소스.
+- 기관 공지: 승인된 기관 담당자의 비공개 저장·수정·게시·중지, 지역 홈/목록/상세 연결.
+- 기존 로그인·지도 유지·시설·활동·모임·커뮤니티 기능을 보존했습니다.
+
+현재 운영 프로젝트에는 반려동물·공지 SQL이 적용됐습니다. 다른 서버에 설치할 때는 기존 출석/활동 설정 뒤 `supabase/pet_companion.sql`, `supabase/institution_notices.sql`이 필요합니다.
+실제 광고 운영 설정/SSV 배포, 실물 Android의 화면 꺼짐 산책 검증, 준비 중 의상·코스는 후속 작업입니다.
+상세 범위는 [이번 main 변경 내용](docs/main_changes_2026_10_25.md), [홈](docs/home_attendance_design.md), [콩이 서버 연결](docs/pet_live_setup.md), [기관 공지](docs/home_local_news.md)를 참고하세요.
+
 사용자가 지정한 main 반영 저장소는 **[CPA-KWON/silver-life](https://github.com/CPA-KWON/silver-life)**입니다.
 `fix/integrate-branches-and-security`에서
 기존 main의 신고 기능, 지도 안정화 브랜치, 활동 미션·경험 은행 브랜치를 통합했습니다.
