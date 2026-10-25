@@ -78,9 +78,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _petPreview.addListener(_refreshPoints);
     unawaited(_petPreview.load());
     final owner = Supabase.instance.client.auth.currentUser?.id;
-    _petAuth = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-      if (event.session?.user.id != owner) unawaited(PetWalkService().stop());
-    });
+    _petAuth = Supabase.instance.client.auth.onAuthStateChange.listen(
+      (event) {
+        if (event.session?.user.id != owner) unawaited(PetWalkService().stop());
+      },
+      onError: (Object error, StackTrace stack) {
+        // Supabase retries temporary token-refresh/network failures. This
+        // supplemental listener must handle stream errors as AuthGate does;
+        // actual sign-out events still stop the walk and remove private pages.
+        if (error is! AuthException) {
+          FlutterError.reportError(
+            FlutterErrorDetails(exception: error, stack: stack),
+          );
+        }
+      },
+    );
     _petClock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         unawaited(_petPreview.load());

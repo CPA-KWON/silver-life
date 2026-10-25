@@ -225,4 +225,26 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets(
+    'temporary auth refresh error preserves the session and private home',
+    (t) async {
+      await mount(
+        t,
+        AuthGate(
+          signedInPage: MainShell(activityRepository: FakeActivityRepository()),
+        ),
+      );
+      // Failure injection into the pinned SDK's auth stream; not used by app code.
+      // ignore: invalid_use_of_internal_member
+      Supabase.instance.client.auth.notifyException(
+        AuthRetryableFetchException(message: 'test network interruption'),
+      );
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull);
+      expect(Supabase.instance.client.auth.currentUser, isNotNull);
+      expect(find.byType(MainShell), findsOneWidget);
+      expect(find.text('다가오는 모임'), findsOneWidget);
+      await finish(t);
+    },
+  );
 }
