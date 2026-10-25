@@ -18,6 +18,7 @@ import '../pet/pet_walk_service.dart';
 import '../pet/pet_design.dart';
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -215,6 +216,29 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
+  /// Menu labels follow the phone's font setting up to 1.2x, then shrink
+  /// further only when the widest label would come closer than 6 to the edges
+  /// of its fifth of the bar, so no label crowds the rounded edge.
+  TextScaler _navTextScaler(BuildContext context, double barWidth) {
+    final capped = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2);
+    final style = Theme.of(context).navigationBarTheme.labelTextStyle
+        ?.resolve({WidgetState.selected});
+    final fontSize = style?.fontSize ?? 18;
+    final slot = barWidth / _destinations.length - 12;
+    var widest = 0.0;
+    for (final destination in _destinations) {
+      final painter = TextPainter(
+        text: TextSpan(text: destination.label, style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: capped,
+      )..layout();
+      widest = math.max(widest, painter.width);
+      painter.dispose();
+    }
+    if (widest <= slot) return capped;
+    return TextScaler.linear(capped.scale(fontSize) / fontSize * slot / widest);
+  }
+
   static const _destinations = [
     NavigationDestination(
       icon: Icon(Icons.home_outlined),
@@ -370,19 +394,28 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         color: AppColors.background,
         child: SafeArea(
           top: false,
-          minimum: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+          // At least 12 below the bar even where the system gesture area is
+          // thin; narrow side margins leave the edge labels more room.
+          minimum: const EdgeInsets.fromLTRB(6, 8, 6, 12),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: NavigationBar(
-              height: 82,
-              selectedIndex: _index,
-              onDestinationSelected: (i) => setState(() {
-                if (i == 0 && _index != 0) _homeRefresh.value++;
-                _index = i;
-                if (i == 2) _activityVisited = true;
-              }),
-              labelPadding: EdgeInsets.zero,
-              destinations: _destinations,
+            borderRadius: BorderRadius.circular(24),
+            child: LayoutBuilder(
+              builder: (context, constraints) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: _navTextScaler(context, constraints.maxWidth),
+                ),
+                child: NavigationBar(
+                  height: 82,
+                  selectedIndex: _index,
+                  onDestinationSelected: (i) => setState(() {
+                    if (i == 0 && _index != 0) _homeRefresh.value++;
+                    _index = i;
+                    if (i == 2) _activityVisited = true;
+                  }),
+                  labelPadding: EdgeInsets.zero,
+                  destinations: _destinations,
+                ),
+              ),
             ),
           ),
         ),

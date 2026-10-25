@@ -159,8 +159,9 @@ final ThemeData seniorFriendlyTheme = ThemeData(
     labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
     labelTextStyle: WidgetStateProperty.resolveWith((states) {
       final selected = states.contains(WidgetState.selected);
+      // Menu labels sit five abreast; 16 lets "커뮤니티" fit common phones.
       return _style(
-        18,
+        16,
         selected ? FontWeight.w600 : FontWeight.w500,
         selected ? Colors.white : AppColors.navigationMuted,
         height: 1.2,
