@@ -39,10 +39,10 @@ void main() {
       lessThan(t.getTopLeft(find.text('다가오는 모임')).dy),
     );
     expect(find.text('동네 소식'), findsOneWidget);
-    expect(find.text('아직 우리 동네 커뮤니티 글이 없어요.'), findsOneWidget);
+    expect(find.text('아직 우리 동네 글이 없어요'), findsOneWidget);
     await tap(t, find.text('반려동물 만나기'));
     expect(adopted, true);
-    await tap(t, find.text('커뮤니티 더 보기'));
+    await tap(t, find.byKey(const ValueKey('home-community-more')));
     expect(find.text('아직 게시글이 없습니다.'), findsOneWidget);
     await finish(t);
   });
@@ -83,10 +83,10 @@ void main() {
       backend.failPosts = true;
       await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
       expect(find.text('커뮤니티 글을 불러오지 못했어요.'), findsOneWidget);
-      expect(find.text('아직 우리 동네 커뮤니티 글이 없어요.'), findsNothing);
+      expect(find.text('아직 우리 동네 글이 없어요'), findsNothing);
       backend.failPosts = false;
       await tap(t, find.text('다시 시도').last);
-      expect(find.text('아직 우리 동네 커뮤니티 글이 없어요.'), findsOneWidget);
+      expect(find.text('아직 우리 동네 글이 없어요'), findsOneWidget);
       await finish(t);
     },
   );

@@ -148,4 +148,24 @@ class AttendanceRepository {
         ),
     ];
   }
+
+  /// A Monday–Sunday strip can span two months. Read both using the existing
+  /// self-only attendance table; never infer missed/attended days from streak.
+  Future<List<AttendanceDay>> week(DateTime today) async {
+    final monday = DateTime(
+      today.year,
+      today.month,
+      today.day - today.weekday + 1,
+    );
+    final sunday = DateTime(monday.year, monday.month, monday.day + 6);
+    final months = await Future.wait([
+      month(monday),
+      if (monday.month != sunday.month || monday.year != sunday.year)
+        month(sunday),
+    ]);
+    return months
+        .expand((v) => v)
+        .where((d) => !d.date.isBefore(monday) && !d.date.isAfter(sunday))
+        .toList();
+  }
 }

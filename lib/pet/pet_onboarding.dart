@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../attendance/attendance_controller.dart';
+
 import 'pet_design.dart';
 import 'pet_preview_controller.dart';
 import 'pet_home_pages.dart';
@@ -19,7 +21,13 @@ class PetPreviewEntry extends StatelessWidget {
   Widget build(BuildContext c) => ListenableBuilder(
     listenable: pet,
     builder: (c, _) {
-      Widget photo = PetPhoto(pet: pet, height: 120);
+      final attended =
+          AttendanceScope.maybeOf(c)?.status?.attendedToday ?? pet.attended;
+      Widget photo = PetPhoto(
+        pet: pet,
+        height: 140,
+        mood: pet.adopted && pet.worn.isEmpty ? 'greeting' : null,
+      );
       if (!pet.adopted) {
         photo = ColorFiltered(
           colorFilter: const ColorFilter.matrix([
@@ -48,86 +56,106 @@ class PetPreviewEntry extends StatelessWidget {
         );
       }
       final portrait = Container(
-        width: 116,
-        height: 128,
+        width: 128,
+        height: 140,
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .8),
-          borderRadius: BorderRadius.circular(24),
+          color: Colors.white.withValues(alpha: .75),
+          borderRadius: BorderRadius.circular(26),
         ),
-        child: photo,
+        child: Transform.scale(scale: 1.12, child: photo),
       );
       final content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             pet.adopted ? '나의 반려동물' : 'NEW · 나의 반려동물',
             style: petText(14, color: PetColors.blue),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 3),
           if (pet.adopted)
             Wrap(
               spacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(pet.name!, style: petText(25)),
-                PetPill(pet.stageName),
+                Text(pet.name!, style: petText(26, weight: FontWeight.w800)),
+                PetPill(pet.stageName, horizontal: 9, fontSize: 14),
               ],
             )
           else
-            Text('함께할 반려동물을\n만나보세요', style: petText(22)),
+            Text(
+              '함께할 반려동물을\n만나보세요',
+              style: petText(21, weight: FontWeight.w800),
+            ),
           const SizedBox(height: 8),
-          Text(
-            pet.error != null
-                ? '서버 연결을 확인해주세요'
-                : pet.adopted
-                ? '${nickname ?? '회원'}님, 오늘도\n와주셨네요!'
-                : '매일 돌보고 활동하면\n함께 자라요',
-            style: petText(
-              17,
-              color: PetColors.secondary,
-              weight: FontWeight.w600,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              pet.error != null
+                  ? '서버 연결을 확인해주세요'
+                  : !pet.adopted
+                  ? '매일 돌보고 활동하면 함께 자라요'
+                  : attended
+                  ? '출석, 고마워요! 같이 놀아요'
+                  : '오늘도 같이 놀아요!',
+              style: petText(
+                16,
+                color: PetColors.secondary,
+                weight: FontWeight.w600,
+              ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           FilledButton(
             onPressed: pet.busy ? null : onTap,
             style: FilledButton.styleFrom(
               backgroundColor: PetColors.blue,
-              minimumSize: const Size(0, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              minimumSize: const Size(0, 50),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               shape: const StadiumBorder(),
             ),
             child: Text(
               pet.adopted ? '${pet.name} 만나러 가기 →' : '반려동물 만나기',
-              style: petText(17, color: Colors.white),
+              textAlign: TextAlign.center,
+              style: petText(17, color: Colors.white, weight: FontWeight.w800),
             ),
           ),
         ],
       );
       return Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFE1F0FC), Color(0xFFF3EFFF)],
+            colors: [Color(0xFFE0F1FB), Color(0xFFEAEEFF)],
           ),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x08086FA9),
+              blurRadius: 20,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: LayoutBuilder(
           builder: (c, b) =>
-              b.maxWidth < 300 || MediaQuery.textScalerOf(c).scale(1) > 1.4
+              b.maxWidth < 310 || MediaQuery.textScalerOf(c).scale(1) > 1.4
               ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Center(child: portrait),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     content,
                   ],
                 )
               : Row(
                   children: [
                     portrait,
-                    const SizedBox(width: 18),
+                    const SizedBox(width: 14),
                     Expanded(child: content),
                   ],
                 ),

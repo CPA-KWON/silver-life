@@ -69,6 +69,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   );
   DateTime? _attendancePromptedFor;
   bool _attendanceOpen = false;
+  VoidCallback? _pendingAttendanceSync;
 
   @override
   void initState() {
@@ -92,6 +93,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _petPreview.removeListener(_refreshPoints);
+    if (_pendingAttendanceSync != null) {
+      _petPreview.removeListener(_pendingAttendanceSync!);
+    }
     _attendance.dispose();
     _petClock?.cancel();
     _petAuth?.cancel();
@@ -123,8 +127,42 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _attendancePromptedFor = status.today;
     _attendanceOpen = true;
     await showAttendanceDialog(context, _attendance);
-    if (mounted) unawaited(_petPreview.load());
+    if (mounted) await _syncAttendancePet();
     _attendanceOpen = false;
+  }
+
+  // The wallet and pet share the existing attendance transaction. If the
+  // calendar already paid today's points, pet_action grants only the once-daily
+  // pet experience; it never pays the wallet twice.
+  Future<void> _syncAttendancePet() async {
+    if (_petPreview.busy) {
+      // A background pet refresh may overlap the stamp. Queue one sync rather
+      // than losing that day's growth reward or issuing a concurrent mutation.
+      if (_pendingAttendanceSync == null) {
+        _pendingAttendanceSync = () {
+          if (_petPreview.busy) return;
+          final listener = _pendingAttendanceSync;
+          _pendingAttendanceSync = null;
+          if (listener != null) _petPreview.removeListener(listener);
+          if (mounted) unawaited(_syncAttendancePet());
+        };
+        _petPreview.addListener(_pendingAttendanceSync!);
+      }
+      return;
+    }
+    if (!_petPreview.isPreview &&
+        _petPreview.ready &&
+        _petPreview.adopted &&
+        _attendance.status?.attendedToday == true &&
+        !_petPreview.attendanceRewarded) {
+      try {
+        await _petPreview.run('attendance');
+      } catch (_) {
+        await _petPreview.load();
+      }
+    } else {
+      await _petPreview.load();
+    }
   }
 
   void _refreshPoints() {
@@ -258,6 +296,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             activityRepository: widget.activityRepository,
                             refreshListenable: _homeRefresh,
                             petPreview: _petPreview,
+                            onAttendanceChanged: _syncAttendancePet,
                             onOpenPet: () => _homeNavigator.currentState!.push(
                               MaterialPageRoute<void>(
                                 settings: const RouteSettings(name: 'pet'),

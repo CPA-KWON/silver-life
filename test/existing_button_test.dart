@@ -49,7 +49,7 @@ void main() {
       await finish(t);
     },
   );
-  testWidgets('home lists favorite facilities and links to the full list', (
+  testWidgets('home favorite tile opens the existing saved facility list', (
     t,
   ) async {
     await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
@@ -67,8 +67,8 @@ void main() {
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
     await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
-    expect(find.text('행복경로당'), findsOneWidget);
-    await tap(t, find.text('더 보기').last);
+    expect(find.text('행복경로당'), findsNothing);
+    await tap(t, find.text('즐겨찾는 시설'));
     expect(find.text('즐겨찾는 시설'), findsWidgets);
     expect(find.text('행복경로당'), findsOneWidget);
     await finish(t);

@@ -65,7 +65,7 @@ void main() {
     (t) async {
       final r = FakeActivityRepository()..pref = {'place_name': '동네'};
       await mount(t, MainShell(activityRepository: r));
-      await tap(t, find.text('더 보기'));
+      await tap(t, find.text('맞춤 활동 찾기'));
       expect(find.byType(ActivitySectionPage), findsOneWidget);
       expect(find.text('전체 프로그램 탐색'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);

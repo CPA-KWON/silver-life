@@ -171,7 +171,7 @@ void main() {
     expect(find.text('지역 커뮤니티 · 자유게시판'), findsOneWidget);
     r.fail = false;
     await tap(t, find.text('다시 시도'));
-    expect(find.text('아직 등록된 기관 공지가 없어요.'), findsOneWidget);
+    expect(find.text('아직 등록된 기관 공지가 없어요'), findsOneWidget);
     await finish(t);
   });
 }

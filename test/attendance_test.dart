@@ -97,7 +97,7 @@ void main() {
     await tap(t, find.text('닫기'));
     expect(find.text('매일매일 출석체크'), findsNothing);
     expect(repo.checkInCalls, 0);
-    expect(find.text('🪙 0 P'), findsOneWidget);
+    expect(find.bySemanticsLabel('보유 포인트 0포인트, 출석체크 열기'), findsOneWidget);
     // Next app start (same day, still not stamped) asks again.
     await finish(t);
     await shell(t, repo);
@@ -131,7 +131,7 @@ void main() {
     expect(button.onPressed, isNull);
     expect(find.text('🔥 1일 연속 출석 달성!'), findsOneWidget);
     await tap(t, find.text('닫기'));
-    expect(find.text('🪙 1 P'), findsOneWidget);
+    expect(find.bySemanticsLabel('보유 포인트 1포인트, 출석체크 열기'), findsOneWidget);
     await finish(t);
   });
 
@@ -167,7 +167,7 @@ void main() {
     await repo.checkIn();
     await shell(t, repo);
     expect(find.text('매일매일 출석체크'), findsNothing);
-    await tap(t, find.text('🪙 3 P').first);
+    await tap(t, find.bySemanticsLabel('보유 포인트 3포인트, 출석체크 열기'));
     expect(find.text('매일매일 출석체크'), findsOneWidget);
     expect(find.text('오늘 출석 완료!'), findsOneWidget);
     await tap(t, find.text('‹ 이전 달'));

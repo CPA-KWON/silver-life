@@ -87,6 +87,10 @@ flutter:
     - assets/pet/baby/
     - assets/pet/junior/
     - assets/pet/adult/
+    # Explicit entries also refresh the incremental bundle for the new home art.
+    - assets/pet/baby/greeting.png
+    - assets/pet/junior/greeting.png
+    - assets/pet/adult/greeting.png
     - assets/pet/items/
     - assets/pet/motion/
     - assets/pet/models/

@@ -17,21 +17,25 @@ void main() {
   });
   tearDownAll(() => Supabase.instance.dispose());
 
-  testWidgets('home compact summary reflects stored missions', (t) async {
-    await t.binding.setSurfaceSize(const Size(320, 900));
-    addTearDown(() => t.binding.setSurfaceSize(null));
-    final repo = FakeActivityRepository();
-    repo.missions.addAll([
-      {'status': 'completed'},
-      {'status': 'approved'},
-    ]);
-    await mount(t, HomeTab(activityRepository: repo), scale: 2);
-    expect(find.textContaining('미션 1/2개 완료'), findsOneWidget);
-    expect(find.text('이번 주 활동 현황'), findsOneWidget);
-    expect(find.text('시작 전'), findsNothing);
-    expect(t.takeException(), isNull);
-    await finish(t);
-  });
+  testWidgets(
+    'home activity entry replaces the dashboard with a dedicated destination',
+    (t) async {
+      await t.binding.setSurfaceSize(const Size(320, 900));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+      final repo = FakeActivityRepository();
+      repo.missions.addAll([
+        {'status': 'completed'},
+        {'status': 'approved'},
+      ]);
+      await mount(t, HomeTab(activityRepository: repo), scale: 2);
+      expect(find.text('더 둘러보기'), findsOneWidget);
+      expect(find.text('맞춤 활동 찾기'), findsOneWidget);
+      expect(find.text('이번 주 활동 현황'), findsNothing);
+      expect(find.text('시작 전'), findsNothing);
+      expect(t.takeException(), isNull);
+      await finish(t);
+    },
+  );
 
   testWidgets('empty home stays usable with large text on a small phone', (
     t,

@@ -402,7 +402,9 @@ class PetPhoto extends StatelessWidget {
     final s = stage ?? pet.stage;
     final folder = ['baby', 'junior', 'adult'][s];
     final clothes = outfit ?? pet.worn;
-    final body = mood == 'hello' && s == 0
+    final body = mood == 'greeting'
+        ? 'assets/pet/$folder/greeting.png'
+        : mood == 'hello' && s == 0
         ? 'assets/pet/motion/hello.gif'
         : mood == 'eating' && s == 0
         ? 'assets/pet/motion/eating.png'

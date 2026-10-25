@@ -5,12 +5,12 @@ import '../activity/activity_repository.dart';
 import '../activity/activity_hub_page.dart';
 import '../activity/activity_detail_page.dart';
 import '../activity/activity_widgets.dart';
-import '../attendance/point_badge.dart';
+import '../attendance/attendance_controller.dart';
+import '../attendance/attendance_dialog.dart';
+import 'home_widgets.dart';
 import '../community/post_detail_page.dart';
 import '../community/community_page.dart';
 import '../core/meetup_category.dart';
-import '../facility/facility_repository.dart';
-import '../facility/naver_local_search.dart';
 import '../facility/nearby_facilities_page.dart';
 import '../meetup/meetup_page.dart';
 import '../notices/notice_repository.dart';
@@ -23,7 +23,6 @@ import '../profile/profile_page.dart';
 typedef HomeData = ({
   String nickname,
   ActivityData? activity,
-  List<FacilityResult>? favorites,
   List<ActivityData>? meetups,
   List<ActivityData>? news,
   List<NoticeData>? notices,
@@ -39,8 +38,10 @@ class HomeTab extends StatefulWidget {
     this.onOpenPet,
     this.refreshListenable,
     this.noticeRepository,
+    this.onAttendanceChanged,
   });
   final ActivityRepository? activityRepository;
+  final Future<void> Function()? onAttendanceChanged;
   final NoticeRepository? noticeRepository;
   final PetPreviewController? petPreview;
   final VoidCallback? onOpenPet;
@@ -74,8 +75,6 @@ class _HomeTabState extends State<HomeTab> {
         .select('nickname, region_sido, region_sigungu')
         .eq('id', client.auth.currentUser!.id)
         .single();
-    final favorites = loadFavoriteFacilities(limit: 3)
-        .then<List<FacilityResult>?>((v) => v, onError: (_) => null);
     final activity = repo.home().then<ActivityData?>(
       (v) => v,
       onError: (_) => null,
@@ -91,7 +90,6 @@ class _HomeTabState extends State<HomeTab> {
     return (
       nickname: profile['nickname'] as String,
       activity: await activity,
-      favorites: await favorites,
       meetups: await meetups,
       news: await news,
       notices: await official,
@@ -182,69 +180,110 @@ class _HomeTabState extends State<HomeTab> {
         : '${d.month}월 ${d.day}일 (${['월', '화', '수', '목', '금', '토', '일'][d.weekday - 1]}) ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget title(String label, {Widget? trailing}) => Padding(
-    padding: const EdgeInsets.only(top: 24, bottom: 12),
-    child: Row(
-      children: [
-        Expanded(child: Text(label, style: petText(22))),
-        ?trailing,
-      ],
-    ),
+  Future<void> attendanceCalendar() async {
+    final controller = AttendanceScope.maybeOf(context);
+    if (controller == null) return;
+    await showAttendanceDialog(context, controller);
+    if (mounted) await widget.onAttendanceChanged?.call();
+  }
+
+  Widget title(String label) => Padding(
+    padding: const EdgeInsets.only(top: 26, bottom: 12, left: 4),
+    child: Text(label, style: petText(22, weight: FontWeight.w800)),
   );
-  Widget newsHeading(String label, String action, VoidCallback onTap) => Wrap(
-    alignment: WrapAlignment.spaceBetween,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      Text(label, style: petText(18)),
-      TextButton(onPressed: onTap, child: Text(action)),
-    ],
-  );
-  Widget newsEmpty(String label) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Text(
-      label,
-      style: petText(17, color: PetColors.secondary, weight: FontWeight.w500),
-    ),
-  );
-  Widget newsRow({
+
+  Widget newsGroup({
     required String label,
-    required String source,
+    required String empty,
+    required String failure,
+    required List<ActivityData>? rows,
     required bool official,
-    required VoidCallback onTap,
-  }) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    required VoidCallback onList,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               color: official
-                  ? const Color(0xFFFFF5E7)
-                  : const Color(0xFFEAF4FB),
-              borderRadius: BorderRadius.circular(16),
+                  ? const Color(0xFFFFF5E4)
+                  : const Color(0xFFF0EDFF),
+              borderRadius: BorderRadius.circular(17),
             ),
             child: Icon(
-              official ? Icons.campaign_outlined : Icons.forum_outlined,
-              color: official ? PetColors.orange : PetColors.blue,
-              size: 27,
+              official ? Icons.campaign_outlined : Icons.chat_outlined,
+              color: official
+                  ? const Color(0xFFE78D05)
+                  : const Color(0xFF7450E8),
+              size: 26,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: petText(20)),
-                const SizedBox(height: 5),
+                Text(label, style: petText(19, weight: FontWeight.w800)),
+                if (rows != null && rows.isEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    empty,
+                    style: petText(
+                      15,
+                      color: const Color(0xFF728698),
+                      weight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Semantics(
+            label: '$label 더 보기',
+            container: true,
+            button: true,
+            onTap: onList,
+            excludeSemantics: true,
+            child: TextButton(
+              key: ValueKey(
+                official ? 'home-official-more' : 'home-community-more',
+              ),
+              onPressed: onList,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.only(left: 6),
+                minimumSize: const Size(62, 56),
+              ),
+              child: Text('더 보기 ›', style: petText(15, color: PetColors.blue)),
+            ),
+          ),
+        ],
+      ),
+      if (rows == null) ActivityInfo(failure, onRetry: reload),
+      for (final n in rows?.take(2) ?? <ActivityData>[])
+        InkWell(
+          onTap: () => open(
+            official
+                ? NoticeDetailPage(id: n['id'], repository: notices)
+                : PostDetailPage(postId: n['id']),
+          ),
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(63, 8, 0, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${n['title']}', style: petText(18)),
+                const SizedBox(height: 3),
                 Text(
-                  source,
+                  official
+                      ? '기관 공지 · ${n['org_name']}'
+                      : '지역 커뮤니티 · ${n['category']}',
                   style: petText(
-                    16,
+                    14,
                     color: PetColors.secondary,
                     weight: FontWeight.w500,
                   ),
@@ -252,68 +291,8 @@ class _HomeTabState extends State<HomeTab> {
               ],
             ),
           ),
-        ],
-      ),
-    ),
-  );
-  Widget header(String nickname) => Padding(
-    padding: const EdgeInsets.only(left: 4, right: 4, top: 10, bottom: 24),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('안녕하세요, $nickname님', style: petText(26)),
-              const SizedBox(height: 6),
-              Text(
-                '오늘도 동네에서 즐거운 하루 보내세요',
-                style: petText(
-                  17,
-                  color: PetColors.secondary,
-                  weight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
         ),
-        const SizedBox(width: 12),
-        Semantics(
-          button: true,
-          child: InkWell(
-            onTap: () => open(ProfilePage(activityRepository: repo)),
-            borderRadius: BorderRadius.circular(32),
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Column(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFD4E5F1),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.person_outline_rounded,
-                      size: 32,
-                      color: PetColors.blue,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text('내 정보', style: petText(15)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
+    ],
   );
   Widget eventRow({
     required String label,
@@ -369,22 +348,67 @@ class _HomeTabState extends State<HomeTab> {
       ),
     ),
   );
-  Widget emptyMeetups() => PetCard(
-    padding: 20,
+  Widget emptyMeetups() => HomeCard(
+    padding: 18,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('아직 예정된 동네 모임이 없어요', style: petText(19)),
-        const SizedBox(height: 6),
-        Text(
-          '가까운 모임에서 이웃을 만나보세요',
-          style: petText(
-            16,
-            color: PetColors.secondary,
-            weight: FontWeight.w500,
+        const SizedBox(height: 4),
+        Center(
+          child: SizedBox(
+            width: 76,
+            height: 76,
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE9F4FC),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Center(child: HomeMeetupIcon()),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFCE42),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 19,
+                      color: Color(0xFFA16B00),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 14),
+        Text(
+          '아직 예정된 동네 모임이 없어요',
+          textAlign: TextAlign.center,
+          style: petText(19, weight: FontWeight.w800),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '가까운 모임에서 이웃을 만나보세요',
+          textAlign: TextAlign.center,
+          style: petText(
+            16,
+            color: PetColors.secondary,
+            weight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
         PetPrimary(
           '동네 모임 둘러보기',
           light: true,
@@ -393,9 +417,13 @@ class _HomeTabState extends State<HomeTab> {
       ],
     ),
   );
+
   Widget dashboard(HomeData home) {
     final data = home.activity, now = DateTime.now();
-    final missions = activityRows(data?['missions']);
+    final meetups = home.meetups
+        ?.where((m) => date(m['event_at'])?.isAfter(now) == true)
+        .take(2)
+        .toList();
     final upcoming =
         activityRows(data?['applications'])
             .where(
@@ -410,41 +438,35 @@ class _HomeTabState extends State<HomeTab> {
                 date(a['program']['starts_at'])!
                     .compareTo(date(b['program']['starts_at'])!),
           );
-    final endWeek = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).add(Duration(days: 8 - now.weekday));
-    final weekly = upcoming
-        .where((e) => date(e['program']['starts_at'])!.isBefore(endWeek))
-        .length;
-    final recommendations = activityRows(data?['recommendations'])
-        .where((p) => p['kind'] == 'activity')
-        .take(2)
-        .toList();
-    final meetups = home.meetups
-        ?.where((m) => date(m['event_at'])?.isAfter(now) == true)
-        .take(2)
-        .toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          header(home.nickname),
-          if (widget.petPreview != null && widget.onOpenPet != null)
+          HomeHeader(
+            nickname: home.nickname,
+            onProfile: () => open(ProfilePage(activityRepository: repo)),
+            onCalendar: attendanceCalendar,
+          ),
+          HomeAttendanceCard(
+            onCalendar: attendanceCalendar,
+            onStamped: widget.onAttendanceChanged,
+          ),
+          if (widget.petPreview != null && widget.onOpenPet != null) ...[
+            const SizedBox(height: 16),
             PetPreviewEntry(
               pet: widget.petPreview!,
               onTap: widget.onOpenPet!,
               nickname: home.nickname,
             ),
+          ],
           title('다가오는 모임'),
           if (meetups == null)
             ActivityInfo('동네 모임을 불러오지 못했어요.', onRetry: reload)
-          else if (meetups.isEmpty)
+          else if (meetups.isEmpty && upcoming.isEmpty)
             emptyMeetups()
           else
-            PetCard(
+            HomeCard(
               padding: 16,
               child: Column(
                 children: [
@@ -458,163 +480,96 @@ class _HomeTabState extends State<HomeTab> {
                           open(PostDetailPage(postId: '${meetups[i]['id']}')),
                     ),
                   ],
+                  for (final e in upcoming.take(1)) ...[
+                    if (meetups.isNotEmpty)
+                      const Divider(color: PetColors.line),
+                    eventRow(
+                      label: '${e['program']['title']}',
+                      subtitle:
+                          '${when(e['program']['starts_at'])} · ${e['program']['place_name']}',
+                      confirmed: true,
+                      onTap: () => program(e['program']['id']),
+                    ),
+                  ],
                 ],
               ),
             ),
           title('동네 소식'),
-          PetCard(
+          HomeCard(
             padding: 18,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                newsHeading(
-                  '기관 공지',
-                  '공지 더 보기',
-                  () => open(NoticeListPage(repository: notices)),
+                newsGroup(
+                  label: '기관 공지',
+                  empty: '아직 등록된 기관 공지가 없어요',
+                  failure: '기관 공지를 불러오지 못했어요.',
+                  rows: home.notices,
+                  official: true,
+                  onList: () => open(NoticeListPage(repository: notices)),
                 ),
-                if (home.notices == null)
-                  ActivityInfo('기관 공지를 불러오지 못했어요.', onRetry: reload)
-                else if (home.notices!.isEmpty)
-                  newsEmpty('아직 등록된 기관 공지가 없어요.'),
-                for (final n in home.notices?.take(2) ?? <NoticeData>[])
-                  newsRow(
-                    label: '${n['title']}',
-                    source: '기관 공지 · ${n['org_name']}',
-                    official: true,
-                    onTap: () => open(
-                      NoticeDetailPage(id: n['id'], repository: notices),
-                    ),
-                  ),
-                const Divider(height: 28, color: PetColors.line),
-                newsHeading(
-                  '지역 커뮤니티',
-                  '커뮤니티 더 보기',
-                  () => open(const CommunityPage()),
+                const Divider(height: 26, color: PetColors.line),
+                newsGroup(
+                  label: '지역 커뮤니티',
+                  empty: '아직 우리 동네 글이 없어요',
+                  failure: '커뮤니티 글을 불러오지 못했어요.',
+                  rows: home.news,
+                  official: false,
+                  onList: () => open(const CommunityPage()),
                 ),
-                if (home.news == null)
-                  ActivityInfo('커뮤니티 글을 불러오지 못했어요.', onRetry: reload)
-                else if (home.news!.isEmpty)
-                  newsEmpty('아직 우리 동네 커뮤니티 글이 없어요.'),
-                for (final n in home.news ?? <ActivityData>[])
-                  newsRow(
-                    label: '${n['title']}',
-                    source: '지역 커뮤니티 · ${n['category']}',
-                    official: false,
-                    onTap: () => open(PostDetailPage(postId: '${n['id']}')),
-                  ),
               ],
             ),
           ),
-          // Empty weeks occupy no dashboard block. A real summary is compact and
-          // follows the pet card instead of pushing the card out of the first screen.
-          if (missions.isNotEmpty || weekly > 0) ...[
-            const SizedBox(height: 16),
-            PetCard(
-              padding: 16,
-              child: InkWell(
-                onTap: () => section(ActivitySection.mine),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('이번 주 활동 현황', style: petText(20)),
-                    const SizedBox(height: 6),
-                    Text(
-                      missions.isEmpty
-                          ? '이번 주 참여 예정 $weekly개'
-                          : '미션 ${missions.where((m) => m['status'] == 'completed').length}/${missions.length}개 완료 · 예정 $weekly개',
-                      style: petText(17, color: PetColors.secondary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          if (upcoming.isNotEmpty) ...[
-            title('참여 예정 프로그램'),
-            PetCard(
-              padding: 16,
-              child: eventRow(
-                label: '${upcoming.first['program']['title']}',
-                subtitle:
-                    '${when(upcoming.first['program']['starts_at'])} · ${upcoming.first['program']['place_name']}',
-                confirmed: true,
-                onTap: () => program(upcoming.first['program']['id']),
-              ),
-            ),
-          ],
-          if (data == null) ...[
-            const SizedBox(height: 20),
-            ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload),
-          ] else if (data['preferences'] != null &&
-              recommendations.isNotEmpty) ...[
-            title(
-              '맞춤 추천 활동',
-              trailing: TextButton(
-                onPressed: () => section(ActivitySection.find),
-                child: const Text('더 보기'),
-              ),
-            ),
-            for (final p in recommendations)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: PetCard(
-                  padding: 16,
-                  child: eventRow(
-                    label: '${p['title']}',
-                    subtitle: '${when(p['starts_at'])} · ${p['place_name']}',
-                    icon: Icons.explore_outlined,
-                    onTap: () => program(p['id']),
-                  ),
-                ),
-              ),
-          ],
-          if (home.favorites != null && home.favorites!.isNotEmpty) ...[
-            title(
-              '즐겨찾는 시설',
-              trailing: TextButton(
-                onPressed: () => open(const FavoriteFacilitiesPage()),
-                child: const Text('더 보기'),
-              ),
-            ),
-            PetCard(
-              padding: 16,
-              child: Column(
+          title('더 둘러보기'),
+          LayoutBuilder(
+            builder: (context, b) {
+              final large =
+                  MediaQuery.textScalerOf(context).scale(1) > 1.4 ||
+                  b.maxWidth < 310;
+              final width = large ? b.maxWidth : (b.maxWidth - 12) / 2;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  for (final f in home.favorites!)
-                    eventRow(
-                      label: f.name,
-                      subtitle: f.address,
-                      icon: Icons.star_outline,
-                      onTap: () async {
-                        await openSavedFacility(context, f);
-                        if (mounted) await reload();
-                      },
+                  SizedBox(
+                    width: width,
+                    child: HomeExploreTile(
+                      title: '맞춤 활동 찾기',
+                      subtitle: '나에게 맞는\n동네 프로그램 추천',
+                      icon: Icons.auto_awesome_outlined,
+                      colors: const [Color(0xFFE2F4EC), Color(0xFFF0F9F5)],
+                      ink: const Color(0xFF2B9565),
+                      onTap: () => section(ActivitySection.find),
                     ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: HomeExploreTile(
+                      title: '즐겨찾는 시설',
+                      subtitle: '자주 가는 곳을\n한곳에 모아보기',
+                      icon: Icons.star_outline_rounded,
+                      colors: const [Color(0xFFFFF2DA), Color(0xFFFFF7E9)],
+                      ink: const Color(0xFFE4930B),
+                      onTap: () => open(const FavoriteFacilitiesPage()),
+                    ),
+                  ),
                 ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-          // Existing functions remain reachable without filling the home with empty cards.
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              TextButton(
-                onPressed: () => section(ActivitySection.find),
-                child: const Text('맞춤 활동 찾기'),
-              ),
-              if (home.favorites == null || home.favorites!.isEmpty)
-                TextButton(
-                  onPressed: () => open(const FavoriteFacilitiesPage()),
-                  child: const Text('즐겨찾는 시설'),
-                ),
-              const PointBadge(),
-            ],
+              );
+            },
           ),
-          if (home.favorites == null)
-            ActivityInfo('즐겨찾는 시설을 불러오지 못했어요.', onRetry: reload),
+          const SizedBox(height: 20),
+          Text(
+            '포인트·출석은 화면 맨 위에서 확인할 수 있어요',
+            textAlign: TextAlign.center,
+            style: petText(
+              14,
+              color: const Color(0xFF728698),
+              weight: FontWeight.w600,
+            ),
+          ),
+          if (data == null) ...[
+            const SizedBox(height: 16),
+            ActivityInfo('활동 현황을 불러오지 못했어요.', onRetry: reload),
+          ],
         ],
       ),
     );
