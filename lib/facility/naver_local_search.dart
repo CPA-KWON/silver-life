@@ -72,6 +72,7 @@ class FacilityResult {
     required this.lat,
     required this.lng,
     required this.distanceMeters,
+    this.liveOnly = false,
   });
 
   /// Set only when this result came from our own `facilities` table
@@ -86,9 +87,37 @@ class FacilityResult {
   final double lat;
   final double lng;
   final double distanceMeters;
+
+  /// A Kakao nearest-first result. Kakao's terms allow showing it live but
+  /// never storing it, so saving goes through [findStorableFacility] first.
+  final bool liveOnly;
+}
+
+/// Thrown when a live-only place has no matching NAVER place to save.
+class FacilityNotStorableException implements Exception {
+  const FacilityNotStorableException();
 }
 
 String _stripTags(String html) => html.replaceAll(RegExp('<[^>]*>'), '');
+
+// Kakao category group codes: HP8 hospitals (incl. specialties), PM9 pharmacy.
+final _kakaoGroups = {
+  '약국': 'PM9',
+  for (final term in ['병원', '내과', '정형외과', '안과', '치과', '이비인후과', '피부과'])
+    term: 'HP8',
+};
+
+String _compact(String name) => name.replaceAll(RegExp(r'[\s()·]'), '');
+
+// "서울 중구 세종대로 110" -> "서울 중구": enough for NAVER to find the place.
+String _district(String address) {
+  final parts = address.split(' ').where((p) => p.isNotEmpty).toList();
+  final end = parts.lastIndexWhere(
+    (p) => RegExp(r'(시|군|구)$').hasMatch(p),
+    parts.length > 3 ? 2 : parts.length - 1,
+  );
+  return parts.take(end < 0 ? 1 : end + 1).join(' ');
+}
 
 /// Keeps the existing API and query format while sharing connections, address
 /// lookups and concurrent requests between home and the facility map.
@@ -213,6 +242,82 @@ class FacilitySearchService {
     double lat,
     double lng,
   ) async {
+    _checkReady();
+    final area = await _area(lat, lng);
+    // The server answers nearest-first from Kakao when it can, and otherwise
+    // falls back to the NAVER text query below.
+    final body = await _post({
+      'query': area.isEmpty ? category : '$area $category',
+      'nearby': {
+        'keyword': category,
+        'lat': lat,
+        'lng': lng,
+        if (_kakaoGroups[category] != null) 'group': _kakaoGroups[category],
+      },
+    });
+    if (body['source'] == 'kakao') {
+      // Live-only data is never cached, in line with Kakao's storage terms.
+      return List<FacilityResult>.unmodifiable(
+        [
+          for (final place in (body['places'] as List).cast<Map>())
+            FacilityResult(
+              name: place['name'] as String,
+              category: place['category'] as String,
+              address: place['address'] as String,
+              telephone: place['telephone'] as String,
+              lat: (place['lat'] as num).toDouble(),
+              lng: (place['lng'] as num).toDouble(),
+              distanceMeters: Geolocator.distanceBetween(
+                lat,
+                lng,
+                (place['lat'] as num).toDouble(),
+                (place['lng'] as num).toDouble(),
+              ),
+              liveOnly: true,
+            ),
+        ]..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters)),
+      );
+    }
+    final immutable = List<FacilityResult>.unmodifiable(
+      _naverResults(body, lat, lng),
+    );
+    // A failed address lookup should not cache a nationwide fallback for five
+    // minutes when a later retry could find the intended neighbourhood.
+    if (area.isNotEmpty) {
+      _remember(_results, '$category:${_positionKey(lat, lng)}', immutable);
+    }
+    return immutable;
+  }
+
+  /// The NAVER place matching a live-only [place], which may be saved, or
+  /// [place] itself when it is already storable.
+  Future<FacilityResult> findStorable(FacilityResult place) async {
+    if (!place.liveOnly) return place;
+    _checkReady();
+    final district = _district(place.address);
+    final body = await _post({
+      'query': district.isEmpty ? place.name : '$district ${place.name}',
+    });
+    final name = _compact(place.name);
+    final matches = _naverResults(body, place.lat, place.lng).where((r) {
+      final other = _compact(r.name);
+      return r.distanceMeters <= 500 &&
+          (other.contains(name) || name.contains(other));
+    }).toList();
+    if (matches.isEmpty) throw const FacilityNotStorableException();
+    final match = matches.first;
+    return FacilityResult(
+      name: match.name,
+      category: match.category,
+      address: match.address,
+      telephone: match.telephone,
+      lat: match.lat,
+      lng: match.lng,
+      distanceMeters: place.distanceMeters,
+    );
+  }
+
+  void _checkReady() {
     final token = _accessToken();
     if (token == null || token.isEmpty) {
       throw const FacilitySearchAuthException();
@@ -220,7 +325,36 @@ class FacilitySearchService {
     if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
       throw const FacilitySearchNotReadyException();
     }
-    final area = await _area(lat, lng);
+  }
+
+  List<FacilityResult> _naverResults(
+    Map<String, dynamic> body,
+    double lat,
+    double lng,
+  ) {
+    final items = (body['items'] as List).cast<Map<String, dynamic>>();
+    return items.map((item) {
+      final itemLng = int.parse(item['mapx'] as String) / 10000000;
+      final itemLat = int.parse(item['mapy'] as String) / 10000000;
+      return FacilityResult(
+        name: _stripTags(item['title'] as String),
+        category: item['category'] as String,
+        address: (item['roadAddress'] as String).isNotEmpty
+            ? item['roadAddress'] as String
+            : item['address'] as String,
+        telephone: item['telephone'] as String,
+        lat: itemLat,
+        lng: itemLng,
+        distanceMeters: Geolocator.distanceBetween(lat, lng, itemLat, itemLng),
+      );
+    }).toList()..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+  }
+
+  Future<Map<String, dynamic>> _post(Map<String, Object?> payload) async {
+    final token = _accessToken();
+    if (token == null || token.isEmpty) {
+      throw const FacilitySearchAuthException();
+    }
     final uri = Uri.parse('$supabaseUrl/functions/v1/facility-search');
     final abort = Completer<void>();
     final request =
@@ -230,9 +364,7 @@ class FacilitySearchService {
             'apikey': supabaseAnonKey,
             'Content-Type': 'application/json',
           })
-          ..body = jsonEncode({
-            'query': area.isEmpty ? category : '$area $category',
-          });
+          ..body = jsonEncode(payload);
     final http.Response response;
     try {
       response = await _client
@@ -272,35 +404,15 @@ class FacilitySearchService {
       // status for diagnosis without displaying the raw body to users.
       throw FacilitySearchServerException(response.statusCode);
     }
-    final body =
-        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-    final items = (body['items'] as List).cast<Map<String, dynamic>>();
-    final results = items.map((item) {
-      final itemLng = int.parse(item['mapx'] as String) / 10000000;
-      final itemLat = int.parse(item['mapy'] as String) / 10000000;
-      return FacilityResult(
-        name: _stripTags(item['title'] as String),
-        category: item['category'] as String,
-        address: (item['roadAddress'] as String).isNotEmpty
-            ? item['roadAddress'] as String
-            : item['address'] as String,
-        telephone: item['telephone'] as String,
-        lat: itemLat,
-        lng: itemLng,
-        distanceMeters: Geolocator.distanceBetween(lat, lng, itemLat, itemLng),
-      );
-    }).toList()..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
-    final immutable = List<FacilityResult>.unmodifiable(results);
-    // A failed address lookup should not cache a nationwide fallback for five
-    // minutes when a later retry could find the intended neighbourhood.
-    if (area.isNotEmpty) {
-      _remember(_results, '$category:${_positionKey(lat, lng)}', immutable);
-    }
-    return immutable;
+    return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
   }
 
   void close() => _client.close();
 }
+
+/// See [FacilitySearchService.findStorable].
+Future<FacilityResult> findStorableFacility(FacilityResult place) =>
+    _searchService.findStorable(place);
 
 Future<List<FacilityResult>> searchNearbyFacilities({
   required String category,

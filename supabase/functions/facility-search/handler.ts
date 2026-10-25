@@ -3,6 +3,51 @@ type Dependencies = {
   fetch: typeof fetch;
 };
 
+type Nearby = { keyword: string; lat: number; lng: number; group?: string };
+
+// Only Korean coordinates and the hospital/pharmacy group codes are accepted.
+function parseNearby(value: unknown): Nearby | null {
+  if (!value || typeof value !== 'object') return null;
+  const { keyword, lat, lng, group } = value as Record<string, unknown>;
+  if (typeof keyword !== 'string' || !keyword.trim() || keyword.length > 60) return null;
+  if (typeof lat !== 'number' || !(lat >= 33 && lat <= 39)) return null;
+  if (typeof lng !== 'number' || !(lng >= 124 && lng <= 132)) return null;
+  if (group !== undefined && group !== 'HP8' && group !== 'PM9') return null;
+  return { keyword: keyword.trim(), lat, lng, group };
+}
+
+// Nearest-first places, or null so the caller falls back to NAVER.
+async function kakaoNearby(fetcher: typeof fetch, key: string, nearby: Nearby) {
+  try {
+    const upstream = new URL('https://dapi.kakao.com/v2/local/search/keyword.json');
+    upstream.searchParams.set('query', nearby.keyword);
+    upstream.searchParams.set('x', String(nearby.lng));
+    upstream.searchParams.set('y', String(nearby.lat));
+    upstream.searchParams.set('radius', '20000');
+    upstream.searchParams.set('sort', 'distance');
+    upstream.searchParams.set('size', '15');
+    if (nearby.group) upstream.searchParams.set('category_group_code', nearby.group);
+    const result = await fetcher(upstream, {
+      headers: { Authorization: `KakaoAK ${key}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!result.ok) return null;
+    const data = await result.json();
+    if (!Array.isArray(data.documents)) return null;
+    return data.documents.map((d: Record<string, string>) => ({
+      name: String(d.place_name ?? ''),
+      category: String(d.category_name ?? ''),
+      address: String(d.road_address_name || d.address_name || ''),
+      telephone: String(d.phone ?? ''),
+      lat: Number(d.y),
+      lng: Number(d.x),
+    })).filter((p: { name: string; lat: number; lng: number }) =>
+      p.name && Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  } catch {
+    return null;
+  }
+}
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
@@ -42,6 +87,14 @@ export function createHandler(deps: Dependencies) {
       try { body = JSON.parse(rawBody); } catch { return reply(400, { error: '검색어를 확인해 주세요.' }); }
       const query = typeof body?.query === 'string' ? body.query.trim() : '';
       if (!query || query.length > 120) return reply(400, { error: '검색어를 확인해 주세요.' });
+      // Kakao terms allow live display only, never storage: the app marks
+      // these places and resolves them through NAVER before saving any.
+      const nearby = parseNearby(body?.nearby);
+      const kakaoKey = deps.env('KAKAO_REST_API_KEY');
+      if (nearby && kakaoKey) {
+        const places = await kakaoNearby(deps.fetch, kakaoKey, nearby);
+        if (places) return reply(200, { source: 'kakao', places });
+      }
       const upstream = new URL('https://naverapihub.apigw.ntruss.com/search/v1/local');
       upstream.searchParams.set('query', query);
       upstream.searchParams.set('display', '5');

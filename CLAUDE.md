@@ -89,7 +89,8 @@
 - 앱: **Flutter** (안드로이드 우선, 블루스택과 실제 폰에서 테스트)
 - 로그인·데이터베이스: **Supabase** (이메일 로그인, Postgres DB)
 - 지도: **네이버 지도 SDK** (`flutter_naver_map`)
-- 시설 검색: **네이버 API Hub 지역검색** (`naverapihub.apigw.ntruss.com`)
+- 시설 검색: **네이버 API Hub 지역검색** (`naverapihub.apigw.ntruss.com`) + **카카오 로컬 키워드 검색**(가까운 순, 서버 Secret `KAKAO_REST_API_KEY`, 없거나 실패하면 네이버로 대체)
+  - ⚠️ 카카오 결과(`FacilityResult.liveOnly`)는 약관상 저장 금지. 즐겨찾기·체크인·모임 장소 저장은 반드시 `findStorableFacility`로 네이버 결과로 바꾼 뒤 저장(README "가까운 순 검색" 참고)
 - 기타: geolocator(현재 위치·거리 계산), geocoding(좌표→동네 이름), url_launcher(전화 걸기), permission_handler(위치 권한 요청), http(네이버 검색 요청)
   - shared_preferences는 앱 코드에서 직접 쓰지 않습니다(Supabase가 내부적으로만 사용).
 - 키 값들은 `.env.json` 파일에 있고 `--dart-define-from-file=.env.json` 옵션으로 실행·빌드합니다.

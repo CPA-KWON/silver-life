@@ -51,3 +51,40 @@ test('missing deployment secrets gives prepared response', async () => {
 test('preflight supported and other HTTP methods rejected', async () => {
   const { handler, calls } = fixture(); assert.equal((await handler(new Request('https://supabase.invalid', { method: 'OPTIONS' }))).status, 200); assert.equal((await handler(new Request('https://supabase.invalid'))).status, 405); assert.equal(calls.length, 0);
 });
+
+function kakaoFixture({ kakaoStatus = 200, key = 'kakao-secret' } = {}) {
+  const calls = [];
+  const env = { ...values, ...(key ? { KAKAO_REST_API_KEY: key } : {}) };
+  const handler = createHandler({ env: k => env[k], fetch: async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (String(url).endsWith('/auth/v1/user')) return Response.json({ id: 'test-user', role: 'authenticated' });
+    if (String(url).startsWith('https://dapi.kakao.com/')) {
+      return kakaoStatus === 200
+        ? Response.json({ documents: [{ place_name: '가까운약국', category_name: '의료,건강 > 약국', road_address_name: '서울 중구 세종대로 1', address_name: '서울 중구 태평로1가 1', phone: '02-1', x: '126.978', y: '37.566' }] })
+        : Response.json({ error: 'private' }, { status: kakaoStatus });
+    }
+    return Response.json({ items: [{ title: '네이버약국' }] });
+  }});
+  return { calls, handler };
+}
+const nearbyBody = { query: '중구 약국', nearby: { keyword: '약국', lat: 37.56, lng: 126.97, group: 'PM9' } };
+test('nearby search asks Kakao nearest-first with server-only key', async () => {
+  const { handler, calls } = kakaoFixture(); const result = await handler(request(nearbyBody));
+  assert.equal(result.status, 200);
+  const body = await result.json(); assert.equal(body.source, 'kakao');
+  assert.deepEqual(body.places[0], { name: '가까운약국', category: '의료,건강 > 약국', address: '서울 중구 세종대로 1', telephone: '02-1', lat: 37.566, lng: 126.978 });
+  const url = new URL(calls[1].url); assert.equal(url.searchParams.get('sort'), 'distance'); assert.equal(url.searchParams.get('x'), '126.97'); assert.equal(url.searchParams.get('y'), '37.56'); assert.equal(url.searchParams.get('category_group_code'), 'PM9');
+  assert.equal(calls[1].init.headers.Authorization, 'KakaoAK kakao-secret'); assert(!JSON.stringify(body).includes('kakao-secret'));
+});
+test('Kakao failure or missing key falls back to NAVER', async () => {
+  for (const fixtureOptions of [{ kakaoStatus: 429 }, { kakaoStatus: 500 }, { key: '' }]) {
+    const { handler } = kakaoFixture(fixtureOptions); const body = await (await handler(request(nearbyBody))).json();
+    assert.equal(body.source, undefined); assert.deepEqual(body.items, [{ title: '네이버약국' }]);
+  }
+});
+test('invalid nearby values never reach Kakao', async () => {
+  for (const nearby of [{ keyword: '약국', lat: 0, lng: 126.9 }, { keyword: '', lat: 37.5, lng: 126.9 }, { keyword: '약국', lat: 37.5, lng: 126.9, group: 'XX' }, { keyword: '약국', lat: '37.5', lng: 126.9 }]) {
+    const { handler, calls } = kakaoFixture(); await handler(request({ query: '약국', nearby }));
+    assert(!calls.some(c => c.url.startsWith('https://dapi.kakao.com/')));
+  }
+});

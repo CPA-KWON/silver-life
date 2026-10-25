@@ -609,6 +609,11 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   bool? _isFavorite;
   bool _isToggling = false;
 
+  /// What favorites and check-ins save: [FacilityDetailPage.result] itself,
+  /// or its NAVER match when the result is live-only Kakao data.
+  FacilityResult? _storable;
+  bool _notStorable = false;
+
   String? _facilityId;
   bool? _checkedIn;
   int? _checkinCount;
@@ -663,6 +668,18 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
       unawaited(Supabase.instance.client.removeChannel(oldChannel));
     }
     try {
+      if (_storable == null) {
+        try {
+          final storable = await findStorableFacility(widget.result);
+          if (!mounted || generation != _detailGeneration) return;
+          setState(() => _storable = storable);
+        } on FacilityNotStorableException {
+          if (mounted && generation == _detailGeneration) {
+            setState(() => _notStorable = true);
+          }
+          return;
+        }
+      }
       await Future.wait([
         _loadFavoriteStatus(generation),
         _initCheckins(generation),
@@ -684,7 +701,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
 
   Future<void> _initCheckins(int generation) async {
     final client = Supabase.instance.client;
-    final result = widget.result;
+    final result = _storable!;
 
     String facilityId;
     if (result.id != null) {
@@ -808,8 +825,8 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
         .from('favorites')
         .select('id')
         .eq('user_id', userId)
-        .eq('name', widget.result.name)
-        .eq('address', widget.result.address)
+        .eq('name', _storable!.name)
+        .eq('address', _storable!.address)
         .timeout(const Duration(seconds: 10));
     if (mounted && generation == _detailGeneration) {
       setState(() => _isFavorite = rows.isNotEmpty);
@@ -821,7 +838,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     setState(() => _isToggling = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
-      final result = widget.result;
+      final result = _storable!;
       if (_isFavorite == true) {
         await Supabase.instance.client
             .from('favorites')
@@ -897,6 +914,16 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                       child: const Text('다시 시도'),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_notStorable) ...[
+              const SectionCard(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  '이 시설은 즐겨찾기와 "나 여기 있음"을 쓸 수 없어요. '
+                  '전화 걸기와 위치 확인은 그대로 할 수 있어요.',
                 ),
               ),
               const SizedBox(height: 12),

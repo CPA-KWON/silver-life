@@ -47,7 +47,14 @@ void main() {
           expect(request.method, 'POST');
           expect(request.url.host, 'supabase.invalid');
           expect(request.url.path, '/functions/v1/facility-search');
-          expect(jsonDecode(request.body), {'query': '중구 병원'});
+          final sent = jsonDecode(request.body) as Map;
+          expect(sent['query'], '중구 병원');
+          expect(sent['nearby'], {
+            'keyword': '병원',
+            'lat': 37.5665,
+            'lng': 126.978,
+            'group': 'HP8',
+          });
           expect(request.headers['Authorization'], 'Bearer offline-session');
           expect(request.headers, isNot(contains('X-NCP-APIGW-API-KEY')));
           return results();
@@ -301,6 +308,109 @@ void main() {
       expect(facilitySearchErrorMessage(error), isNot(contains('인터넷')));
       expect(error.toString(), isNot(contains('internal diagnostic data')));
     }
+  });
+
+  http.Response kakao() => http.Response(
+    jsonEncode({
+      'source': 'kakao',
+      'places': [
+        for (final (name, lng) in [('먼약국', 126.99), ('가까운약국', 126.9781)])
+          {
+            'name': name,
+            'category': '약국',
+            'address': '서울 중구 세종대로 110',
+            'telephone': '02-1',
+            'lat': 37.5665,
+            'lng': lng,
+          },
+      ],
+    }),
+    200,
+    headers: {'content-type': 'application/json; charset=utf-8'},
+  );
+
+  test('Kakao results are nearest-first, live-only and never cached', () async {
+    var requests = 0;
+    final service = testService(
+      resolveArea: (_, _) async => '중구',
+      client: MockClient((_) async {
+        requests++;
+        return kakao();
+      }),
+    );
+    addTearDown(service.close);
+    final list = await search(service, '약국');
+    expect(list.map((r) => r.name), ['가까운약국', '먼약국']);
+    expect(list.every((r) => r.liveOnly), isTrue);
+    await search(service, '약국');
+    expect(requests, 2);
+  });
+
+  test('saving a Kakao place swaps in the matching NAVER place', () async {
+    final queries = <Object?>[];
+    final service = testService(
+      client: MockClient((request) async {
+        queries.add(jsonDecode(request.body));
+        return http.Response(
+          jsonEncode({
+            'items': [
+              for (final (title, x) in [
+                ('다른약국', '1269781000'),
+                ('<b>가까운</b> 약국', '1269781000'),
+              ])
+                {
+                  'title': title,
+                  'category': '약국',
+                  'roadAddress': '서울특별시 중구 세종대로 110',
+                  'address': '',
+                  'telephone': '02-2',
+                  'mapx': x,
+                  'mapy': '375665000',
+                },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+    );
+    addTearDown(service.close);
+    const place = FacilityResult(
+      name: '가까운약국',
+      category: '약국',
+      address: '서울 중구 세종대로 110',
+      telephone: '02-1',
+      lat: 37.5665,
+      lng: 126.9781,
+      distanceMeters: 12,
+      liveOnly: true,
+    );
+    final stored = await service.findStorable(place);
+    expect(queries, [
+      {'query': '서울 중구 가까운약국'},
+    ]);
+    expect(stored.name, '가까운 약국');
+    expect(stored.address, '서울특별시 중구 세종대로 110');
+    expect(stored.liveOnly, isFalse);
+  });
+
+  test('a Kakao place without a nearby NAVER match cannot be saved', () async {
+    final service = testService(client: MockClient((_) async => results()));
+    addTearDown(service.close);
+    const place = FacilityResult(
+      name: '없는약국',
+      category: '약국',
+      address: '서울 중구 세종대로 110',
+      telephone: '',
+      lat: 37.5665,
+      lng: 126.978,
+      distanceMeters: 0,
+      liveOnly: true,
+    );
+    await expectLater(
+      service.findStorable(place),
+      throwsA(isA<FacilityNotStorableException>()),
+    );
   });
 }
 
