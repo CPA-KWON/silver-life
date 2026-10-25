@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../ui/design_widgets.dart';
+import '../notices/notice_pages.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
 import 'activity_forms.dart';
@@ -109,6 +110,13 @@ class _ActivityAgencyPageState extends State<ActivityAgencyPage> {
         icon: const Icon(Icons.add),
         label: Text(experience ? '경험 나눔 모집 등록' : '프로그램 등록'),
       ),
+      if (!experience)
+        TextButton.icon(
+          onPressed: () =>
+              open(NoticeManagePage(organizations: widget.organizations)),
+          icon: const Icon(Icons.campaign_outlined),
+          label: const Text('기관 공지 관리'),
+        ),
       const SizedBox(height: 12),
       if (rows.isEmpty) const ActivityInfo('등록한 프로그램이 없어요.'),
       for (final p in rows) ...[

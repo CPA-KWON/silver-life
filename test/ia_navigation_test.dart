@@ -85,7 +85,8 @@ void main() {
     await tap(t, find.text('내 정보'));
     await t.binding.handlePopRoute();
     await t.pumpAndSettle();
-    expect(find.text('이번 주 활동 현황'), findsOneWidget);
+    expect(find.text('다가오는 모임'), findsOneWidget);
+    expect(find.text('이번 주 활동 현황'), findsNothing);
     await tap(t, find.widgetWithText(NavigationDestination, '활동'));
     expect(find.text('이번 주 미션 만들기'), findsOneWidget);
     await finish(t);

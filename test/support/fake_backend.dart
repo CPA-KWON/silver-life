@@ -162,6 +162,7 @@ class FakeBackend {
       facilities.add({'id': id, ...data});
       return response(id);
     }
+    if (name == 'institution_notice_feed') return response([]);
     if (name == 'email_exists') return response(false);
     if ((name == 'profiles' && failProfile) ||
         (name == 'favorites' && failFavorites) ||

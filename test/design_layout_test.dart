@@ -17,9 +17,7 @@ void main() {
   });
   tearDownAll(() => Supabase.instance.dispose());
 
-  testWidgets('home ring reflects stored missions instead of mockup numbers', (
-    t,
-  ) async {
+  testWidgets('home compact summary reflects stored missions', (t) async {
     await t.binding.setSurfaceSize(const Size(320, 900));
     addTearDown(() => t.binding.setSurfaceSize(null));
     final repo = FakeActivityRepository();
@@ -29,7 +27,7 @@ void main() {
     ]);
     await mount(t, HomeTab(activityRepository: repo), scale: 2);
     expect(find.textContaining('미션 1/2개 완료'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('이번 주 활동 현황'), findsOneWidget);
     expect(find.text('시작 전'), findsNothing);
     expect(t.takeException(), isNull);
     await finish(t);
@@ -42,8 +40,9 @@ void main() {
     addTearDown(() => t.binding.setSurfaceSize(null));
     final repo = FakeActivityRepository();
     await mount(t, MainShell(activityRepository: repo), scale: 2);
-    expect(find.text('시작 전'), findsOneWidget);
-    expect(find.textContaining('미션 미생성'), findsOneWidget);
+    expect(find.text('이번 주 활동 현황'), findsNothing);
+    expect(find.text('시작 전'), findsNothing);
+    expect(find.text('동네 모임 둘러보기'), findsOneWidget);
     expect(t.takeException(), isNull);
     await tap(t, find.widgetWithText(NavigationDestination, '활동'));
     await tap(t, find.text('경험 나눔'));

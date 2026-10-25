@@ -53,6 +53,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Timer? _petClock;
   final _homeRefresh = ValueNotifier<int>(0);
   final _homeNavigator = GlobalKey<NavigatorState>();
+  Color _homeSurface = PetColors.background;
+  late final _homeObserver = _HomeSurfaceObserver((route) {
+    final color = route?.settings.name == 'pet'
+        ? PetColors.sky
+        : PetColors.background;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _homeSurface != color) {
+        setState(() => _homeSurface = color);
+      }
+    });
+  });
   late final _attendance = AttendanceController(
     repository: widget.attendanceRepository,
   );
@@ -195,7 +206,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   Widget _buildScaffold(BuildContext context) {
     return Scaffold(
-      backgroundColor: _index == 0 ? PetColors.sky : AppColors.background,
+      backgroundColor: _index == 0 ? _homeSurface : AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RetainedMapTab(
@@ -238,6 +249,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     },
                     child: Navigator(
                       key: _homeNavigator,
+                      observers: [_homeObserver],
                       onGenerateRoute: (_) => MaterialPageRoute<void>(
                         builder: (_) {
                           // Always construct the home entry, even if another tab
@@ -248,6 +260,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             petPreview: _petPreview,
                             onOpenPet: () => _homeNavigator.currentState!.push(
                               MaterialPageRoute<void>(
+                                settings: const RouteSettings(name: 'pet'),
                                 builder: (_) => !_petPreview.ready
                                     ? PetConnectionPage(pet: _petPreview)
                                     : _petPreview.adopted
@@ -324,5 +337,24 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+}
+
+class _HomeSurfaceObserver extends NavigatorObserver {
+  _HomeSurfaceObserver(this.onRoute);
+  final void Function(Route<dynamic>?) onRoute;
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    onRoute(route);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    onRoute(previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    onRoute(newRoute);
   }
 }

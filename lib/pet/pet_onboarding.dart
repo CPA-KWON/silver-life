@@ -6,68 +6,134 @@ import 'pet_home_pages.dart';
 import 'pet_care_pages.dart';
 
 class PetPreviewEntry extends StatelessWidget {
-  const PetPreviewEntry({super.key, required this.pet, required this.onTap});
+  const PetPreviewEntry({
+    super.key,
+    required this.pet,
+    required this.onTap,
+    this.nickname,
+  });
   final PetPreviewController pet;
   final VoidCallback onTap;
+  final String? nickname;
   @override
   Widget build(BuildContext c) => ListenableBuilder(
     listenable: pet,
-    builder: (c, _) => PetCard(
-      color: const Color(0xFFE3F1FB),
-      padding: 16,
-      margin: 18,
-      child: Row(
+    builder: (c, _) {
+      Widget photo = PetPhoto(pet: pet, height: 120);
+      if (!pet.adopted) {
+        photo = ColorFiltered(
+          colorFilter: const ColorFilter.matrix([
+            .2126,
+            .7152,
+            .0722,
+            0,
+            0,
+            .2126,
+            .7152,
+            .0722,
+            0,
+            0,
+            .2126,
+            .7152,
+            .0722,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+          ]),
+          child: Opacity(opacity: .55, child: photo),
+        );
+      }
+      final portrait = Container(
+        width: 116,
+        height: 128,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .8),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: photo,
+      );
+      final content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 90, child: PetPhoto(pet: pet, height: 105)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Text(
+            pet.adopted ? '나의 반려동물' : 'NEW · 나의 반려동물',
+            style: petText(14, color: PetColors.blue),
+          ),
+          const SizedBox(height: 7),
+          if (pet.adopted)
+            Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Text(
-                  pet.adopted ? '나의 반려동물' : 'NEW · 나의 반려동물',
-                  style: petText(13, color: PetColors.blue),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  pet.adopted ? pet.name! : '함께할 반려동물을 만나보세요',
-                  style: petText(21),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  pet.error != null
-                      ? '서버 연결을 확인해주세요'
-                      : pet.adopted
-                      ? '오늘도 함께 동네 활동을 해봐요'
-                      : '매일 돌보고 활동하며 함께 자라요',
-                  style: petText(
-                    15,
-                    color: PetColors.secondary,
-                    weight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: pet.busy ? null : onTap,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 42),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: Text(
-                    pet.adopted ? '콩이 만나러 가기 →' : '반려동물 만나기',
-                    style: petText(15, color: Colors.white),
-                  ),
-                ),
+                Text(pet.name!, style: petText(25)),
+                PetPill(pet.stageName),
               ],
+            )
+          else
+            Text('함께할 반려동물을\n만나보세요', style: petText(22)),
+          const SizedBox(height: 8),
+          Text(
+            pet.error != null
+                ? '서버 연결을 확인해주세요'
+                : pet.adopted
+                ? '${nickname ?? '회원'}님, 오늘도\n와주셨네요!'
+                : '매일 돌보고 활동하면\n함께 자라요',
+            style: petText(
+              17,
+              color: PetColors.secondary,
+              weight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: pet.busy ? null : onTap,
+            style: FilledButton.styleFrom(
+              backgroundColor: PetColors.blue,
+              minimumSize: const Size(0, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(
+              pet.adopted ? '${pet.name} 만나러 가기 →' : '반려동물 만나기',
+              style: petText(17, color: Colors.white),
             ),
           ),
         ],
-      ),
-    ),
+      );
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE1F0FC), Color(0xFFF3EFFF)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: LayoutBuilder(
+          builder: (c, b) =>
+              b.maxWidth < 300 || MediaQuery.textScalerOf(c).scale(1) > 1.4
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(child: portrait),
+                    const SizedBox(height: 16),
+                    content,
+                  ],
+                )
+              : Row(
+                  children: [
+                    portrait,
+                    const SizedBox(width: 18),
+                    Expanded(child: content),
+                  ],
+                ),
+        ),
+      );
+    },
   );
 }
 
@@ -115,7 +181,10 @@ class _AdoptionState extends State<PetAdoptionPage> {
             : complete
             ? () => Navigator.pushReplacement(
                 c,
-                MaterialPageRoute<void>(builder: (_) => PetHomePage(pet: pet)),
+                MaterialPageRoute<void>(
+                  settings: const RouteSettings(name: 'pet'),
+                  builder: (_) => PetHomePage(pet: pet),
+                ),
               )
             : adopt,
       ),

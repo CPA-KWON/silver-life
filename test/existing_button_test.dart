@@ -43,7 +43,8 @@ void main() {
       expect(find.text('활동 현황을 불러오지 못했어요.'), findsOneWidget);
       repo.fail = false;
       await tap(t, find.text('다시 시도'));
-      expect(find.text('이번 주 활동 현황'), findsOneWidget);
+      expect(find.text('다가오는 모임'), findsOneWidget);
+      expect(find.text('이번 주 활동 현황'), findsNothing);
       expect(find.text('최근 커뮤니티 글'), findsNothing);
       await finish(t);
     },
@@ -52,7 +53,8 @@ void main() {
     t,
   ) async {
     await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
-    expect(find.textContaining('아직 즐겨찾는 시설이 없어요.'), findsOneWidget);
+    expect(find.text('즐겨찾는 시설'), findsOneWidget);
+    expect(find.textContaining('아직 즐겨찾는 시설이 없어요.'), findsNothing);
     backend.favorites.add({
       'id': 'fav',
       'user_id': FakeBackend.user,
@@ -81,7 +83,8 @@ void main() {
     expect(find.text('아직 신청한 활동이 없어요.'), findsOneWidget);
     await tap(t, find.byType(BackButton));
     await tap(t, find.byType(BackButton));
-    expect(find.text('이번 주 활동 현황'), findsOneWidget);
+    expect(find.text('다가오는 모임'), findsOneWidget);
+    expect(find.text('이번 주 활동 현황'), findsNothing);
     await finish(t);
   });
   testWidgets('community and meetup region failures have usable retry', (
