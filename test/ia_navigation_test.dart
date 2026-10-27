@@ -42,6 +42,7 @@ void main() {
       await tap(t, find.widgetWithText(NavigationDestination, '활동'));
       expect(find.byType(TabBar), findsNothing);
       await tap(t, find.text('주간 미션'));
+      await tap(t, find.text('프로그램별 주간 미션 보기'));
       expect(find.text('이번 주 미션 만들기'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       await tap(t, find.widgetWithText(NavigationDestination, '시설 찾기'));
@@ -56,7 +57,9 @@ void main() {
       expect(find.text('이번 주 미션 만들기'), findsOneWidget);
       await t.binding.handlePopRoute();
       await t.pumpAndSettle();
-      expect(find.text('맞춤 활동 찾기'), findsOneWidget);
+      await t.binding.handlePopRoute();
+      await t.pumpAndSettle();
+      expect(find.byType(ActivityHubPage), findsOneWidget);
       await finish(t);
     },
   );
@@ -70,7 +73,7 @@ void main() {
       expect(find.text('전체 프로그램 탐색'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       await tap(t, find.byType(BackButton));
-      expect(find.text('경험 나눔'), findsOneWidget);
+      expect(find.byType(ActivityHubPage), findsOneWidget);
       await finish(t);
     },
   );
@@ -81,6 +84,7 @@ void main() {
     await mount(t, AuthGate(signedInPage: MainShell(activityRepository: r)));
     await tap(t, find.widgetWithText(NavigationDestination, '활동'));
     await tap(t, find.text('주간 미션'));
+    await tap(t, find.text('프로그램별 주간 미션 보기'));
     await tap(t, find.widgetWithText(NavigationDestination, '홈'));
     await tap(t, find.text('내 정보'));
     await t.binding.handlePopRoute();

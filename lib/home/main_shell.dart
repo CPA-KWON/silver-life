@@ -186,6 +186,27 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   bool _activityVisited = false;
   final _activityNavigator = GlobalKey<NavigatorState>();
 
+  void _openPet() {
+    if (_index != 0) setState(() => _index = 0);
+    final navigator = _homeNavigator.currentState!;
+    var found = false;
+    navigator.popUntil((route) {
+      found = route.settings.name == 'pet';
+      return found || route.isFirst;
+    });
+    if (found) return;
+    navigator.push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'pet'),
+        builder: (_) => !_petPreview.ready
+            ? PetConnectionPage(pet: _petPreview)
+            : _petPreview.adopted
+            ? PetHomePage(pet: _petPreview)
+            : PetAdoptionPage(pet: _petPreview),
+      ),
+    );
+  }
+
   void _openActivity(Widget page) {
     setState(() {
       _index = 2;
@@ -309,16 +330,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                             refreshListenable: _homeRefresh,
                             petPreview: _petPreview,
                             onAttendanceChanged: _syncAttendancePet,
-                            onOpenPet: () => _homeNavigator.currentState!.push(
-                              MaterialPageRoute<void>(
-                                settings: const RouteSettings(name: 'pet'),
-                                builder: (_) => !_petPreview.ready
-                                    ? PetConnectionPage(pet: _petPreview)
-                                    : _petPreview.adopted
-                                    ? PetHomePage(pet: _petPreview)
-                                    : PetAdoptionPage(pet: _petPreview),
-                              ),
-                            ),
+                            onOpenPet: _openPet,
                             onOpenActivity: (section) => _openActivity(
                               ActivitySectionPage(
                                 section: section,
@@ -356,6 +368,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                         onGenerateRoute: (_) => MaterialPageRoute<void>(
                           builder: (_) => ActivityHubPage(
                             repository: widget.activityRepository,
+                            petController: _petPreview,
+                            onOpenPet: _openPet,
+                            onAttendanceChanged: _syncAttendancePet,
                           ),
                         ),
                       ),

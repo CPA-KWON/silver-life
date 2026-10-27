@@ -1,9 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
-import '../attendance/point_badge.dart';
+import '../attendance/attendance_controller.dart';
+import '../attendance/attendance_dialog.dart';
+import '../pet/pet_design.dart';
+import '../pet/pet_preview_controller.dart';
+import '../pet/pet_repository.dart';
+import '../pet/pet_preview_pages.dart';
+import 'activity_hub_widgets.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
 import 'activity_forms.dart';
@@ -22,7 +30,7 @@ enum ActivitySection {
 
 String activitySectionTitle(ActivitySection section) => switch (section) {
   ActivitySection.find => '맞춤 활동 찾기',
-  ActivitySection.missions => '주간 미션',
+  ActivitySection.missions => '프로그램별 주간 미션',
   ActivitySection.mine => '나의 활동',
   ActivitySection.experience => '경험 나눔',
   ActivitySection.programs => '전체 프로그램',
@@ -31,45 +39,240 @@ String activitySectionTitle(ActivitySection section) => switch (section) {
   ActivitySection.support => '경험 나눔 지원 현황',
 };
 
-/// A directory, not four sideways pages. Each destination has one purpose.
-class ActivityHubPage extends StatelessWidget {
-  const ActivityHubPage({super.key, this.repository});
+/// Four focused destinations, backed by the existing wallet and pet missions.
+class ActivityHubPage extends StatefulWidget {
+  const ActivityHubPage({
+    super.key,
+    this.repository,
+    this.petController,
+    this.onOpenPet,
+    this.onAttendanceChanged,
+  });
   final ActivityRepository? repository;
+  final PetPreviewController? petController;
+  final VoidCallback? onOpenPet;
+  final Future<void> Function()? onAttendanceChanged;
+  @override
+  State<ActivityHubPage> createState() => _ActivityHubState();
+}
+
+class _ActivityHubState extends State<ActivityHubPage> {
+  final search = TextEditingController();
+  late final pet =
+      widget.petController ?? PetPreviewController(repository: PetRepository());
+  @override
+  void initState() {
+    super.initState();
+    if (widget.petController == null) unawaited(pet.load());
+  }
+
+  @override
+  void dispose() {
+    search.dispose();
+    if (widget.petController == null) pet.dispose();
+    super.dispose();
+  }
+
+  Future<void> open(Widget page) async {
+    FocusScope.of(context).unfocus();
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => page));
+    if (mounted) await pet.load();
+  }
+
+  void section(ActivitySection value, {String query = '', String? category}) =>
+      open(
+        ActivitySectionPage(
+          section: value,
+          repository: widget.repository,
+          initialQuery: query,
+          initialCategory: category,
+        ),
+      );
+  void openPet() {
+    if (widget.onOpenPet != null) {
+      widget.onOpenPet!();
+    } else {
+      open(
+        !pet.ready
+            ? PetConnectionPage(pet: pet)
+            : pet.adopted
+            ? PetHomePage(pet: pet)
+            : PetAdoptionPage(pet: pet),
+      );
+    }
+  }
+
+  Future<void> calendar() async {
+    final attendance = AttendanceScope.maybeOf(context);
+    if (attendance == null) return;
+    await showAttendanceDialog(context, attendance);
+    if (!mounted) return;
+    if (widget.onAttendanceChanged != null) {
+      await widget.onAttendanceChanged!();
+    } else {
+      await pet.load();
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('활동'),
-      actions: const [PointBadge(), SizedBox(width: 8)],
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        for (final entry in const [
-          (ActivitySection.find, Icons.search, '조건에 맞는 활동과 전체 프로그램'),
-          (ActivitySection.missions, Icons.flag_outlined, '이번 주 3단계 미션과 진행 현황'),
-          (ActivitySection.mine, Icons.event_available, '신청 상태·참여 이력·혜택'),
-          (
-            ActivitySection.experience,
-            Icons.volunteer_activism,
-            '내 경험 관리와 기관 모집 지원',
-          ),
-        ])
-          ActivityMenuLink(
-            title: activitySectionTitle(entry.$1),
-            subtitle: entry.$3,
-            icon: entry.$2,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ActivitySectionPage(
-                  section: entry.$1,
-                  repository: repository,
+    backgroundColor: PetColors.background,
+    body: RefreshIndicator(
+      onRefresh: pet.load,
+      child: ListenableBuilder(
+        listenable: pet,
+        builder: (context, _) => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
+              children: [
+                Text('활동', style: petText(32, weight: FontWeight.w800)),
+                ActivityWalletPill(
+                  balance: AttendanceScope.maybeOf(context)?.status?.balance,
+                  onTap: calendar,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '오늘 할 수 있는 동네 활동을 찾아보세요',
+              style: petText(
+                17,
+                color: PetColors.secondary,
+                weight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 18),
+            ActivityDiscoveryCard(
+              controller: search,
+              onFind: () => section(ActivitySection.find),
+              onSearch: (value) {
+                final query = value.trim();
+                section(
+                  query.isEmpty
+                      ? ActivitySection.find
+                      : ActivitySection.programs,
+                  query: query,
+                );
+              },
+              onCategory: (label) => section(
+                ActivitySection.programs,
+                category: activityQuickCategories[label],
+              ),
+            ),
+            const SizedBox(height: 14),
+            ActivityWeeklyCard(
+              missions: pet.missions,
+              loaded: pet.ready,
+              adopted: pet.adopted,
+              hasError: pet.error != null,
+              onTap: () => open(
+                PetTodayPage(
+                  pet: pet,
+                  missionsOnly: true,
+                  onOpenPet: openPet,
+                  onOpenProgramMissions: () =>
+                      section(ActivitySection.missions),
                 ),
               ),
             ),
-          ),
-      ],
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (c, b) {
+                final single =
+                    b.maxWidth < 330 ||
+                    MediaQuery.textScalerOf(c).scale(1) > 1.4;
+                final mine = ActivityPurposeTile(
+                  title: '나의 활동',
+                  description: '신청 상태·참여 이력\n혜택',
+                  icon: Icons.event_available_outlined,
+                  color: const Color(0xFF298F5C),
+                  tint: const Color(0xFFE5F6EE),
+                  onTap: () => section(ActivitySection.mine),
+                );
+                final experience = ActivityPurposeTile(
+                  title: '경험 나눔',
+                  description: '내 경험 관리와\n기관 모집 지원',
+                  icon: Icons.favorite_rounded,
+                  color: const Color(0xFFE7528E),
+                  tint: const Color(0xFFFCECF4),
+                  onTap: () => section(ActivitySection.experience),
+                );
+                return single
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          mine,
+                          const SizedBox(height: 12),
+                          experience,
+                        ],
+                      )
+                    : IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: mine),
+                            const SizedBox(width: 12),
+                            Expanded(child: experience),
+                          ],
+                        ),
+                      );
+              },
+            ),
+            const SizedBox(height: 14),
+            Material(
+              color: const Color(0xFFEDE8FF),
+              borderRadius: BorderRadius.circular(28),
+              child: InkWell(
+                onTap: openPet,
+                borderRadius: BorderRadius.circular(28),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 56,
+                        height: 62,
+                        child: PetPhoto(
+                          pet: pet,
+                          mood: 'greeting',
+                          outfit: const {},
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '활동하면 콩이도 자라요',
+                              style: petText(19, weight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '참여 확인되면 포인트·성장 경험치 지급',
+                              style: petText(15, color: PetColors.purple),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: PetColors.purple,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -132,8 +335,12 @@ class ActivitySectionPage extends StatefulWidget {
     required this.section,
     this.repository,
     this.place,
+    this.initialQuery = '',
+    this.initialCategory,
   });
   final ActivitySection section;
+  final String initialQuery;
+  final String? initialCategory;
   final ({String name, double lat, double lng})? place;
   final ActivityRepository? repository;
   @override
@@ -143,6 +350,14 @@ class ActivitySectionPage extends StatefulWidget {
 class _ActivitySectionPageState extends State<ActivitySectionPage> {
   late final repo = widget.repository ?? ActivityRepository();
   late Future<ActivityData> future = repo.home();
+  late final keyword = TextEditingController(text: widget.initialQuery);
+  late String? categoryFilter = widget.initialCategory;
+  @override
+  void dispose() {
+    keyword.dispose();
+    super.dispose();
+  }
+
   bool busy = false;
   String historyView = '신청 내역';
 
@@ -209,11 +424,18 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
       const SectionHeader(title: '맞춤 추천 결과'),
       if (activityRows(d['recommendations']).isEmpty)
         const ActivityInfo('현재 조건에 맞는 모집 중 활동이 없어요.'),
-      for (final p in activityRows(d['recommendations'])) program(p),
+      for (final p in filter(activityRows(d['recommendations']))) program(p),
     ],
     const SizedBox(height: 12),
     OutlinedButton(
-      onPressed: () => section(ActivitySection.programs),
+      onPressed: () => open(
+        ActivitySectionPage(
+          section: ActivitySection.programs,
+          repository: repo,
+          initialQuery: keyword.text,
+          initialCategory: categoryFilter,
+        ),
+      ),
       child: const Text('전체 프로그램 탐색'),
     ),
   ];
@@ -340,6 +562,21 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         ),
     ],
     ActivitySection.programs || ActivitySection.recruitment => [
+      TextField(
+        controller: keyword,
+        textInputAction: TextInputAction.search,
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(
+          labelText: '프로그램 검색',
+          hintText: '활동명·기관·장소로 검색',
+          prefixIcon: Icon(Icons.search),
+        ),
+      ),
+      const SizedBox(height: 12),
+      activitySelect<String>('분야', categoryFilter ?? '전체', [
+        '전체',
+        ...activityCategories,
+      ], (v) => setState(() => categoryFilter = v == '전체' ? null : v)),
       Text(
         widget.place == null
             ? '전체 지역의 모집 목록이에요. 장소와 시간을 확인해주세요.'
@@ -351,8 +588,25 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
       for (final p in matchingPrograms(d)) program(p),
     ],
   };
+  List<ActivityData> filter(List<ActivityData> rows) {
+    final q = keyword.text.trim().toLowerCase();
+    return rows.where((p) {
+      if (categoryFilter != null && p['category'] != categoryFilter) {
+        return false;
+      }
+      return q.isEmpty ||
+          [
+            'title',
+            'description',
+            'org_name',
+            'place_name',
+            'category',
+          ].any((key) => '${p[key] ?? ''}'.toLowerCase().contains(q));
+    }).toList();
+  }
+
   List<ActivityData> matchingPrograms(ActivityData d) =>
-      activityRows(d['programs']).where((p) {
+      filter(activityRows(d['programs'])).where((p) {
         final place = widget.place;
         if (place != null) {
           final lat = p['lat'], lng = p['lng'];

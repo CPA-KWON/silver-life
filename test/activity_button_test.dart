@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:silver_life/pet/pet_preview_controller.dart';
 import 'package:silver_life/activity/activity_hub_page.dart';
 import 'package:silver_life/activity/activity_map_page.dart';
 import 'package:silver_life/activity/activity_forms.dart';
@@ -14,7 +15,13 @@ void main() {
     t,
   ) async {
     final r = FakeActivityRepository()..fail = true;
-    await mount(t, ActivityHubPage(repository: r));
+    await mount(
+      t,
+      ActivityHubPage(
+        repository: r,
+        petController: PetPreviewController()..ready = true,
+      ),
+    );
     expect(find.byType(TabBar), findsNothing);
     await tap(t, find.text('맞춤 활동 찾기'));
     expect(find.text('다시 시도'), findsOneWidget);
@@ -307,7 +314,14 @@ void main() {
     await t.binding.setSurfaceSize(const Size(320, 900));
     addTearDown(() => t.binding.setSurfaceSize(null));
     final r = FakeActivityRepository()..pref = {'place_name': '동네'};
-    await mount(t, ActivityHubPage(repository: r), scale: 2);
+    await mount(
+      t,
+      ActivityHubPage(
+        repository: r,
+        petController: PetPreviewController()..ready = true,
+      ),
+      scale: 2,
+    );
     await tap(t, find.text('경험 나눔'));
     expect(t.takeException(), isNull);
     await mount(t, ActivityPreferencesPage(repository: r), scale: 2);

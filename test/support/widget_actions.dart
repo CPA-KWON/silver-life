@@ -45,7 +45,14 @@ Future<void> tap(WidgetTester t, Finder f) async {
     await t.scrollUntilVisible(
       f,
       180,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find
+          .byWidgetPredicate(
+            (w) =>
+                w is Scrollable &&
+                (w.axisDirection == AxisDirection.down ||
+                    w.axisDirection == AxisDirection.up),
+          )
+          .last,
       maxScrolls: 40,
     );
   } else {
