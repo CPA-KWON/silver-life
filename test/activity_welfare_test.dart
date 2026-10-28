@@ -145,7 +145,7 @@ void main() {
       expect(find.text('무료 · 재료비 별도'), findsOneWidget);
       await tap(t, find.text('은빛 요가'));
       expect(find.byType(ActivityWelfareDetailPage), findsOneWidget);
-      expect(find.text('기관에 전화 문의'), findsOneWidget);
+      expect(find.text('접수 문의'), findsOneWidget);
       expect(find.text('신청하기'), findsNothing);
       await visible(t, find.text('시설 위치 지도 보기'));
       expect(r.applyCalls, 0);

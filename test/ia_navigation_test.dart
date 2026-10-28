@@ -110,6 +110,7 @@ void main() {
       expect(find.byType(MainShell), findsOneWidget);
       await t.binding.handlePopRoute();
       await t.pumpAndSettle();
+      await visible(t, find.text('경험 나눔'));
       expect(find.text('경험 나눔'), findsOneWidget);
       expect(find.byType(MainShell), findsOneWidget);
       await finish(t);
@@ -124,10 +125,10 @@ void main() {
       await tap(t, find.text('나의 활동'));
       await tap(t, find.widgetWithText(NavigationDestination, '홈'));
       await tap(t, find.text('내 정보'));
-      await tap(t, find.widgetWithText(OutlinedButton, '로그아웃'));
+      await tap(t, find.text('로그아웃'));
       await tap(t, find.text('취소'));
       expect(Supabase.instance.client.auth.currentUser, isNotNull);
-      await tap(t, find.widgetWithText(OutlinedButton, '로그아웃'));
+      await tap(t, find.text('로그아웃'));
       await tap(t, find.widgetWithText(TextButton, '로그아웃'));
       expect(Supabase.instance.client.auth.currentUser, isNull);
       expect(find.byType(MainShell), findsNothing);
@@ -192,16 +193,21 @@ void main() {
       r.manager = true;
       await mount(t, ProfilePage(activityRepository: r));
       await tap(t, find.text('기관 관리'));
-      for (final label in ['운영 현황', '프로그램 관리', '신청자 관리', '경험 나눔 관리', '운영 성과']) {
-        await tap(t, find.text(label));
+      for (final (entry, label) in [
+        ('프로그램', '프로그램 관리'),
+        ('신청자', '신청자 관리'),
+        ('경험 나눔', '경험 나눔 관리'),
+        ('운영 성과', '운영 성과'),
+      ]) {
+        await tap(t, find.text(entry));
         expect(find.text(label), findsOneWidget);
         expect(t.takeException(), isNull);
         await tap(t, find.byTooltip('뒤로'));
       }
-      await tap(t, find.text('경험 나눔 관리'));
+      await tap(t, find.text('경험 나눔'));
       await tap(t, find.text('경험 나눔 모집 관리'));
       await tap(t, find.text('경험 나눔 모집 등록'));
-      expect(find.text('경험 나눔 도우미 모집'), findsOneWidget);
+      expect(find.text('경험 나눔 모집 등록'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, '참여비 (원)'), findsNothing);
       await finish(t);
     },
@@ -225,6 +231,7 @@ void main() {
         ),
       );
       expect(find.text('가벼운 산책'), findsOneWidget);
+      await visible(t, find.text('산책 경험 나눔'));
       expect(find.text('산책 경험 나눔'), findsOneWidget);
       expect(find.text('다른 시설 활동'), findsNothing);
       await finish(t);

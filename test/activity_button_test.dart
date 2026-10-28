@@ -26,9 +26,10 @@ Future<void> writeExperience(WidgetTester t) async {
 }
 
 Future<void> rejectReason(WidgetTester t) async {
-  await tap(t, find.text('신청 반려'));
+  await tap(t, find.text('가벼운 산책'));
+  await tap(t, find.widgetWithText(FilledButton, '반려'));
   await t.enterText(find.byType(TextField).last, '정원이 모두 찼어요');
-  await tap(t, find.text('다음'));
+  await tap(t, find.widgetWithText(FilledButton, '반려하기'));
 }
 
 void main() {
@@ -266,11 +267,13 @@ void main() {
       await rejectReason(t);
       await tap(t, find.text('취소'));
       expect(r.manageCalls, 0);
-      await tap(t, find.text('신청 승인'));
-      await tap(t, find.text('확인'));
+      await tap(t, find.widgetWithText(FilledButton, '승인하기'));
+      await tap(t, find.widgetWithText(FilledButton, '승인하기'));
       expect(r.lastAction, 'approved');
+      await tap(t, find.text('참여 예정'));
+      await tap(t, find.text('가벼운 산책'));
       await tap(t, find.text('실제 활동 완료 확인'));
-      await tap(t, find.text('확인'));
+      await tap(t, find.widgetWithText(FilledButton, '참여 완료 확인'));
       expect(r.lastAction, 'completed');
       await mount(
         t,
@@ -280,8 +283,8 @@ void main() {
           repository: r,
         ),
       );
-      await tap(t, find.text('가벼운 산책 모집 마감'));
-      await tap(t, find.text('확인'));
+      await tap(t, find.text('모집 마감'));
+      await tap(t, find.widgetWithText(FilledButton, '모집 마감'));
       expect(r.closeCalls, 1);
       await finish(t);
     },
@@ -309,14 +312,14 @@ void main() {
       );
       await fill(t, '프로그램 이름', '새 프로그램');
       await fill(t, '활동 안내', '동네 활동 안내');
-      await fill(t, '참여 대상 (선택)', '만 60세 이상');
-      await fill(t, '준비물 (선택)', '신분증');
-      await fill(t, '층별 안내 (선택)', '1층 → 엘리베이터 → 2층 강당');
+      await fill(t, '대상', '만 60세 이상');
+      await fill(t, '준비물', '신분증');
+      await fill(t, '층별 안내', '1층 → 엘리베이터 → 2층 강당');
       await tap(t, find.text('활동 장소 선택'));
       for (final title in ['활동 시작', '활동 종료', '모집 마감']) {
         await tap(t, find.textContaining(title));
       }
-      await tap(t, find.text('저장'));
+      await tap(t, find.text('등록하기'));
       expect(r.saveCalls, 1);
       expect(r.programs.last['place_name'], '테스트 복지관');
       expect(r.programs.last['preparations'], '신분증');
@@ -332,7 +335,9 @@ void main() {
       ),
     );
     expect(
-      t.widget<FilledButton>(find.widgetWithText(FilledButton, '저장')).onPressed,
+      t
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '등록하기'))
+          .onPressed,
       isNull,
     );
     await finish(t);
@@ -384,7 +389,7 @@ void main() {
       ),
     );
     await rejectReason(t);
-    await tap(t, find.text('확인'));
+    await tap(t, find.widgetWithText(FilledButton, '반려하기'));
     expect(r.lastAction, 'rejected');
     expect(r.applications.single['rejection_reason'], '정원이 모두 찼어요');
     expect(r.benefit, false);

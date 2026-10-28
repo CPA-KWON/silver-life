@@ -740,6 +740,15 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         )
         .toList();
     return [
+      if (!supportOnly) ...[
+        ActivityButton(
+          '관심 프로그램',
+          light: true,
+          icon: Icons.favorite_border,
+          onTap: () => open(SavedProgramsPage(repository: repo)),
+        ),
+        const SizedBox(height: 12),
+      ],
       _tabs(
         supportOnly ? ['진행 중', '완료', '전체'] : ['신청 내역', '참여 이력', '혜택'],
         supportOnly ? supportView : historyView,
@@ -1364,7 +1373,7 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
             methodFilter == '전화·방문' && !isExternal) {
           return false;
         }
-        final isFree = isExternal
+        final isFree = p['source'] == 'welfare'
             ? ((p['raw_program'] as Map?)?['is_free'] == true)
             : p['fee'] == 0;
         if (freeOnly && !isFree) return false;

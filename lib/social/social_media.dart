@@ -11,17 +11,51 @@ class SocialMedia {
     maxHeight: 1600,
     imageQuality: 85,
   );
+  static Future<List<XFile>> chooseMany({
+    required int limit,
+    bool camera = false,
+  }) async {
+    if (camera) {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+        requestFullMetadata: false,
+      );
+      return file == null ? [] : [file];
+    }
+    return ImagePicker().pickMultiImage(
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 85,
+      limit: limit,
+      requestFullMetadata: false,
+    );
+  }
+
   static Future<String> upload(XFile image, {String folder = 'posts'}) async {
     final c = Supabase.instance.client, bytes = await image.readAsBytes();
     if (bytes.length > 10 * 1024 * 1024) {
       throw StateError('사진은 10MB 이하로 골라 주세요.');
     }
-    final mime =
-        image.mimeType ??
-        (image.path.toLowerCase().endsWith('.png')
-            ? 'image/png'
-            : 'image/jpeg');
-    if (!['image/jpeg', 'image/png', 'image/webp'].contains(mime)) {
+    final String mime;
+    if (bytes.length >= 8 &&
+        bytes[0] == 137 &&
+        bytes[1] == 80 &&
+        bytes[2] == 78 &&
+        bytes[3] == 71) {
+      mime = 'image/png';
+    } else if (bytes.length >= 3 &&
+        bytes[0] == 255 &&
+        bytes[1] == 216 &&
+        bytes[2] == 255) {
+      mime = 'image/jpeg';
+    } else if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.take(4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.skip(8).take(4)) == 'WEBP') {
+      mime = 'image/webp';
+    } else {
       throw StateError('JPG·PNG·WebP 사진을 골라 주세요.');
     }
     final path =

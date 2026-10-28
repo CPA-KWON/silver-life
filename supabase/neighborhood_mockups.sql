@@ -153,12 +153,13 @@ language plpgsql security definer set search_path='' as $$
 declare uid uuid:=auth.uid(); result uuid:=(data->>'id')::uuid;old public.activity_programs; n integer;is_draft boolean:=coalesce((data->>'draft')::boolean,false);method text:=coalesce(data->>'application_method','app'); draft_key uuid:=(data->>'draft_id')::uuid;
 begin
  if uid is null or not public.activity_is_member((data->>'org_id')::uuid) then raise exception '기관 담당자 권한이 필요해요' using errcode='42501';end if;
- if draft_key is not null and not exists(select 1 from public.activity_program_drafts d where d.id=draft_key and d.org_id=(data->>'org_id')::uuid) then raise exception '임시 저장 수정 권한이 없어요' using errcode='42501';end if;
+ if draft_key is not null and not exists(select 1 from public.activity_program_drafts d where d.id=draft_key and d.org_id=($1->>'org_id')::uuid) then raise exception '임시 저장 수정 권한이 없어요' using errcode='42501';end if;
  if is_draft and result is null then
-  if draft_key is null then insert into public.activity_program_drafts(org_id,data) values((data->>'org_id')::uuid,data-'draft_id') returning id into result;
+  if draft_key is null then insert into public.activity_program_drafts(org_id,data) values(($1->>'org_id')::uuid,$1-'draft_id') returning id into result;
   else update public.activity_program_drafts set data=$1-'draft_id',updated_at=now() where id=draft_key returning id into result;end if;
   return result;
  end if;
+ if greatest(char_length(coalesce(data->>'target_audience','')),char_length(coalesce(data->>'preparations','')),char_length(coalesce(data->>'floor_guide','')))>2000 then raise exception '안내는 항목당 2000자까지 적어 주세요.';end if;
  if method not in('app','phone','visit') then raise exception '신청 방법을 확인해 주세요';end if;
  if method='phone' and coalesce(data->>'contact_phone','') !~ '^[+0-9() -]{7,30}$' then raise exception '연락처를 확인해 주세요';end if;
  if char_length(btrim(coalesce(data->>'title',''))) not between 1 and 100 then raise exception '프로그램 이름을 써 주세요';end if;

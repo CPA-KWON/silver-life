@@ -171,7 +171,7 @@ class ActivityRepository {
       await client.from('activity_program_favorites').upsert({
         'user_id': userId,
         'program_id': id,
-      });
+      }, ignoreDuplicates: true);
     } else {
       await client
           .from('activity_program_favorites')

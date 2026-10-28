@@ -78,8 +78,9 @@ class _MeetupPlaceSheetState extends State<_MeetupPlaceSheet> {
                     if (s.hasError) {
                       return _Message(
                         '즐겨찾는 시설을 불러오지 못했어요. 다시 시도해 주세요.',
-                        onRetry: () =>
-                            setState(() => _future = loadFavoriteFacilities()),
+                        onRetry: () => setState(() {
+                          _future = loadFavoriteFacilities();
+                        }),
                       );
                     }
                     final items = s.data!;

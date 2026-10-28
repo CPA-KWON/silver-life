@@ -65,7 +65,7 @@ void main() {
         'enrollment': 'enrollment',
         'action': 'completed',
       });
-      expect(body('activity_save_program'), {
+      expect(body('activity_save_program_v3'), {
         'data': {'title': '프로그램'},
       });
       expect(body('activity_close_program'), {'target_program': 'program'});

@@ -8,10 +8,14 @@ class SocialFormCard extends StatelessWidget {
     super.key,
     required this.child,
     this.required = false,
+    this.step,
+    this.color = PetColors.purple,
   });
   final String label;
   final Widget child;
   final bool required;
+  final int? step;
+  final Color color;
   @override
   Widget build(BuildContext c) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
@@ -19,7 +23,33 @@ class SocialFormCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('$label${required ? ' · 필수' : ''}', style: petText(17)),
+          Row(
+            children: [
+              if (step != null) ...[
+                CircleAvatar(
+                  radius: 13,
+                  backgroundColor: color,
+                  child: Text('$step', style: petText(13, color: Colors.white)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    text: label,
+                    children: [
+                      if (required)
+                        TextSpan(
+                          text: ' · 필수',
+                          style: petText(12, color: Colors.redAccent),
+                        ),
+                    ],
+                  ),
+                  style: petText(17),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
           child,
         ],

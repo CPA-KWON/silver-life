@@ -87,6 +87,16 @@ class _AgencyState extends State<ActivityAgencyPage> {
       final r = await agencyRejectReason(context);
       if (r == null) return;
       reason = r;
+      if (!mounted ||
+          !await activityDialog(
+            context,
+            title: '신청을 반려할까요?',
+            message: '신청자에게 아래 사유가 표시돼요.',
+            action: '반려하기',
+            rows: [('반려 사유', reason)],
+          )) {
+        return;
+      }
     } else if (!await activityDialog(
       context,
       title: action == 'approved'
@@ -126,7 +136,8 @@ class _AgencyState extends State<ActivityAgencyPage> {
     }
   }
 
-  Widget shortcut(String text, IconData icon, VoidCallback action) => Expanded(
+  Widget shortcut(String text, IconData icon, VoidCallback action) => SizedBox(
+    width: (MediaQuery.sizeOf(context).width - 84) / 3,
     child: InkWell(
       onTap: action,
       child: Padding(
@@ -135,7 +146,7 @@ class _AgencyState extends State<ActivityAgencyPage> {
           children: [
             Icon(icon, color: PetColors.blue, size: 28),
             const SizedBox(height: 7),
-            Text(text, style: petText(13)),
+            Text(text, style: petText(16), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -195,7 +206,9 @@ class _AgencyState extends State<ActivityAgencyPage> {
       ),
       const NeighborhoodHeading('바로 가기'),
       ActivityCard(
-        child: Row(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 12,
           children: [
             shortcut(
               '프로그램',
@@ -206,6 +219,11 @@ class _AgencyState extends State<ActivityAgencyPage> {
               '신청자',
               Icons.people_outline,
               () => go(AgencySection.applications),
+            ),
+            shortcut(
+              '경험 나눔',
+              Icons.favorite_outline,
+              () => go(AgencySection.experience),
             ),
             shortcut(
               '공지',
@@ -360,7 +378,13 @@ class _AgencyState extends State<ActivityAgencyPage> {
         ),
       if (ps.isEmpty && activityRows(d['drafts']).isEmpty)
         const ActivityEmpty('등록한 프로그램이 없어요'),
-      ActivityButton('새 프로그램 등록', icon: Icons.add, onTap: () => edit()),
+      ActivityButton(
+        widget.section == AgencySection.experiencePrograms
+            ? '경험 나눔 모집 등록'
+            : '새 프로그램 등록',
+        icon: Icons.add,
+        onTap: () => edit(),
+      ),
     ];
   }
 
@@ -671,12 +695,18 @@ Future<String?> agencyRejectReason(BuildContext c) {
               TextField(
                 decoration: const InputDecoration(labelText: '직접 적기'),
                 maxLength: 1000,
-                onChanged: (v) => selected = v,
+                onChanged: (v) => set(() => selected = v),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(c),
+                child: const Text('취소'),
               ),
               ActivityButton(
                 '반려하기',
                 color: Colors.red,
-                onTap: () => Navigator.pop(c, selected.trim()),
+                onTap: selected.trim().length < 5
+                    ? null
+                    : () => Navigator.pop(c, selected.trim()),
               ),
             ],
           ),
@@ -705,6 +735,16 @@ class _ApplicantState extends State<AgencyApplicantPage> {
     if (action == 'rejected') {
       reason = await agencyRejectReason(context);
       if (reason == null) return;
+      if (!mounted ||
+          !await activityDialog(
+            context,
+            title: '신청을 반려할까요?',
+            message: '신청자에게 아래 사유가 표시돼요.',
+            action: '반려하기',
+            rows: [('반려 사유', reason)],
+          )) {
+        return;
+      }
     } else if (!await activityDialog(
       context,
       title: action == 'approved' ? '신청을 승인할까요?' : '실제 참여 완료를 확인할까요?',

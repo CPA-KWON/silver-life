@@ -248,6 +248,9 @@ class FakeBackend {
       facilities.add({'id': id, ...data});
       return response(id);
     }
+    if (request.url.path.contains('/storage/v1/object/list/')) {
+      return response([]);
+    }
     if (name == 'institution_notice_feed') return response([]);
     if (name == 'email_exists') return response(false);
     if ((name == 'profiles' && failProfile) ||

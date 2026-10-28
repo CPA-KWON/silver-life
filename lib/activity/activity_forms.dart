@@ -319,7 +319,11 @@ class _ProgramFormState extends State<ActivityProgramForm> {
 
   @override
   Widget build(BuildContext c) => NeighborhoodScreen(
-    title: widget.existing == null ? '프로그램 등록' : '프로그램 수정',
+    title: kind == 'experience'
+        ? (widget.existing == null ? '경험 나눔 모집 등록' : '경험 나눔 모집 수정')
+        : widget.existing == null
+        ? '프로그램 등록'
+        : '프로그램 수정',
     tint: const Color(0xFFDDE6F3),
     bottom: Row(
       children: [
@@ -418,7 +422,13 @@ class _ProgramFormState extends State<ActivityProgramForm> {
                           decoration: const InputDecoration(labelText: '대상'),
                         ),
                         const SizedBox(height: 10),
-                        activityInput(fee, '참여비 (원)', number: true),
+                        if (kind != 'experience')
+                          activityInput(fee, '참여비 (원)', number: true)
+                        else
+                          Text(
+                            '경험 나눔은 무료로 참여해요.',
+                            style: petText(17, color: PetColors.green),
+                          ),
                         TextField(
                           controller: preparations,
                           decoration: const InputDecoration(labelText: '준비물'),

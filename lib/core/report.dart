@@ -44,6 +44,10 @@ Future<void> showReportFlow(
                     label: Text(r),
                   ),
                 ),
+              TextButton(
+                onPressed: () => Navigator.pop(c),
+                child: const Text('취소'),
+              ),
               ActivityButton(
                 '신고하기',
                 color: Colors.red,

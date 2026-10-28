@@ -189,11 +189,12 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
         'duration_minutes': _duration,
       };
       if (_isEditing) {
-        await client
+        final updated = await client
             .from('posts')
             .update(data)
             .eq('id', widget.existingPost!['id'] as String)
             .select('id');
+        if (updated.isEmpty) throw StateError('모임 수정 권한이 없어요.');
       } else {
         await client.from('posts').insert({...data, 'author_id': userId});
       }
@@ -311,6 +312,20 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
                       onSelected: (_) => setState(() => _capacity = n),
                     ),
                 ],
+              ),
+            ),
+            SocialFormCard(
+              '다른 인원 고르기',
+              child: DropdownButtonFormField<int>(
+                initialValue: _capacity,
+                decoration: const InputDecoration(labelText: '최대 인원'),
+                items: [
+                  for (var n = 2; n <= 30; n++)
+                    DropdownMenuItem(value: n, child: Text('$n명')),
+                ],
+                onChanged: _isSaving
+                    ? null
+                    : (v) => setState(() => _capacity = v!),
               ),
             ),
             SocialFormCard(

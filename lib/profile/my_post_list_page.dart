@@ -48,7 +48,9 @@ class _MyPostsState extends State<MyPostListPage> {
     return rows;
   }
 
-  void refresh() => setState(() => data = load());
+  void refresh() => setState(() {
+    data = load();
+  });
   Future<void> open(Widget p) async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => p));
     if (mounted) refresh();

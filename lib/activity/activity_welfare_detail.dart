@@ -51,7 +51,7 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
         await c.from('welfare_program_favorites').upsert({
           'user_id': u,
           'program_key': key,
-        });
+        }, ignoreDuplicates: true);
       }
       if (mounted) setState(() => favorite = favorite != true);
     } catch (_) {
@@ -116,7 +116,7 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
           Expanded(
             flex: 2,
             child: ActivityButton(
-              visit ? '문의' : '전화 문의',
+              visit ? '접수 문의' : '전화로 신청 문의',
               icon: Icons.phone_outlined,
               color: PetColors.green,
               onTap: phone.isEmpty ? null : () => callFacility(c, phone),
@@ -158,7 +158,7 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '앱에서는 바로 신청되지 않아요.',
+                  '참여 조건을 확인하고 기관에 접수해 주세요.',
                   style: petText(15, color: PetColors.secondary),
                 ),
                 const SizedBox(height: 14),
@@ -265,7 +265,7 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
           ],
           const SizedBox(height: 16),
           Text(
-            '전화·방문 신청은 앱 신청 내역·참여 보상에 자동 반영되지 않아요.',
+            '전화·방문으로 접수한 내역은 기관에서 확인해 주세요. 앱 신청 내역에는 표시되지 않아요.',
             style: petText(14, color: PetColors.secondary),
           ),
         ],

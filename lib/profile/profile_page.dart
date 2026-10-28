@@ -8,6 +8,8 @@ import '../activity/activity_agency_page.dart';
 import '../attendance/attendance_controller.dart';
 import '../facility/nearby_facilities_page.dart';
 import 'account_settings_page.dart';
+import 'institution_access_page.dart';
+import '../activity/saved_programs_page.dart';
 import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
 import 'extra_settings_pages.dart';
@@ -25,6 +27,22 @@ class _ProfileState extends State<ProfilePage> {
   late Future<Map<String, dynamic>> data = load();
   late Future<ActivityData> agency =
       (widget.activityRepository ?? ActivityRepository()).home();
+  late Future<Map<String, dynamic>?> access = loadAccess();
+  Future<Map<String, dynamic>?> loadAccess() async {
+    try {
+      final c = Supabase.instance.client;
+      return await c
+          .from('institution_access_requests')
+          .select('status')
+          .eq('user_id', c.auth.currentUser!.id)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> load() async {
     final c = Supabase.instance.client,
         u = c.auth.currentUser!.id,
@@ -56,7 +74,11 @@ class _ProfileState extends State<ProfilePage> {
     if (mounted &&
         uid != null &&
         Supabase.instance.client.auth.currentUser?.id == uid) {
-      setState(() => data = load());
+      setState(() {
+        data = load();
+        access = loadAccess();
+        agency = (widget.activityRepository ?? ActivityRepository()).home();
+      });
     }
   }
 
@@ -95,7 +117,9 @@ class _ProfileState extends State<ProfilePage> {
           ? ActivityEmpty(
               '내 정보를 불러오지 못했어요',
               action: '다시 시도',
-              onAction: () => setState(() => data = load()),
+              onAction: () => setState(() {
+                data = load();
+              }),
             )
           : ListView(
               padding: const EdgeInsets.all(16),
@@ -215,6 +239,16 @@ class _ProfileState extends State<ProfilePage> {
                         color: PetColors.green,
                       ),
                       item(
+                        Icons.favorite_border,
+                        '관심 프로그램',
+                        () => open(
+                          SavedProgramsPage(
+                            repository: widget.activityRepository,
+                          ),
+                        ),
+                        color: PetColors.pink,
+                      ),
+                      item(
                         Icons.star_outline,
                         '즐겨찾는 시설',
                         () => open(const FavoriteFacilitiesPage()),
@@ -255,18 +289,38 @@ class _ProfileState extends State<ProfilePage> {
                   builder: (c, a) {
                     if (a.hasError) {
                       return TextButton(
-                        onPressed: () => setState(
-                          () => agency =
+                        onPressed: () => setState(() {
+                          agency =
                               (widget.activityRepository ??
                                       ActivityRepository())
-                                  .home(),
-                        ),
+                                  .home();
+                        }),
                         child: const Text('기관 권한 확인 다시 시도'),
                       );
                     }
                     final org = activityRows(a.data?['organizations']);
                     return org.isEmpty
-                        ? const SizedBox()
+                        ? FutureBuilder<Map<String, dynamic>?>(
+                            future: access,
+                            builder: (c, r) {
+                              final status = r.data?['status'];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 18),
+                                child: ActivityCard(
+                                  child: item(
+                                    Icons.business_outlined,
+                                    status == 'pending'
+                                        ? '기관 인증 심사 중'
+                                        : status == 'rejected'
+                                        ? '기관 인증 반려 · 확인'
+                                        : '기관 담당자 인증',
+                                    () => open(const InstitutionAccessPage()),
+                                    subtitle: '기관 등록·인증 심사 상태 확인',
+                                  ),
+                                ),
+                              );
+                            },
+                          )
                         : Column(
                             children: [
                               const NeighborhoodHeading('기관 담당자'),

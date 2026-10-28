@@ -16,6 +16,7 @@ import 'activity_repository.dart';
 import 'activity_forms.dart';
 import 'activity_detail_page.dart';
 import 'activity_design.dart';
+import 'saved_programs_page.dart';
 import 'activity_program_card.dart';
 import 'activity_welfare_catalog.dart';
 import 'activity_welfare_detail.dart';
@@ -169,6 +170,15 @@ class _ActivityHubState extends State<ActivityHubPage> {
               onCategory: (label) => section(
                 ActivitySection.programs,
                 category: activityQuickCategories[label],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: ActivityButton(
+                '전체 프로그램 보기',
+                light: true,
+                icon: Icons.apps_outlined,
+                onTap: () => section(ActivitySection.programs),
               ),
             ),
             const SizedBox(height: 14),

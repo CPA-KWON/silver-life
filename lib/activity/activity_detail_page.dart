@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../pet/pet_design.dart';
+import '../core/phone_call.dart';
 import 'activity_design.dart';
 import 'activity_repository.dart';
 import 'activity_map_page.dart';
@@ -221,6 +222,38 @@ class _DetailState extends State<ActivityDetailPage> {
       ),
     ),
   );
+  Future<void> externalApplication(ActivityData p) async {
+    final phone = '${p['contact_phone'] ?? ''}'.trim();
+    if (p['application_method'] == 'phone' && phone.isNotEmpty) {
+      await callFacility(context, phone);
+      return;
+    }
+    final map = await activityDialog(
+      context,
+      title: p['application_method']=='phone'?'전화 신청 안내':'방문 신청 안내',
+      message: p['application_method']=='phone'?'연락처가 아직 등록되지 않았어요. 기관 공식 안내에서 접수 연락처를 확인해 주세요.':'아래 내용을 확인하고 기관에서 접수해 주세요. 접수 여부는 기관에서 확인할 수 있어요.',
+      action: '위치 확인하기',
+      secondary: '닫기',
+      icon: Icons.location_on_outlined,
+      rows: [
+        ('장소', '${p['place_name'] ?? '기관 확인 필요'}'),
+        ('대상', '${p['target_audience'] ?? '기관 문의'}'),
+        ('준비물', '${p['preparations'] ?? '기관 문의'}'),
+        if (phone.isNotEmpty) ('문의', phone),
+      ],
+    );
+    if (map && mounted) {
+      await Navigator.push(
+        context,
+        PageRouteBuilder(
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          pageBuilder: (_, a, b) => ActivityMapPage(program: p),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<ActivityData>(
     future: future,
@@ -228,6 +261,7 @@ class _DetailState extends State<ActivityDetailPage> {
       final p = s.data?['program'] == null
           ? <String, dynamic>{}
           : Map<String, dynamic>.from(s.data!['program']);
+      final external = ['phone', 'visit'].contains(p['application_method']);
       final isSupport = p['kind'] == 'experience',
           e = s.data?['application'] as Map?;
       final applied =
@@ -271,6 +305,16 @@ class _DetailState extends State<ActivityDetailPage> {
               ? null
               : busy
               ? const ActivityButton('처리 중…', onTap: null)
+              : external
+              ? ActivityButton(
+                  closed
+                      ? '모집이 마감됐어요'
+                      : p['application_method'] == 'phone' &&
+                            '${p['contact_phone'] ?? ''}'.trim().isNotEmpty
+                      ? '전화로 신청 문의'
+                      : p['application_method']=='phone'?'신청 안내 확인':'방문 신청 안내',
+                  onTap: closed ? null : () => externalApplication(p),
+                )
               : applied
               ? Row(
                   children: [
@@ -393,6 +437,37 @@ class _DetailState extends State<ActivityDetailPage> {
                           ],
                         ),
                       ),
+                      if (external) ...[
+                        const ActivityHeading('참여 신청 안내'),
+                        ActivityCard(
+                          color: const Color(0xFFFFF2DC),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                p['application_method'] == 'phone'
+                                    ? '전화로 접수하는 프로그램이에요'
+                                    : '기관에 방문해 접수하는 프로그램이에요',
+                                style: petText(21),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '참여 조건과 준비물을 확인한 뒤 기관에 신청해 주세요.',
+                                style: petText(17, color: PetColors.secondary),
+                              ),
+                              if ('${p['contact_phone'] ?? ''}'
+                                  .trim()
+                                  .isNotEmpty)
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      callFacility(context, p['contact_phone']),
+                                  icon: const Icon(Icons.phone_outlined),
+                                  label: Text('${p['contact_phone']}'),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                       ActivityHeading(isSupport ? '모집 정보' : '한눈에 보기'),
                       ActivityCard(
                         child: Column(
@@ -419,8 +494,8 @@ class _DetailState extends State<ActivityDetailPage> {
                                             ActivityMapPage.hasCoordinates(p)
                                             ? () => Navigator.push(
                                                 context,
-                                                MaterialPageRoute<void>(
-                                                  builder: (_) =>
+                                                PageRouteBuilder<void>(transitionDuration:Duration.zero,reverseTransitionDuration:Duration.zero,
+                                                  pageBuilder: (_,a,b) =>
                                                       ActivityMapPage(
                                                         program: p,
                                                         mapPlaceholder: widget

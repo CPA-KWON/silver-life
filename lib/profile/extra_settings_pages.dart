@@ -188,7 +188,7 @@ class _DeleteState extends State<DeleteAccountPage> {
           email = c.auth.currentUser!.email!;
       await c.auth.signInWithPassword(email: email, password: password.text);
       try {
-        for (final folder in ['posts', 'avatars']) {
+        for (final folder in ['posts', 'avatars', 'org-proofs']) {
           while (true) {
             final objects = await c.storage
                 .from(SocialMedia.bucket)

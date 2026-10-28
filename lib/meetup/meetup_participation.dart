@@ -81,9 +81,7 @@ class _MeetupParticipationCardState extends State<MeetupParticipationCard> {
       'meetup_participation',
       params: {'p_post': widget.postId},
     );
-    return MeetupParticipation.fromJson(
-      Map<String, dynamic>.from(data as Map),
-    );
+    return MeetupParticipation.fromJson(Map<String, dynamic>.from(data as Map));
   }
 
   Future<void> _join() => _run('meetup_join', '모임에 참여했어요.');
@@ -123,9 +121,7 @@ class _MeetupParticipationCardState extends State<MeetupParticipationCard> {
       );
     } on PostgrestException catch (e) {
       // DB 함수가 이유를 쉬운 한국어로 알려준다(모집 마감, 지난 모임 등).
-      message = e.code == 'P0001'
-          ? e.message
-          : '처리하지 못했어요. 다시 시도해 주세요.';
+      message = e.code == 'P0001' ? e.message : '처리하지 못했어요. 다시 시도해 주세요.';
     } catch (_) {
       message = '처리하지 못했어요. 다시 시도해 주세요.';
     }
@@ -159,7 +155,9 @@ class _MeetupParticipationCardState extends State<MeetupParticipationCard> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
-                        onPressed: () => setState(() => _future = _load()),
+                        onPressed: () => setState(() {
+                          _future = _load();
+                        }),
                         child: const Text('다시 불러오기'),
                       ),
                     ],
@@ -256,7 +254,9 @@ class _ParticipantChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 18,
           fontWeight: participant.isHost ? FontWeight.w700 : FontWeight.w500,
-          color: participant.isHost ? AppColors.blueText : AppColors.textPrimary,
+          color: participant.isHost
+              ? AppColors.blueText
+              : AppColors.textPrimary,
         ),
       ),
     );

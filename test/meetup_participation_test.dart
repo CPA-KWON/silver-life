@@ -64,6 +64,24 @@ void main() {
     await finish(t);
   });
 
+  testWidgets('a member can cancel even when their joined meetup is full', (
+    t,
+  ) async {
+    backend.posts.add(othersMeetup());
+    backend.meetupJoined.add('meetup');
+    backend.meetupOthers = 8;
+    await mount(t, const PostDetailPage(postId: 'meetup'));
+    expect(
+      t
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '참여 취소'))
+          .onPressed,
+      isNotNull,
+    );
+    await tap(t, find.widgetWithText(FilledButton, '참여 취소'));
+    await tap(t, find.widgetWithText(FilledButton, '참여 취소하기'));
+    expect(backend.meetupJoined, isEmpty);
+    await finish(t);
+  });
   testWidgets('past meetup cannot be joined', (t) async {
     backend.posts.add(othersMeetup(past: true));
     await mount(t, const PostDetailPage(postId: 'meetup'));

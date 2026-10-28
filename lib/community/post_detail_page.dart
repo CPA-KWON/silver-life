@@ -11,7 +11,7 @@ import '../activity/activity_map_page.dart';
 import '../meetup/new_meetup_page.dart';
 import '../social/neighborhood_feed.dart';
 import '../social/neighborhood_repository.dart';
-import '../social/social_media.dart';
+import '../social/photo_widgets.dart';
 import 'new_post_page.dart';
 
 class PostDetailPage extends StatefulWidget {
@@ -291,24 +291,26 @@ class _PostState extends State<PostDetailPage> {
     focus.requestFocus();
   }
 
-  Widget image(String path) => FutureBuilder<String>(
-    future: SocialMedia.url(path),
-    builder: (c, s) => s.hasData
-        ? Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.network(
-                s.data!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Text('사진을 불러오지 못했어요'),
-              ),
-            ),
-          )
-        : const Padding(
-            padding: EdgeInsets.all(16),
-            child: Icon(Icons.image_outlined),
+  Widget image(String path, List<String> paths) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PhotoViewer(
+            photos: [for (final p in paths) (file: null, path: p)],
+            initialIndex: paths.indexOf(path),
           ),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: SocialPhoto(path: path),
+        ),
+      ),
+    ),
   );
   @override
   Widget build(BuildContext c) => FutureBuilder<SocialData>(
@@ -361,14 +363,18 @@ class _PostState extends State<PostDetailPage> {
                           child: ActivityButton(
                             ended || started
                                 ? '지난 모임'
-                                : full
-                                ? '모집 마감'
                                 : own
                                 ? '모임 수정'
                                 : p['joined'] == true
                                 ? '참여 취소'
+                                : full
+                                ? '모집 마감'
                                 : '참여하기',
-                            onTap: ended || started || full || busy
+                            onTap:
+                                ended ||
+                                    started ||
+                                    busy ||
+                                    (full && !own && p['joined'] != true)
                                 ? null
                                 : own
                                 ? () => menu(p)
@@ -624,7 +630,10 @@ class _PostState extends State<PostDetailPage> {
                             style: petText(18, weight: FontWeight.w500),
                           ),
                           for (final path in p['image_paths'] as List? ?? [])
-                            image('$path'),
+                            image(
+                              '$path',
+                              List<String>.from(p['image_paths'] ?? []),
+                            ),
                           const SizedBox(height: 18),
                           Wrap(
                             spacing: 10,
@@ -667,7 +676,9 @@ class _PostState extends State<PostDetailPage> {
                             '댓글을 불러오지 못했어요',
                             action: '다시 시도',
                             onAction: () {
-                              setState(() => replies = loadReplies());
+                              setState(() {
+                                replies = loadReplies();
+                              });
                             },
                           )
                         : r.connectionState != ConnectionState.done
