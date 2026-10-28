@@ -188,7 +188,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   iconColor: AppColors.blueText,
                   badgeColor: AppColors.blueTint,
                   title: '회원정보 관리',
-                  subtitle: '닉네임, 거주 지역 수정 및 로그아웃',
+                  subtitle: '닉네임·지역 수정, 회원 탈퇴',
                   onTap: () async {
                     final userId =
                         Supabase.instance.client.auth.currentUser?.id;

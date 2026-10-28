@@ -141,6 +141,7 @@ lib/ 밖의 중요한 파일
 | `point_ledger` | 포인트 변동 내역 | id, user_id, amount, reason(현재 attendance만), ref_date — 나중에 다른 보상·사용을 reason으로 확장 |
 
 - `posts.category` 값은 `자유게시판`, `건강정보`, `나눔·도움요청`, `동네모임` 4가지만 허용됩니다(DB에서 막음).
+- 회원 탈퇴는 `delete_my_account()`(`supabase/account_deletion.sql`)가 `auth.users`의 본인 줄만 지우고, 나머지 표는 on delete cascade로 같이 지워진다. 예외로 `institution_notices.created_by`는 on delete set null(공지는 남고 작성자만 비움). **새 표에 사용자 칸을 만들 땐 반드시 `on delete cascade`(또는 set null)를 붙일 것** — 안 붙이면 탈퇴가 막힌다.
 - 동네모임은 별도 테이블이 아니라 `posts`에 `category = '동네모임'`으로 저장되고, `event_at`(모임 일시)과 `facility_id`(모임 장소)를 씁니다. 모임은 장소가 반드시 있어야 합니다(DB 규칙 `meetup_requires_facility`).
 - 커뮤니티 글은 **글쓴이의 사는 지역**(`profiles.region_*`)으로, 모임은 **모임 장소의 지역**(`facilities.region_*`)으로 걸러서 보여줍니다.
 - 신고 3건 이상인 글·댓글은 DB 읽기 권한(RLS)에서 숨겨집니다(글쓴이 본인에게만 보임). 팀은 대시보드 Table Editor의 `report_summary`(신고 모아보기)에서 확인합니다.
@@ -169,6 +170,7 @@ lib/ 밖의 중요한 파일
 - 동네모임 만들기·수정, 시설을 모임 장소로 지정, 예정/지난 모임
 - 홈(다가오는 모임, 최근 글), 내 정보, 내 글 관리, 개인정보처리방침
 - 게시글·모임·댓글 신고하기(사유 4가지, 중복 신고 불가, 3건 이상 숨김)
+- 회원 탈퇴(내 정보 > 회원정보 관리 > 회원 탈퇴, 경고 2번 → DB 함수 `delete_my_account`가 본인 계정만 삭제 → 로그인 화면). 구글 플레이용 안내 페이지 `docs/account-deletion.html`
 - 출석체크(하루 1번 출석도장, 연속 출석 보상, 월별 달력)와 포인트 배지(모든 탭 상단 오른쪽 🪙 P)
 - 홈에 즐겨찾는 시설 3개, 모임 장소를 즐겨찾기에서 고르기
 

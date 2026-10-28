@@ -332,6 +332,48 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets('account deletion warns twice, deletes, and returns to login', (
+    t,
+  ) async {
+    await mount(
+      t,
+      AuthGate(
+        signedInPage: MainShell(
+          activityRepository: FakeActivityRepository(),
+          nearbyLoader: ({force = false}) async => [],
+        ),
+      ),
+    );
+    await tap(t, find.text('내 정보'));
+    await tap(t, find.text('회원정보 관리'));
+    final deleteButton = find.widgetWithText(OutlinedButton, '회원 탈퇴');
+
+    await tap(t, deleteButton);
+    expect(find.textContaining('되돌릴 수 없어요'), findsOneWidget);
+    await tap(t, find.text('취소'));
+    await tap(t, deleteButton);
+    await tap(t, find.text('계속하기'));
+    await tap(t, find.text('취소'));
+    expect(backend.accountDeletes, 0);
+
+    backend.failAccountDelete = true;
+    await tap(t, deleteButton);
+    await tap(t, find.text('계속하기'));
+    await tap(t, find.text('탈퇴하기'));
+    expect(find.text('탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요.'), findsOneWidget);
+    expect(find.byType(AccountSettingsPage), findsOneWidget);
+
+    backend.failAccountDelete = false;
+    await tap(t, deleteButton);
+    await tap(t, find.text('계속하기'));
+    await tap(t, find.text('탈퇴하기'));
+    expect(backend.accountDeletes, 1);
+    expect(Supabase.instance.client.auth.currentUser, isNull);
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.byType(AccountSettingsPage), findsNothing);
+    await backend.signIn();
+    await finish(t);
+  });
   testWidgets('five navigation destinations and profile menus open', (t) async {
     await mount(
       t,

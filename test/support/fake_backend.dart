@@ -8,6 +8,8 @@ import 'package:silver_life/core/meetup_category.dart';
 class FakeBackend {
   static const user = '00000000-0000-0000-0000-000000000001';
   bool failProfile = false, failFavorites = false, failPosts = false;
+  bool failAccountDelete = false;
+  int accountDeletes = 0;
   int postWrites = 0, commentWrites = 0, favoriteWrites = 0, checkinWrites = 0;
   final requests = <Uri>[];
   final profile = <String, dynamic>{
@@ -113,6 +115,8 @@ class FakeBackend {
     favoriteWrites = 0;
     checkinWrites = 0;
     profile['nickname'] = '한결';
+    failAccountDelete = false;
+    accountDeletes = 0;
   }
 
   Future<http.Response> handle(http.Request request) async {
@@ -134,6 +138,13 @@ class FakeBackend {
         }, status: 400);
       }
       return response(session);
+    }
+    if (name == 'delete_my_account') {
+      if (failAccountDelete) {
+        return response({'message': 'failed', 'code': 'P0001'}, status: 400);
+      }
+      accountDeletes++;
+      return response('');
     }
     if (name == 'facility_presence') {
       final body = jsonDecode(request.body) as Map;
