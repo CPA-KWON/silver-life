@@ -4,13 +4,15 @@ import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_theme.dart';
+import 'profile/app_preferences.dart';
 import 'auth/auth_gate.dart';
 
 // Provide these at build/run time, e.g.:
 // flutter run --dart-define-from-file=.env.json
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-final _supabaseConfigured = _supabaseUrl.isNotEmpty && _supabaseAnonKey.isNotEmpty;
+final _supabaseConfigured =
+    _supabaseUrl.isNotEmpty && _supabaseAnonKey.isNotEmpty;
 
 // From NAVER Cloud Platform console (Services > Maps). Facility search will
 // not work until this is provided, but the rest of the app doesn't need it.
@@ -33,6 +35,7 @@ Future<void> main() async {
     );
   }
 
+  await AppPreferences.instance.load();
   runApp(const SilverLifeApp());
 }
 
@@ -41,20 +44,32 @@ class SilverLifeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '실버라이프',
-      debugShowCheckedModeBanner: false,
-      locale: const Locale('ko', 'KR'),
-      supportedLocales: const [Locale('ko', 'KR')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      theme: seniorFriendlyTheme,
-      home: _supabaseConfigured
-          ? const AuthGate()
-          : const _SupabaseNotConfiguredPage(),
+    return AnimatedBuilder(
+      animation: AppPreferences.instance,
+      builder: (context, _) => MaterialApp(
+        title: '실버라이프',
+        debugShowCheckedModeBanner: false,
+        locale: const Locale('ko', 'KR'),
+        supportedLocales: const [Locale('ko', 'KR')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: seniorFriendlyTheme,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(
+              MediaQuery.textScalerOf(context)
+                  .scale(AppPreferences.instance.fontScale),
+            ),
+          ),
+          child: child!,
+        ),
+        home: _supabaseConfigured
+            ? const AuthGate()
+            : const _SupabaseNotConfiguredPage(),
+      ),
     );
   }
 }
@@ -78,4 +93,3 @@ class _SupabaseNotConfiguredPage extends StatelessWidget {
     );
   }
 }
-

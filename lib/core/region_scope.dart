@@ -30,7 +30,7 @@ class RegionScopeBar extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.segmentTrack,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(28),
         ),
         child: Padding(
           padding: const EdgeInsets.all(4),
@@ -81,7 +81,7 @@ class _Segment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(11);
+    final radius = BorderRadius.circular(24);
     return MergeSemantics(
       child: Semantics(
         button: true,
@@ -89,7 +89,7 @@ class _Segment extends StatelessWidget {
         enabled: onTap != null,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: selected ? Colors.white : Colors.transparent,
+            color: selected ? AppColors.primary : Colors.transparent,
             borderRadius: radius,
             boxShadow: selected
                 ? const [
@@ -124,9 +124,7 @@ class _Segment extends StatelessWidget {
                         fontWeight: selected
                             ? FontWeight.w600
                             : FontWeight.w500,
-                        color: selected
-                            ? AppColors.textPrimary
-                            : AppColors.scheduleText,
+                        color: selected ? Colors.white : AppColors.scheduleText,
                       ),
                     ),
                   ),

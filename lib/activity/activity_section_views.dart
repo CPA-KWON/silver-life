@@ -7,6 +7,8 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
   late String? categoryFilter = widget.initialCategory;
   bool busy = false;
   String historyView = '신청 내역', supportView = '진행 중', sort = '가까운 순';
+  String methodFilter = '전체';
+  bool freeOnly = false;
   @override
   void dispose() {
     keyword.dispose();
@@ -1170,6 +1172,30 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         ),
       ),
       const SizedBox(height: 12),
+      if (widget.section == ActivitySection.programs) ...[
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final v in ['전체', '앱으로 신청', '전화·방문'])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(v),
+                    selected: methodFilter == v,
+                    onSelected: (_) => setState(() => methodFilter = v),
+                  ),
+                ),
+              FilterChip(
+                label: const Text('무료만'),
+                selected: freeOnly,
+                onSelected: (v) => setState(() => freeOnly = v),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+      ],
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -1331,6 +1357,17 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
 
   List<ActivityData> matchingPrograms(ActivityData d) =>
       filter(catalogPrograms(d)).where((p) {
+        final isExternal =
+            p['source'] == 'welfare' ||
+            ['phone', 'visit'].contains(p['application_method']);
+        if (methodFilter == '앱으로 신청' && isExternal ||
+            methodFilter == '전화·방문' && !isExternal) {
+          return false;
+        }
+        final isFree = isExternal
+            ? ((p['raw_program'] as Map?)?['is_free'] == true)
+            : p['fee'] == 0;
+        if (freeOnly && !isFree) return false;
         final place = widget.place;
         if (place != null) {
           final lat = p['lat'], lng = p['lng'];

@@ -71,5 +71,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>프로필 사진과 게시글에 첨부할 사진을 선택합니다.</string>
 </dict>
 </plist>

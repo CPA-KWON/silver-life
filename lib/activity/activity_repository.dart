@@ -69,8 +69,32 @@ class ActivityRepository {
     await client.rpc('activity_program_detail', params: {'program_id': id})
         as Map,
   );
-  Future<ActivityData> agency() async =>
-      Map<String, dynamic>.from(await client.rpc('activity_agency') as Map);
+  Future<ActivityData> agency() async {
+    final data = Map<String, dynamic>.from(
+      await client.rpc('activity_agency') as Map,
+    );
+    try {
+      data['drafts'] = await client
+          .from('activity_program_drafts')
+          .select()
+          .order('updated_at', ascending: false);
+    } catch (_) {
+      data['drafts_unavailable'] = true;
+    }
+    return data;
+  }
+
+  Future<void> manageBatch(
+    List<String> ids,
+    String action, {
+    String reason = '',
+  }) async {
+    await client.rpc(
+      'activity_manage_batch',
+      params: {'enrollments': ids, 'action': action, 'reason': reason},
+    );
+  }
+
   Future<void> plan({bool rebuild = false}) async {
     await client.rpc(
       'activity_plan_week',
@@ -194,16 +218,7 @@ class ActivityRepository {
   }
 
   Future<void> program(ActivityData data) async {
-    await client.rpc(
-      [
-            'target_audience',
-            'preparations',
-            'floor_guide',
-          ].any((k) => '${data[k] ?? ''}'.trim().isNotEmpty)
-          ? 'activity_save_program_v2'
-          : 'activity_save_program',
-      params: {'data': data},
-    );
+    await client.rpc('activity_save_program_v3', params: {'data': data});
   }
 
   Future<void> close(String id) async {

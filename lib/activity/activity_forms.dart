@@ -7,6 +7,8 @@ import '../facility/naver_local_search.dart';
 import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
+import '../ui/neighborhood_design.dart';
+import '../social/social_form_widgets.dart';
 
 typedef ActivityPlacePicker = Future<FacilityResult?> Function(BuildContext);
 Future<FacilityResult?> pickActivityPlace(BuildContext c) =>
@@ -146,208 +148,391 @@ class ActivityProgramForm extends StatefulWidget {
     this.placePicker = pickActivityPlace,
     this.datePicker = pickActivityDate,
     this.initialKind = 'activity',
+    this.existing,
   });
   final List<ActivityData> organizations;
-  final String initialKind;
   final ActivityRepository? repository;
   final ActivityPlacePicker placePicker;
   final Future<DateTime?> Function(BuildContext, DateTime?) datePicker;
+  final String initialKind;
+  final ActivityData? existing;
   @override
-  State<ActivityProgramForm> createState() => _ActivityProgramFormState();
+  State<ActivityProgramForm> createState() => _ProgramFormState();
 }
 
-class _ActivityProgramFormState extends State<ActivityProgramForm> {
+class _ProgramFormState extends State<ActivityProgramForm> {
+  final form = GlobalKey<FormState>();
   final title = TextEditingController(),
       description = TextEditingController(),
-      targetAudience = TextEditingController(),
+      target = TextEditingController(),
       preparations = TextEditingController(),
-      floorGuide = TextEditingController(),
-      capacity = TextEditingController(text: '10'),
-      fee = TextEditingController(text: '0');
-  late String? org = widget.organizations.firstOrNull?['id'];
+      floor = TextEditingController(),
+      fee = TextEditingController(text: '0'),
+      capacity = TextEditingController(text: '20'),
+      phone = TextEditingController();
+  String? org;
   late String kind = widget.initialKind;
-  String category = activityCategories.first, participation = '혼자';
+  String category = activityCategories.first,
+      method = 'app',
+      participation = '함께';
   int level = 1;
-  final transports = {'도보', '대중교통', '자동차'};
-  FacilityResult? place;
+  Set<String> transports = {'도보', '대중교통', '자동차'};
   DateTime? start, end, deadline;
+  FacilityResult? place;
+  bool busy = false;
+  @override
+  void initState() {
+    super.initState();
+    org = widget.organizations.firstOrNull?['id'];
+    final p = widget.existing;
+    if (p != null) {
+      org = p['org_id'] ?? org;
+      title.text = p['title'] ?? '';
+      description.text = p['description'] ?? '';
+      target.text = p['target_audience'] ?? '';
+      preparations.text = p['preparations'] ?? '';
+      floor.text = p['floor_guide'] ?? '';
+      fee.text = '${p['fee'] ?? 0}';
+      capacity.text = '${p['capacity'] ?? 20}';
+      phone.text = p['contact_phone'] ?? '';
+      kind = p['kind'] ?? kind;
+      category = p['category'] ?? category;
+      method = p['application_method'] ?? method;
+      participation = p['participation'] ?? participation;
+      level = p['difficulty'] ?? level;
+      transports = Set<String>.from(p['transports'] ?? transports);
+      start = DateTime.tryParse('${p['starts_at']}')?.toLocal();
+      end = DateTime.tryParse('${p['ends_at']}')?.toLocal();
+      deadline = DateTime.tryParse('${p['deadline']}')?.toLocal();
+      if (p['lat'] is num && p['lng'] is num) {
+        place = FacilityResult(
+          name: p['place_name'] ?? '',
+          address: '',
+          category: '복지관',
+          telephone: p['contact_phone'] ?? '',
+          lat: (p['lat'] as num).toDouble(),
+          lng: (p['lng'] as num).toDouble(),
+          distanceMeters: double.nan,
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     for (final c in [
       title,
       description,
-      capacity,
-      fee,
-      targetAudience,
+      target,
       preparations,
-      floorGuide,
+      floor,
+      fee,
+      capacity,
+      phone,
     ]) {
       c.dispose();
     }
     super.dispose();
   }
 
-  Future<void> chooseDate(String which) async {
-    final d = await widget.datePicker(context, switch (which) {
-      'start' => start,
-      'end' => end,
-      _ => deadline,
-    });
-    if (mounted && d != null) {
+  ActivityData payload(bool draft) => {
+    if (widget.existing?['id'] != null) 'id': widget.existing!['id'],
+    if (widget.existing?['draft_id'] != null)
+      'draft_id': widget.existing!['draft_id'],
+    'org_id': org,
+    'title': title.text.trim(),
+    'description': description.text.trim(),
+    'target_audience': target.text.trim(),
+    'preparations': preparations.text.trim(),
+    'floor_guide': floor.text.trim(),
+    'fee': kind == 'experience' ? 0 : int.tryParse(fee.text),
+    'capacity': int.tryParse(capacity.text),
+    'kind': kind,
+    'category': category,
+    'application_method': method,
+    'contact_phone': phone.text.trim(),
+    'draft': draft,
+    'participation': participation,
+    'difficulty': level,
+    'transports': transports.toList(),
+    'place_name': place?.name,
+    'lat': place?.lat,
+    'lng': place?.lng,
+    'starts_at': start?.toUtc().toIso8601String(),
+    'ends_at': end?.toUtc().toIso8601String(),
+    'deadline': deadline?.toUtc().toIso8601String(),
+  };
+  Future<void> save({bool draft = false}) async {
+    if (busy || org == null) return;
+    if (!draft && !form.currentState!.validate()) return;
+    if (!draft &&
+        (place == null || start == null || end == null || deadline == null)) {
+      await activityFailure(context, title: '장소와 모든 일정을 선택해 주세요');
+      return;
+    }
+    if (!draft && (!end!.isAfter(start!) || deadline!.isAfter(start!))) {
+      await activityFailure(
+        context,
+        title: '일정을 확인해 주세요',
+        message: '종료는 시작 후, 모집 마감은 시작 전에 정해 주세요.',
+      );
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await (widget.repository ?? ActivityRepository()).program(payload(draft));
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted) {
+        await activityFailure(
+          context,
+          title: '프로그램을 저장하지 못했어요',
+          message: '입력 내용을 확인한 뒤 다시 시도해 주세요.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> date(String key) async {
+    final v = await widget.datePicker(
+      context,
+      key == 'start'
+          ? start
+          : key == 'end'
+          ? end
+          : deadline,
+    );
+    if (v != null && mounted) {
       setState(() {
-        switch (which) {
-          case 'start':
-            start = d;
-          case 'end':
-            end = d;
-          default:
-            deadline = d;
+        if (key == 'start') {
+          start = v;
+        } else if (key == 'end') {
+          end = v;
+        } else {
+          deadline = v;
         }
       });
     }
   }
 
-  Future<void> save() async {
-    if (org == null ||
-        place == null ||
-        start == null ||
-        end == null ||
-        deadline == null) {
-      throw StateError('장소와 모든 일정을 선택해주세요.');
-    }
-    if (!start!.isAfter(DateTime.now()) ||
-        !deadline!.isAfter(DateTime.now()) ||
-        !end!.isAfter(start!) ||
-        deadline!.isAfter(start!)) {
-      throw StateError('모집 마감은 시작 이전, 종료는 시작 이후로 설정해주세요.');
-    }
-    final n = int.tryParse(capacity.text),
-        cost = kind == 'experience' ? 0 : int.tryParse(fee.text);
-    if (n == null ||
-        n < 1 ||
-        n > 1000 ||
-        cost == null ||
-        cost < 0 ||
-        cost > 10000000 ||
-        transports.isEmpty) {
-      throw StateError('정원·참여비·이동수단을 확인해주세요.');
-    }
-    await (widget.repository ?? ActivityRepository()).program({
-      'org_id': org,
-      'title': title.text.trim(),
-      'description': description.text.trim(),
-      'target_audience': targetAudience.text.trim(),
-      'preparations': preparations.text.trim(),
-      'floor_guide': floorGuide.text.trim(),
-      'kind': kind,
-      'category': category,
-      'place_name': place!.name,
-      'lat': place!.lat,
-      'lng': place!.lng,
-      'starts_at': start!.toUtc().toIso8601String(),
-      'ends_at': end!.toUtc().toIso8601String(),
-      'deadline': deadline!.toUtc().toIso8601String(),
-      'capacity': n,
-      'fee': cost,
-      'transports': transports.toList(),
-      'participation': participation,
-      'difficulty': level,
-    });
-  }
-
   @override
-  Widget build(BuildContext context) => ActivitySaveForm(
-    title: '기관 프로그램 등록',
-    enabled: org != null,
-    onSave: save,
-    children: org == null
-        ? [const Text('기관 담당자 권한이 필요해요.')]
-        : [
-            activitySelect(
-              '운영 기관',
-              org!,
-              [for (final o in widget.organizations) o['id'] as String],
-              (v) => setState(() => org = v),
-              describe: (v) =>
-                  widget.organizations.firstWhere((o) => o['id'] == v)['name'],
+  Widget build(BuildContext c) => NeighborhoodScreen(
+    title: widget.existing == null ? '프로그램 등록' : '프로그램 수정',
+    tint: const Color(0xFFDDE6F3),
+    bottom: Row(
+      children: [
+        if (widget.existing?['id'] == null) ...[
+          Expanded(
+            child: ActivityButton(
+              '임시 저장',
+              light: true,
+              onTap: busy ? null : () => save(draft: true),
             ),
-            activitySelect(
-              '모집 유형',
-              kind,
-              ['activity', 'experience'],
-              (v) => setState(() => kind = v),
-              describe: (v) => v == 'activity' ? '참여 프로그램' : '경험 나눔 도우미 모집',
-            ),
-            activityInput(title, '프로그램 이름'),
-            activityInput(description, '활동 안내', lines: 4),
-            for (final field in [
-              (targetAudience, '참여 대상'),
-              (preparations, '준비물'),
-              (floorGuide, '층별 안내'),
-            ])
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: field.$1,
-                  maxLines: field.$2 == '층별 안내' ? 3 : 1,
-                  maxLength: 2000,
-                  decoration: InputDecoration(labelText: '${field.$2} (선택)'),
-                ),
-              ),
-            activitySelect(
-              '활동 분야',
-              category,
-              activityCategories,
-              (v) => setState(() => category = v),
-            ),
-            OutlinedButton(
-              onPressed: () async {
-                final p = await widget.placePicker(context);
-                if (mounted && p != null) setState(() => place = p);
-              },
-              child: Text(place?.name ?? '활동 장소 선택'),
-            ),
-            for (final e in [
-              ('start', '활동 시작', start),
-              ('end', '활동 종료', end),
-              ('deadline', '모집 마감', deadline),
-            ])
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: OutlinedButton(
-                  onPressed: () => chooseDate(e.$1),
-                  child: Text('${e.$2} ${activityDate(e.$3)}'),
-                ),
-              ),
-            const SizedBox(height: 12),
-            activityInput(capacity, '정원', number: true),
-            if (kind == 'activity') activityInput(fee, '참여비 (원)', number: true),
-            const Text(
-              '유료 기관 프로그램에는 활성화된 50% 혜택이 적용돼요. 할인 비용 부담은 운영 계약에서 정해주세요. 앱에서 결제하지 않아요.',
-            ),
-            activitySelect('참여 방식', participation, [
-              '혼자',
-              '함께',
-            ], (v) => setState(() => participation = v)),
-            activitySelect<int>('난이도', level, [
-              1,
-              2,
-              3,
-            ], (v) => setState(() => level = v)),
-            const Text('이용 가능한 이동수단'),
-            Wrap(
-              spacing: 6,
-              children: [
-                for (final t in ['도보', '대중교통', '자동차'])
-                  FilterChip(
-                    label: Text(t),
-                    selected: transports.contains(t),
-                    onSelected: (v) => setState(() {
-                      v ? transports.add(t) : transports.remove(t);
-                    }),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Expanded(
+          flex: 2,
+          child: ActivityButton(
+            widget.existing == null ? '등록하기' : '수정 저장',
+            onTap: busy || org == null ? null : save,
+          ),
+        ),
+      ],
+    ),
+    child: org == null
+        ? const ActivityEmpty('기관 담당자만 등록할 수 있어요', icon: Icons.lock_outline)
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: form,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SocialFormCard(
+                    '기본 정보',
+                    child: Column(
+                      children: [
+                        activitySelect<String>(
+                          '운영 기관',
+                          org!,
+                          [for (final o in widget.organizations) '${o['id']}'],
+                          (v) => setState(() => org = v),
+                          describe: (v) =>
+                              '${widget.organizations.firstWhere((o) => o['id'] == v)['name']}',
+                        ),
+                        activityInput(title, '프로그램 이름'),
+                        activityInput(description, '활동 안내', lines: 3),
+                      ],
+                    ),
                   ),
-              ],
+                  SocialFormCard(
+                    '분야',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final v in activityCategories)
+                          ChoiceChip(
+                            label: Text(v),
+                            selected: category == v,
+                            onSelected: (_) => setState(() => category = v),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SocialFormCard(
+                    '일정·장소',
+                    required: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final v in [
+                          ('start', '활동 시작', start),
+                          ('end', '활동 종료', end),
+                          ('deadline', '모집 마감', deadline),
+                        ])
+                          OutlinedButton(
+                            onPressed: () => date(v.$1),
+                            child: Text('${v.$2} ${activityDate(v.$3)}'),
+                          ),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final p = await widget.placePicker(c);
+                            if (mounted && p != null) setState(() => place = p);
+                          },
+                          icon: const Icon(Icons.place_outlined),
+                          label: Text(place?.name ?? '활동 장소 선택'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SocialFormCard(
+                    '참여 조건',
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: target,
+                          decoration: const InputDecoration(labelText: '대상'),
+                        ),
+                        const SizedBox(height: 10),
+                        activityInput(fee, '참여비 (원)', number: true),
+                        TextField(
+                          controller: preparations,
+                          decoration: const InputDecoration(labelText: '준비물'),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: floor,
+                          decoration: const InputDecoration(labelText: '층별 안내'),
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: capacity,
+                          decoration: const InputDecoration(labelText: '정원'),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final n = int.tryParse(v ?? '');
+                            return n == null || n < 1 || n > 1000
+                                ? '정원은 1~1000명으로 적어 주세요'
+                                : null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  SocialFormCard(
+                    '신청 방법',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final v in [
+                              ('app', '앱으로 신청'),
+                              ('phone', '전화 신청'),
+                              ('visit', '방문 신청'),
+                            ])
+                              ChoiceChip(
+                                label: Text(v.$2),
+                                selected: method == v.$1,
+                                onSelected: (_) =>
+                                    setState(() => method = v.$1),
+                              ),
+                          ],
+                        ),
+                        if (method != 'app')
+                          TextFormField(
+                            controller: phone,
+                            decoration: const InputDecoration(
+                              labelText: '기관 연락처',
+                            ),
+                            keyboardType: TextInputType.phone,
+                            validator: (v) =>
+                                method == 'phone' &&
+                                    !RegExp(r'^[+0-9() -]{7,30}$')
+                                        .hasMatch(v ?? '')
+                                ? '기관 전화번호를 적어 주세요'
+                                : null,
+                          ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '전화·방문 접수는 앱 신청·참여 보상과 자동 연동되지 않아요.',
+                          style: petText(14, color: PetColors.secondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ExpansionTile(
+                    title: const Text('추천 세부 조건'),
+                    children: [
+                      activitySelect(
+                        '모집 유형',
+                        kind,
+                        ['activity', 'experience'],
+                        (v) => setState(() => kind = v),
+                        describe: (v) =>
+                            v == 'activity' ? '참여 프로그램' : '경험 나눔 도우미 모집',
+                      ),
+                      activitySelect('참여 방식', participation, [
+                        '혼자',
+                        '함께',
+                      ], (v) => setState(() => participation = v)),
+                      activitySelect<int>('난이도', level, [
+                        1,
+                        2,
+                        3,
+                      ], (v) => setState(() => level = v)),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final t in ['도보', '대중교통', '자동차'])
+                            FilterChip(
+                              label: Text(t),
+                              selected: transports.contains(t),
+                              onSelected: (v) => setState(() {
+                                v ? transports.add(t) : transports.remove(t);
+                              }),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  SocialFormCard(
+                    '참여 보상',
+                    child: Text(
+                      '앱 신청 프로그램은 기관에서 실제 참여 완료를 확인한 뒤 기존 보상 규칙에 따라 지급돼요.',
+                      style: petText(16, color: PetColors.secondary),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
   );
 }

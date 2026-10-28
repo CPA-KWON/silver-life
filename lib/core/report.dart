@@ -1,89 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Must match the `reports.reason` check constraint in supabase/reports.sql.
-const kReportReasons = ['욕설·비방', '광고', '사기 의심', '기타'];
+import '../activity/activity_design.dart';
+import '../pet/pet_design.dart';
 
-/// Asks for a reason, then files a report against exactly one of
-/// [postId] / [commentId]. Results are shown as dialogs rather than
-/// SnackBars so they don't disappear before a senior user can read them.
-/// Once a post/comment has 3+ reports, RLS hides it from everyone but its
-/// author (see supabase/reports.sql) — nothing to filter client-side.
+const kReportReasons = ['욕설·비방', '광고', '사기 의심', '음란·불쾌한 내용', '기타'];
 Future<void> showReportFlow(
   BuildContext context, {
   String? postId,
   String? commentId,
 }) async {
   assert((postId == null) != (commentId == null));
-  final target = postId != null ? '글' : '댓글';
-
-  final reason = await showDialog<String>(
+  String? selected;
+  final reason = await showModalBottomSheet<String>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text('이 $target을 신고하는 이유를 골라주세요'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final reason in kReportReasons) ...[
-            OutlinedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(reason),
-              child: Text(reason),
-            ),
-            const SizedBox(height: 12),
-          ],
-          TextButton(
-            style: TextButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-              textStyle: const TextStyle(fontSize: 18),
-            ),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('취소'),
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (c) => StatefulBuilder(
+      builder: (c, set) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('신고 이유를 골라 주세요', style: petText(24)),
+              const SizedBox(height: 8),
+              Text(
+                '신고는 익명으로 처리돼요',
+                style: petText(15, color: PetColors.secondary),
+              ),
+              const SizedBox(height: 16),
+              for (final r in kReportReasons)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: OutlinedButton.icon(
+                    onPressed: () => set(() => selected = r),
+                    icon: Icon(
+                      selected == r
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                    ),
+                    label: Text(r),
+                  ),
+                ),
+              ActivityButton(
+                '신고하기',
+                color: Colors.red,
+                onTap: selected == null
+                    ? null
+                    : () => Navigator.pop(c, selected),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     ),
   );
   if (reason == null || !context.mounted) return;
-
-  final client = Supabase.instance.client;
-  String title;
-  String message;
+  var title = '신고가 접수됐어요', message = '확인 후 규정에 따라 조치할게요. 알려주셔서 고맙습니다.';
   try {
-    await client.from('reports').insert({
-      'reporter_id': client.auth.currentUser!.id,
+    final c = Supabase.instance.client;
+    await c.from('reports').insert({
+      'reporter_id': c.auth.currentUser!.id,
       'post_id': ?postId,
       'comment_id': ?commentId,
       'reason': reason,
     });
-    title = '신고가 접수됐어요';
-    message = '알려주셔서 고맙습니다.\n우리 팀이 확인한 뒤 조치할게요.';
   } on PostgrestException catch (e) {
-    if (e.code == '23505') {
-      // unique (reporter_id, post_id|comment_id) — already reported.
-      title = '이미 신고하셨어요';
-      message = '이 $target은 이미 신고하셨어요.\n같은 $target은 한 번만 신고할 수 있어요.';
-    } else {
-      title = '신고하지 못했어요';
-      message = '잠시 후 다시 시도해 주세요.';
-    }
+    title = e.code == '23505' ? '이미 신고하셨어요' : '신고하지 못했어요';
+    message = e.code == '23505'
+        ? '같은 글이나 댓글은 한 번만 신고할 수 있어요.'
+        : '잠시 후 다시 시도해 주세요.';
   } catch (_) {
     title = '신고하지 못했어요';
-    message = '인터넷 연결을 확인하고 다시 시도해 주세요.';
+    message = '인터넷 연결을 확인한 뒤 다시 시도해 주세요.';
   }
-  if (!context.mounted) return;
-
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(title),
-      content: Text(message, style: const TextStyle(fontSize: 18)),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('확인'),
-        ),
-      ],
-    ),
-  );
+  if (context.mounted) {
+    await activityDialog(
+      context,
+      title: title,
+      message: message,
+      action: '확인',
+      secondary: '닫기',
+      icon: Icons.verified_outlined,
+    );
+  }
 }

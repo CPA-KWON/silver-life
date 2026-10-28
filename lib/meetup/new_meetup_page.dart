@@ -6,8 +6,11 @@ import '../facility/facility_search_page.dart';
 import '../facility/naver_local_search.dart';
 import '../core/meetup_category.dart';
 import 'meetup_place_sheet.dart';
-import '../ui/design_widgets.dart';
+import '../ui/neighborhood_design.dart';
 import '../app_theme.dart';
+import '../ui/design_widgets.dart' show IconBadge;
+import '../social/neighborhood_feed.dart' show meetupTopics;
+import '../social/social_form_widgets.dart';
 
 class NewMeetupPage extends StatefulWidget {
   const NewMeetupPage({
@@ -38,6 +41,10 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
     text: widget.existingPost?['content'] as String?,
   );
   bool _isSaving = false;
+  late String _topic =
+      widget.existingPost?['meetup_topic'] ?? meetupTopics.first;
+  late int _capacity = widget.existingPost?['meetup_capacity'] ?? 10;
+  late int _duration = widget.existingPost?['duration_minutes'] ?? 60;
 
   late DateTime? _eventDate = _initialEventAt?.toLocal();
   late TimeOfDay? _eventTime = _initialEventAt == null
@@ -83,23 +90,12 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   }
 
   Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _eventDate != null && _eventDate!.isAfter(now)
-          ? _eventDate!
-          : now,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-    );
+    final picked = await pickSocialDate(context, _eventDate);
     if (mounted && picked != null) setState(() => _eventDate = picked);
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _eventTime ?? TimeOfDay.now(),
-    );
+    final picked = await pickSocialTime(context, _eventTime);
     if (mounted && picked != null) setState(() => _eventTime = picked);
   }
 
@@ -187,12 +183,16 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
         'content': _contentController.text.trim(),
         'event_at': eventAt.toUtc().toIso8601String(),
         'facility_id': facilityId,
+        'meetup_topic': _topic,
+        'meetup_capacity': _capacity,
+        'duration_minutes': _duration,
       };
       if (_isEditing) {
         await client
             .from('posts')
             .update(data)
-            .eq('id', widget.existingPost!['id'] as String);
+            .eq('id', widget.existingPost!['id'] as String)
+            .select('id');
       } else {
         await client.from('posts').insert({...data, 'author_id': userId});
       }
@@ -209,91 +209,167 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
     }
   }
 
+  Future<void> _cancelMeetup() async {
+    if (!await activityDialog(
+      context,
+      title: '모임을 취소할까요?',
+      message: '모집이 종료되고 참여자 화면에도 취소 상태가 표시돼요.',
+      action: '모임 취소하기',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isSaving = true);
+    try {
+      await Supabase.instance.client
+          .from('posts')
+          .update({'meetup_cancelled': true})
+          .eq('id', widget.existingPost!['id']);
+      if (mounted) _finish(true);
+    } catch (_) {
+      if (mounted) await activityFailure(context, title: '모임을 취소하지 못했어요');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => _finish(false)),
-        title: Text(_isEditing ? '모임 수정' : '모임 만들기'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _PickerRow(
-                icon: Icons.calendar_today_outlined,
-                label: '날짜',
-                value: _eventDate == null
-                    ? '날짜 선택'
-                    : '${_eventDate!.year}.${_eventDate!.month}.${_eventDate!.day}',
-                hasValue: _eventDate != null,
-                onTap: _pickDate,
+  Widget build(BuildContext context) => NeighborhoodScreen(
+    title: _isEditing ? '모임 수정' : '모임 만들기',
+    onBack: () => _finish(false),
+    bottom: ActivityButton(
+      _isEditing ? '수정 저장하기' : '모임 올리기',
+      onTap: _isSaving ? null : _submit,
+    ),
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SocialFormCard(
+              '언제, 어디서',
+              required: true,
+              child: Column(
+                children: [
+                  _PickerRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: '날짜',
+                    value: _eventDate == null
+                        ? '날짜를 골라 주세요'
+                        : '${_eventDate!.month}월 ${_eventDate!.day}일',
+                    hasValue: _eventDate != null,
+                    onTap: _pickDate,
+                  ),
+                  _PickerRow(
+                    icon: Icons.schedule,
+                    label: '시간',
+                    value: _eventTime == null
+                        ? '시작 시간을 골라 주세요'
+                        : _eventTime!.format(context),
+                    hasValue: _eventTime != null,
+                    onTap: _pickTime,
+                  ),
+                  _PickerRow(
+                    icon: Icons.place_outlined,
+                    label: '장소',
+                    value: _eventFacility?.name ?? '장소를 골라 주세요',
+                    hasValue: _eventFacility != null,
+                    onTap: _pickFacility,
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              _PickerRow(
-                icon: Icons.access_time,
-                label: '시간',
-                value: _eventTime == null
-                    ? '시간 선택'
-                    : _eventTime!.format(context),
-                hasValue: _eventTime != null,
-                onTap: _pickTime,
-              ),
-              const SizedBox(height: 8),
-              _PickerRow(
-                icon: Icons.place_outlined,
-                label: '장소',
-                value: _eventFacility == null ? '장소 선택' : _eventFacility!.name,
-                hasValue: _eventFacility != null,
-                onTap: _pickFacility,
-              ),
-              const SizedBox(height: 12),
-              SectionCard(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(labelText: '모임 제목'),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                          ? '제목을 입력해주세요'
-                          : null,
+            ),
+            SocialFormCard(
+              '어떤 모임',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final v in meetupTopics)
+                    ChoiceChip(
+                      label: Text(v),
+                      selected: _topic == v,
+                      onSelected: (_) => setState(() => _topic = v),
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _contentController,
-                      decoration: const InputDecoration(labelText: '내용'),
-                      maxLines: 8,
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                          ? '내용을 입력해주세요'
-                          : null,
+                ],
+              ),
+            ),
+            SocialFormCard(
+              '모집 인원',
+              required: true,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final n in {2, 4, 6, 10, _capacity}.toList()..sort())
+                    ChoiceChip(
+                      label: Text('$n명'),
+                      selected: _capacity == n,
+                      onSelected: (_) => setState(() => _capacity = n),
                     ),
-                  ],
+                ],
+              ),
+            ),
+            SocialFormCard(
+              '함께할 시간',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final n in {30, 60, 90, 120, _duration}.toList()..sort())
+                    ChoiceChip(
+                      label: Text('$n분'),
+                      selected: _duration == n,
+                      onSelected: (_) => setState(() => _duration = n),
+                    ),
+                ],
+              ),
+            ),
+            SocialFormCard(
+              '모임 제목',
+              required: true,
+              child: TextFormField(
+                controller: _titleController,
+                maxLength: 50,
+                decoration: const InputDecoration(
+                  labelText: '제목',
+                  hintText: '어떤 모임인지 한눈에 알게 써 주세요',
+                ),
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? '모임 제목을 써 주세요' : null,
+              ),
+            ),
+            SocialFormCard(
+              '내용',
+              required: true,
+              child: TextFormField(
+                controller: _contentController,
+                maxLength: 1000,
+                minLines: 5,
+                maxLines: 10,
+                decoration: const InputDecoration(
+                  labelText: '내용',
+                  hintText: '무엇을 하는지, 준비물이 있는지 알려 주세요',
+                ),
+                validator: (v) =>
+                    (v?.trim().length ?? 0) < 5 ? '내용을 5자 이상 써 주세요' : null,
+              ),
+            ),
+            if (_isEditing)
+              TextButton(
+                onPressed: _isSaving ? null : _cancelMeetup,
+                child: const Text(
+                  '모임 취소하기',
+                  style: TextStyle(color: Colors.red),
                 ),
               ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _isSaving ? null : _submit,
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_isEditing ? '수정하기' : '등록하기'),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _PickerRow extends StatelessWidget {

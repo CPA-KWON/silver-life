@@ -222,6 +222,7 @@ class ActivityButton extends StatelessWidget {
     child: FilledButton(
       onPressed: onTap,
       style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 54),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         backgroundColor: light ? const Color(0xFFE0EFFA) : color,
         foregroundColor: light ? ActivityColors.blue : Colors.white,
@@ -357,7 +358,7 @@ class ActivityEmpty extends StatelessWidget {
   const ActivityEmpty(
     this.title, {
     super.key,
-    required this.message,
+    this.message = '',
     this.icon = Icons.search,
     this.action,
     this.onAction,

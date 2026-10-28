@@ -1,418 +1,305 @@
-import 'sign_out.dart';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../ui/neighborhood_design.dart';
+import '../activity/activity_repository.dart';
+import '../activity/activity_hub_page.dart';
+import '../activity/activity_agency_page.dart';
+import '../attendance/attendance_controller.dart';
+import '../facility/nearby_facilities_page.dart';
 import 'account_settings_page.dart';
 import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
-import '../app_theme.dart';
-import '../activity/activity_hub_page.dart';
-import '../activity/activity_repository.dart';
-import '../activity/activity_agency_page.dart';
-import '../facility/nearby_facilities_page.dart';
-import '../ui/design_widgets.dart';
+import 'extra_settings_pages.dart';
+import 'sign_out.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, this.activityRepository});
   final ActivityRepository? activityRepository;
-
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<ProfilePage> createState() => _ProfileState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  late Future<Map<String, dynamic>> _profileFuture;
-  late Future<ActivityData> _activityFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _profileFuture = _loadProfile();
-    _activityFuture = (widget.activityRepository ?? ActivityRepository())
-        .home();
+class _ProfileState extends State<ProfilePage> {
+  late Future<Map<String, dynamic>> data = load();
+  late Future<ActivityData> agency =
+      (widget.activityRepository ?? ActivityRepository()).home();
+  Future<Map<String, dynamic>> load() async {
+    final c = Supabase.instance.client,
+        u = c.auth.currentUser!.id,
+        p = await c.from('profiles').select().eq('id', u).single();
+    try {
+      final n = await Future.wait([
+        c
+            .from('posts')
+            .count(CountOption.exact)
+            .eq('author_id', u)
+            .neq('category', '동네모임'),
+        c
+            .from('posts')
+            .count(CountOption.exact)
+            .eq('author_id', u)
+            .eq('category', '동네모임'),
+        c.from('favorites').count(CountOption.exact).eq('user_id', u),
+      ]);
+      p['stats'] = n;
+    } catch (_) {
+      p['stats'] = null;
+    }
+    return p;
   }
 
-  Future<Map<String, dynamic>> _loadProfile() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    return await Supabase.instance.client
-        .from('profiles')
-        .select('nickname, region_sido, region_sigungu')
-        .eq('id', userId)
-        .single();
+  Future<void> open(Widget w) async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => w));
+    if (mounted &&
+        uid != null &&
+        Supabase.instance.client.auth.currentUser?.id == uid) {
+      setState(() => data = load());
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Scaffold(
-      appBar: AppBar(title: const Text('내 정보')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          FutureBuilder<Map<String, dynamic>>(
-            future: _profileFuture,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return SectionCard(
-                  child: TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _profileFuture = _loadProfile();
-                      });
-                    },
-                    child: const Text('내 정보를 불러오지 못했어요. 다시 시도'),
-                  ),
-                );
-              }
-              if (!snapshot.hasData) return const _ProfileCardSkeleton();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: _ProfileCard(profile: snapshot.data!),
-              );
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text('내 활동', style: textTheme.titleMedium),
-          ),
-          SectionCard(
-            child: Column(
-              children: [
-                _MenuRow(
-                  icon: Icons.explore_outlined,
-                  iconColor: AppColors.primary,
-                  badgeColor: AppColors.tint,
-                  title: '나의 활동',
-                  subtitle: '내 활동과 신청 이력 확인',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ActivitySectionPage(
-                        section: ActivitySection.mine,
-                        repository: widget.activityRepository,
-                      ),
-                    ),
-                  ),
-                ),
-                _MenuRow(
-                  icon: Icons.article_outlined,
-                  iconColor: AppColors.primary,
-                  badgeColor: AppColors.tint,
-                  title: '내가 쓴 게시글',
-                  subtitle: '내가 쓴 커뮤니티 글 모아보기',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MyPostListPage(
-                        title: '내가 쓴 게시글',
-                        isMeetup: false,
-                      ),
-                    ),
-                  ),
-                ),
-                _MenuRow(
-                  icon: Icons.event_outlined,
-                  iconColor: AppColors.mintText,
-                  badgeColor: AppColors.mintTint,
-                  title: '내가 만든 모임',
-                  subtitle: '내가 쓴 동네모임 글 모아보기',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MyPostListPage(
-                        title: '내가 만든 모임',
-                        isMeetup: true,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _MenuRow(
-            icon: Icons.favorite_border,
-            iconColor: AppColors.primary,
-            badgeColor: AppColors.tint,
-            title: '즐겨찾는 시설',
-            subtitle: '저장해둔 시설 다시 보기',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FavoriteFacilitiesPage()),
-            ),
-          ),
-          FutureBuilder<ActivityData>(
-            future: _activityFuture,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return TextButton(
-                  onPressed: () => setState(() {
-                    _activityFuture =
-                        (widget.activityRepository ?? ActivityRepository())
-                            .home();
-                  }),
-                  child: const Text('기관 권한 확인 다시 시도'),
-                );
-              }
-              final organizations = activityRows(
-                snapshot.data?['organizations'],
-              );
-              if (organizations.isEmpty) return const SizedBox.shrink();
-              return _MenuRow(
-                icon: Icons.business_outlined,
-                iconColor: AppColors.primary,
-                badgeColor: AppColors.tint,
-                title: '기관 관리',
-                subtitle: '프로그램·신청자·운영 성과 관리',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ActivityAgencyPage(
-                      organizations: organizations,
-                      repository: widget.activityRepository,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text('설정', style: textTheme.titleMedium),
-          ),
-          SectionCard(
-            child: Column(
-              children: [
-                _MenuRow(
-                  icon: Icons.manage_accounts_outlined,
-                  iconColor: AppColors.blueText,
-                  badgeColor: AppColors.blueTint,
-                  title: '회원정보 관리',
-                  subtitle: '닉네임, 거주 지역 수정 및 로그아웃',
-                  onTap: () async {
-                    final userId =
-                        Supabase.instance.client.auth.currentUser?.id;
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AccountSettingsPage(),
-                      ),
-                    );
-                    if (!mounted ||
-                        userId == null ||
-                        Supabase.instance.client.auth.currentUser?.id !=
-                            userId) {
-                      return;
-                    }
-                    setState(() {
-                      _profileFuture = _loadProfile();
-                    });
-                  },
-                ),
-                _MenuRow(
-                  icon: Icons.privacy_tip_outlined,
-                  iconColor: AppColors.scheduleText,
-                  badgeColor: AppColors.neutralTint,
-                  title: '개인정보 처리방침',
-                  subtitle: '언제든 확인할 수 있어요',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const PrivacyPolicyPage(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () => confirmAccountSignOut(context),
-            icon: const Icon(Icons.logout),
-            label: const Text('로그아웃'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.profile});
-
-  final Map<String, dynamic> profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final nickname = (profile['nickname'] as String?) ?? '';
-    final region = [
-      profile['region_sido'],
-      profile['region_sigungu'],
-    ].whereType<String>().where((s) => s.isNotEmpty).join(' ');
-    final initial = nickname.isEmpty
-        ? ''
-        : String.fromCharCode(nickname.runes.first);
-
-    return Container(
-      padding: const EdgeInsets.all(24),
+  Widget item(
+    IconData icon,
+    String title,
+    VoidCallback action, {
+    String? subtitle,
+    Color color = PetColors.blue,
+  }) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    leading: Container(
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.gradientStart, AppColors.heroCircle],
-        ),
-        borderRadius: BorderRadius.circular(28),
+        color: color.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.heroCircle,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              initial,
-              style: textTheme.titleLarge?.copyWith(
-                fontSize: 22,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Icon(icon, color: color),
+    ),
+    title: Text(title, style: petText(18)),
+    subtitle: subtitle == null
+        ? null
+        : Text(subtitle, style: petText(13, color: PetColors.secondary)),
+    trailing: const Icon(Icons.chevron_right),
+    onTap: action,
+  );
+  @override
+  Widget build(BuildContext c) => NeighborhoodScreen(
+    title: '내 정보',
+    tint: const Color(0xFFE2F0FB),
+    child: FutureBuilder<Map<String, dynamic>>(
+      future: data,
+      builder: (c, s) => s.connectionState != ConnectionState.done
+          ? const NeighborhoodLoading()
+          : s.hasError
+          ? ActivityEmpty(
+              '내 정보를 불러오지 못했어요',
+              action: '다시 시도',
+              onAction: () => setState(() => data = load()),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  nickname,
-                  style: textTheme.titleLarge?.copyWith(color: Colors.white),
-                ),
-                if (region.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                          color: Colors.white,
-                        ),
+                NeighborhoodHero(
+                  title: '${s.data!['nickname']} 님',
+                  subtitle:
+                      '${s.data!['region_sido']} · ${s.data!['region_sigungu']}',
+                  color: PetColors.blue,
+                  tags: [
+                    TextButton(
+                      onPressed: () => open(const AccountSettingsPage()),
+                      child: const Text(
+                        '회원정보 수정',
+                        style: TextStyle(color: Colors.white),
                       ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          region,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: Colors.white,
+                    ),
+                  ],
+                ),
+                if (ActivityPetScope.maybeOf(c)?.adopted == true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: ActivityCard(
+                      onTap: ActivityPetScope.openPetOf(c),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.pets, color: PetColors.blue),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '${ActivityPetScope.maybeOf(c)!.name} · 나의 반려동물',
+                              style: petText(18),
+                            ),
                           ),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                ActivityCard(
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceAround,
+                    spacing: 14,
+                    runSpacing: 14,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Column(
+                          children: [
+                            Text(
+                              s.data!['stats'] == null
+                                  ? '—'
+                                  : '${s.data!['stats'][i]}',
+                              style: petText(23),
+                            ),
+                            Text(
+                              ['쓴 글', '만든 모임', '즐겨찾기'][i],
+                              style: petText(12, color: PetColors.secondary),
+                            ),
+                          ],
                         ),
+                      Column(
+                        children: [
+                          Text(
+                            '${AttendanceScope.maybeOf(c)?.status?.balance ?? '—'}',
+                            style: petText(23, color: PetColors.orange),
+                          ),
+                          Text(
+                            '포인트',
+                            style: petText(12, color: PetColors.secondary),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
+                const NeighborhoodHeading('내 활동'),
+                ActivityCard(
+                  child: Column(
+                    children: [
+                      item(
+                        Icons.explore_outlined,
+                        '나의 활동',
+                        () => open(
+                          ActivitySectionPage(
+                            section: ActivitySection.mine,
+                            repository: widget.activityRepository,
+                          ),
+                        ),
+                      ),
+                      item(
+                        Icons.article_outlined,
+                        '내가 쓴 글·댓글',
+                        () => open(
+                          const MyPostListPage(
+                            title: '내가 쓴 글·댓글',
+                            isMeetup: false,
+                          ),
+                        ),
+                        color: PetColors.purple,
+                      ),
+                      item(
+                        Icons.groups_outlined,
+                        '내가 만든 모임',
+                        () => open(
+                          const MyPostListPage(
+                            title: '내가 만든 모임',
+                            isMeetup: true,
+                          ),
+                        ),
+                        color: PetColors.green,
+                      ),
+                      item(
+                        Icons.star_outline,
+                        '즐겨찾는 시설',
+                        () => open(const FavoriteFacilitiesPage()),
+                        color: PetColors.orange,
+                      ),
+                    ],
+                  ),
+                ),
+                const NeighborhoodHeading('설정'),
+                ActivityCard(
+                  child: Column(
+                    children: [
+                      item(
+                        Icons.manage_accounts_outlined,
+                        '회원정보 관리',
+                        () => open(const AccountSettingsPage()),
+                      ),
+                      item(
+                        Icons.notifications_none,
+                        '알림·글씨 크기',
+                        () => open(const ReadingSettingsPage()),
+                      ),
+                      item(
+                        Icons.lock_outline,
+                        '차단한 사용자',
+                        () => open(const BlockedUsersPage()),
+                      ),
+                      item(
+                        Icons.privacy_tip_outlined,
+                        '이용약관·개인정보',
+                        () => open(const PrivacyPolicyPage()),
+                      ),
+                    ],
+                  ),
+                ),
+                FutureBuilder<ActivityData>(
+                  future: agency,
+                  builder: (c, a) {
+                    if (a.hasError) {
+                      return TextButton(
+                        onPressed: () => setState(
+                          () => agency =
+                              (widget.activityRepository ??
+                                      ActivityRepository())
+                                  .home(),
+                        ),
+                        child: const Text('기관 권한 확인 다시 시도'),
+                      );
+                    }
+                    final org = activityRows(a.data?['organizations']);
+                    return org.isEmpty
+                        ? const SizedBox()
+                        : Column(
+                            children: [
+                              const NeighborhoodHeading('기관 담당자'),
+                              ActivityCard(
+                                child: item(
+                                  Icons.business_outlined,
+                                  '기관 관리',
+                                  () => open(
+                                    ActivityAgencyPage(
+                                      organizations: org,
+                                      repository: widget.activityRepository,
+                                    ),
+                                  ),
+                                  subtitle: '${org.first['name']}',
+                                ),
+                              ),
+                            ],
+                          );
+                  },
+                ),
+                const SizedBox(height: 18),
+                ActivityCard(
+                  child: item(
+                    Icons.logout,
+                    '로그아웃',
+                    () => confirmAccountSignOut(c),
+                    color: PetColors.secondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ActivityCard(
+                  child: item(
+                    Icons.person_remove_outlined,
+                    '회원 탈퇴',
+                    () => open(const DeleteAccountPage()),
+                    color: Colors.red,
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileCardSkeleton extends StatelessWidget {
-  const _ProfileCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget bar(double width, double height) => Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: AppColors.neutralTint,
-        borderRadius: BorderRadius.circular(6),
-      ),
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: SectionCard(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                color: AppColors.neutralTint,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [bar(120, 18), const SizedBox(height: 8), bar(80, 14)],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({
-    required this.icon,
-    required this.iconColor,
-    required this.badgeColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final Color badgeColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 64),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              IconBadge(
-                icon: icon,
-                size: 40,
-                color: iconColor,
-                background: badgeColor,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: textTheme.titleSmall),
-                    Text(subtitle, style: textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: AppColors.textTertiary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    ),
+  );
 }
