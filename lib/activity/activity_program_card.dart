@@ -38,6 +38,7 @@ class ActivityListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = program, color = activityCategoryColor(p['category']);
+    if (p['source'] == 'welfare') return _welfareCard(p, color);
     final days = DateTime.tryParse('${p['deadline']}')
         ?.difference(DateTime.now())
         .inDays;
@@ -183,6 +184,71 @@ class ActivityListingCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _welfareCard(ActivityData p, Color color) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: ActivityCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              PetPill(
+                '${p['category']}',
+                color: color.withValues(alpha: .12),
+                ink: color,
+                fontSize: 13,
+              ),
+              const PetPill(
+                '전화·방문 신청',
+                color: PetColors.mint,
+                ink: PetColors.green,
+                fontSize: 13,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('${p['title']}', style: petText(22, weight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+            '${p['org_name']}',
+            style: petText(17, color: ActivityColors.muted),
+          ),
+          const SizedBox(height: 8),
+          _line(Icons.calendar_month_outlined, '${p['display_schedule']}'),
+          if ((p['raw_program'] as Map?)?['target'] != null)
+            _line(Icons.people_outline, '${p['raw_program']['target']}'),
+          if (p['distance_km'] is num)
+            _line(
+              Icons.near_me_outlined,
+              (p['distance_km'] as num) < .1
+                  ? '기준 장소에서 100m 이내 · 직선거리'
+                  : '기준 장소에서 ${(p['distance_km'] as num).toStringAsFixed(1)}km · 직선거리',
+            )
+          else
+            _line(Icons.near_me_outlined, '기준 장소에서 거리 확인 필요'),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(height: 1),
+          ),
+          Row(
+            children: [
+              Expanded(child: Text('${p['display_fee']}', style: petText(18))),
+              const Icon(Icons.chevron_right, color: ActivityColors.muted),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Text(
+            '모집 여부는 기관에 확인해 주세요',
+            style: petText(14, color: PetColors.secondary),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _line(IconData icon, String text) => Padding(
     padding: const EdgeInsets.only(top: 4),

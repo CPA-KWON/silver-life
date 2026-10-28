@@ -17,6 +17,9 @@ import 'activity_forms.dart';
 import 'activity_detail_page.dart';
 import 'activity_design.dart';
 import 'activity_program_card.dart';
+import 'activity_welfare_catalog.dart';
+import 'activity_welfare_detail.dart';
+import '../facility/welfare_programs.dart' show facilityNameMatches;
 
 part 'activity_section_views.dart';
 

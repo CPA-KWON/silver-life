@@ -34,8 +34,11 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
 
   void section(ActivitySection value) =>
       open(ActivitySectionPage(section: value, repository: repo));
-  void detail(ActivityData p) =>
-      open(ActivityDetailPage(programId: p['id'], repository: repo));
+  void detail(ActivityData p) => open(
+    p['source'] == 'welfare'
+        ? ActivityWelfareDetailPage(program: p)
+        : ActivityDetailPage(programId: p['id'], repository: repo),
+  );
   Future<void> plan({bool rebuild = false}) async {
     if (busy) return;
     if (rebuild &&
@@ -137,12 +140,77 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
           onTap: () => section(ActivitySection.programs),
           light: true,
         ),
+      if (d['welfare_unavailable'] == true) ...[
+        const SizedBox(height: 16),
+        ActivityEmpty(
+          '기관 안내 프로그램을 불러오지 못했어요',
+          message: '앱 신청 프로그램은 계속 확인할 수 있어요.',
+          action: '다시 시도',
+          onAction: reload,
+        ),
+      ] else
+        ...welfareRecommendations(d),
       const SizedBox(height: 12),
       Text(
         '거리는 기준 장소에서의 직선거리예요. 실제 이동 경로와 시간은 달라질 수 있어요.',
         textAlign: TextAlign.center,
         style: petText(14, color: PetColors.secondary),
       ),
+    ];
+  }
+
+  List<Widget> welfareRecommendations(ActivityData d) {
+    final pref = d['preferences'] as Map?;
+    final all = filter(activityRows(d['welfare_programs']));
+    final known = pref == null
+        ? all
+        : all
+              .where(
+                (p) => welfareMatchesPreferences(
+                  p,
+                  Map<String, dynamic>.from(pref),
+                ),
+              )
+              .toList();
+    final unknown = pref == null
+        ? <ActivityData>[]
+        : all
+              .where(
+                (p) =>
+                    p['distance_km'] == null &&
+                    welfareMatchesPreferences(
+                      p,
+                      Map<String, dynamic>.from(pref),
+                      includeUnlocated: true,
+                    ),
+              )
+              .toList();
+    return [
+      if (known.isNotEmpty) ...[
+        ActivityHeading('기관 안내 프로그램 ${known.length}개'),
+        Text(
+          pref == null
+              ? '전화·방문으로 신청하는 복지관 프로그램도 찾아보세요.'
+              : '관심 분야·직선거리 기준 안내예요. 이동수단·난이도·모집 여부는 기관에 확인해 주세요.',
+          style: petText(15, color: PetColors.secondary),
+        ),
+        const SizedBox(height: 12),
+        for (final p in known.take(3)) program(p),
+        ActivityButton(
+          '기관 프로그램 전체 보기',
+          light: true,
+          onTap: () => section(ActivitySection.programs),
+        ),
+      ],
+      if (unknown.isNotEmpty) ...[
+        const ActivityHeading('거리 확인이 필요한 기관 안내'),
+        Text(
+          '관심 분야는 맞지만 시설 위치가 아직 연결되지 않았어요. 추천 반경 안인지는 확인이 필요해요.',
+          style: petText(15, color: PetColors.secondary),
+        ),
+        const SizedBox(height: 12),
+        for (final p in unknown.take(2)) program(p),
+      ],
     ];
   }
 
@@ -1135,7 +1203,9 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
-            '모집 중 ${rows.length}개',
+            widget.section == ActivitySection.programs
+                ? '프로그램 ${rows.length}개'
+                : '모집 중 ${rows.length}개',
             style: petText(16, color: PetColors.secondary),
           ),
           DropdownButton<String>(
@@ -1157,12 +1227,12 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
       ),
       if (widget.place != null)
         Text(
-          '${widget.place!.name}에서 모집 중인 프로그램이에요.',
+          '${widget.place!.name}의 프로그램이에요. 신청 방법과 모집 여부를 확인해 주세요.',
           style: petText(16, color: PetColors.secondary),
         ),
       if (rows.isEmpty)
         ActivityEmpty(
-          q.isEmpty ? '현재 모집 중인 프로그램이 없어요.' : '“$q” 프로그램이 지금은 없어요',
+          q.isEmpty ? '현재 등록된 프로그램이 없어요.' : '“$q” 프로그램이 지금은 없어요',
           message: q.isEmpty
               ? '다른 분야도 살펴보거나\n나중에 다시 확인해 주세요'
               : '다른 이름으로 찾아보거나\n분야를 바꿔서 확인해 보세요',
@@ -1179,12 +1249,18 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
               : settings(d),
         ),
       for (final p in rows) program(p),
-      if (q.isNotEmpty &&
-          rows.isEmpty &&
-          activityRows(d['programs']).isNotEmpty) ...[
+      if (widget.section == ActivitySection.programs &&
+          d['welfare_unavailable'] == true)
+        ActivityEmpty(
+          '기관 안내 프로그램을 불러오지 못했어요',
+          message: '표시된 앱 신청 프로그램은 이용할 수 있어요.',
+          action: '다시 시도',
+          onAction: reload,
+        ),
+      if (q.isNotEmpty && rows.isEmpty && catalogPrograms(d).isNotEmpty) ...[
         const ActivityHeading('이런 활동은 어때요?'),
         for (final p
-            in activityRows(d['programs'])
+            in catalogPrograms(d)
                 .where(
                   (p) =>
                       p['kind'] ==
@@ -1226,6 +1302,8 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
                     'org_name',
                     'place_name',
                     'category',
+                    'source_category',
+                    'display_schedule',
                   ].any((key) => '${p[key] ?? ''}'.toLowerCase().contains(q))),
         )
         .toList();
@@ -1236,26 +1314,38 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         );
       }
       final field = sort == '마감일 순' ? 'deadline' : 'starts_at';
-      return '${a[field]}'.compareTo('${b[field]}');
+      final left = DateTime.tryParse('${a[field]}'),
+          right = DateTime.tryParse('${b[field]}');
+      if (left == null) return right == null ? 0 : 1;
+      if (right == null) return -1;
+      return left.compareTo(right);
     });
     return list;
   }
 
+  List<ActivityData> catalogPrograms(ActivityData d) => [
+    ...activityRows(d['programs']),
+    if (widget.section == ActivitySection.programs)
+      ...activityRows(d['welfare_programs']),
+  ];
+
   List<ActivityData> matchingPrograms(ActivityData d) =>
-      filter(activityRows(d['programs'])).where((p) {
+      filter(catalogPrograms(d)).where((p) {
         final place = widget.place;
         if (place != null) {
           final lat = p['lat'], lng = p['lng'];
-          return p['place_name']?.toString().trim() == place.name.trim() &&
-              lat is num &&
-              lng is num &&
-              Geolocator.distanceBetween(
-                    place.lat,
-                    place.lng,
-                    lat.toDouble(),
-                    lng.toDouble(),
-                  ) <=
-                  100;
+          return p['source'] == 'welfare'
+              ? facilityNameMatches(place.name, '${p['place_name']}')
+              : p['place_name']?.toString().trim() == place.name.trim() &&
+                    lat is num &&
+                    lng is num &&
+                    Geolocator.distanceBetween(
+                          place.lat,
+                          place.lng,
+                          lat.toDouble(),
+                          lng.toDouble(),
+                        ) <=
+                        100;
         }
         return p['kind'] ==
             (widget.section == ActivitySection.programs

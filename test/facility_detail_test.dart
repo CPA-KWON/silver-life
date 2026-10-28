@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:silver_life/facility/facility_distance.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:silver_life/app_theme.dart';
@@ -101,6 +103,65 @@ void main() {
         ),
         home: FacilityDetailPage(result: result, onClose: () {}),
       );
+
+  test('distance labels never round a nearby facility to 0.0km', () {
+    expect(facilityDistanceLabel(0), contains('10m 이내'));
+    expect(facilityDistanceLabel(76), contains('80m'));
+    expect(facilityDistanceLabel(2300), contains('2.3km'));
+    expect(facilityDistanceLabel(double.nan), contains('현재 위치를 확인'));
+    expect(facilityDistanceLabel(null), isNot(contains('0.0')));
+  });
+
+  testWidgets(
+    'facility distance uses user GPS rather than stored search-center distance',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FacilityDetailPage(
+            result: facility,
+            onClose: () {},
+            positionLoader: () async => Position(
+              longitude: 127,
+              latitude: 37.6,
+              timestamp: DateTime.now(),
+              accuracy: 10,
+              altitude: 0,
+              altitudeAccuracy: 0,
+              heading: 0,
+              headingAccuracy: 0,
+              speed: 0,
+              speedAccuracy: 0,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('현재 위치에서 약 11.1km · 직선거리'), findsOneWidget);
+      expect(find.textContaining('0.1km'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 20));
+    },
+  );
+  testWidgets('missing GPS does not claim zero distance', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityDetailPage(
+          result: facility,
+          onClose: () {},
+          positionLoader: () async => throw StateError('GPS unavailable'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('현재 위치를 확인하면 거리를 볼 수 있어요'), findsOneWidget);
+    expect(find.textContaining('0.0km'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 20));
+  });
 
   testWidgets(
     'checkins and meetups start together without waiting for one another',

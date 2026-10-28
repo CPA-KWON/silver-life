@@ -103,7 +103,6 @@ String _normalize(String name) => name.replaceAll(_fillerWords, '');
 /// 상도은빛복지관"), so filler words are ignored and either name containing
 /// the other counts — but only for reasonably specific names, so a bare
 /// "복지관" can't match everything.
-@visibleForTesting
 bool facilityNameMatches(String facilityName, String programFacilityName) {
   final place = _normalize(facilityName);
   final program = _normalize(programFacilityName);

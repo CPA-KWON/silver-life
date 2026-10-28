@@ -21,6 +21,9 @@ import 'local_facility_search.dart';
 import 'naver_local_search.dart';
 import 'safe_map_location_tracker.dart';
 import 'welfare_programs.dart';
+import 'facility_distance.dart';
+
+import 'package:geolocator/geolocator.dart';
 
 const kFacilityCategories = ['병원', '약국', '경로당', '복지관'];
 const kHospitalSubcategories = ['내과', '정형외과', '안과', '치과', '이비인후과', '피부과'];
@@ -588,9 +591,11 @@ class FacilityDetailPage extends StatefulWidget {
     this.enableRealtime = true,
     this.refreshVersion = 0,
     this.showBackButton = true,
+    this.positionLoader = loadFacilityPosition,
   });
 
   final FacilityResult result;
+  final FacilityPositionLoader positionLoader;
   final ValueChanged<String>? onOpenPost;
   final bool enableRealtime;
   final int refreshVersion;
@@ -606,6 +611,8 @@ class FacilityDetailPage extends StatefulWidget {
 }
 
 class _FacilityDetailPageState extends State<FacilityDetailPage> {
+  double? _currentDistance;
+  bool _distanceLoading = true;
   bool? _isFavorite;
   bool _isToggling = false;
 
@@ -635,6 +642,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   void initState() {
     super.initState();
     _loadDetails();
+    unawaited(_loadDistance());
     _expiryTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) => _safeRefresh(),
@@ -648,6 +656,38 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     final channel = _checkinChannel;
     if (channel != null) Supabase.instance.client.removeChannel(channel);
     super.dispose();
+  }
+
+  Future<void> _loadDistance() async {
+    Position? p;
+    try {
+      p = await widget.positionLoader();
+    } catch (_) {
+      /* Distance stays unknown. */
+    }
+    final target = widget.result;
+    final valid =
+        p != null &&
+        p.latitude.isFinite &&
+        p.longitude.isFinite &&
+        p.latitude.abs() <= 90 &&
+        p.longitude.abs() <= 180 &&
+        target.lat.isFinite &&
+        target.lng.isFinite &&
+        target.lat.abs() <= 90 &&
+        target.lng.abs() <= 180;
+    if (!mounted) return;
+    setState(() {
+      _currentDistance = valid
+          ? Geolocator.distanceBetween(
+              p!.latitude,
+              p.longitude,
+              target.lat,
+              target.lng,
+            )
+          : null;
+      _distanceLoading = false;
+    });
   }
 
   Future<void> _loadDetails() async {
@@ -915,9 +955,9 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
                   const SizedBox(height: 10),
                   _InfoRow(
                     icon: Icons.directions_walk,
-                    text: result.distanceMeters.isFinite
-                        ? '약 ${(result.distanceMeters / 1000).toStringAsFixed(1)}km'
-                        : '거리는 지도에서 위치를 확인해주세요.',
+                    text: _distanceLoading
+                        ? '현재 위치에서 거리를 확인하고 있어요'
+                        : facilityDistanceLabel(_currentDistance),
                   ),
                   if (result.telephone.isNotEmpty) ...[
                     const SizedBox(height: 20),

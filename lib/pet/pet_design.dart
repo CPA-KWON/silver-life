@@ -101,13 +101,24 @@ class PetPill extends StatelessWidget {
       color: color,
       borderRadius: BorderRadius.circular(30),
     ),
-    child: Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 4,
-      children: [
-        if (icon != null) Icon(icon, size: 18, color: ink),
-        Text(text, style: petText(fontSize, color: ink)),
-      ],
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: ink),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            maxLines: 1,
+            softWrap: false,
+            style: petText(fontSize, color: ink),
+          ),
+        ],
+      ),
     ),
   );
 }

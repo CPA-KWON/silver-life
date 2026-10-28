@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'activity_welfare_catalog.dart';
+
 typedef ActivityData = Map<String, dynamic>;
 List<ActivityData> activityRows(dynamic value) => (value as List? ?? [])
     .map((e) => Map<String, dynamic>.from(e as Map))
@@ -50,6 +52,15 @@ class ActivityRepository {
           .like('reference', 'program-mission:%');
     } catch (_) {
       data['mission_rewards_unavailable'] = true;
+    }
+    try {
+      data['welfare_programs'] = await ActivityWelfareCatalog(client).load(
+        data['preferences'] == null
+            ? null
+            : Map<String, dynamic>.from(data['preferences']),
+      );
+    } catch (_) {
+      data['welfare_unavailable'] = true;
     }
     return data;
   }

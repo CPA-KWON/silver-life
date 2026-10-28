@@ -32,6 +32,7 @@ class FakeActivityRepository extends ActivityRepository {
       'deadline': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
     },
   ];
+  final welfarePrograms = <ActivityData>[];
   final offers = <ActivityData>[];
   final applications = <ActivityData>[];
   final missions = <ActivityData>[];
@@ -55,6 +56,7 @@ class FakeActivityRepository extends ActivityRepository {
       'benefits': benefits,
       'mission_rewards': missionRewards,
       'programs': programs,
+      'welfare_programs': welfarePrograms,
       'recommendations': programs
           .where((p) => p['kind'] == 'activity')
           .toList(),
