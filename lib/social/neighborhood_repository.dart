@@ -31,18 +31,58 @@ class NeighborhoodRepository {
       }
       return true;
     } on PostgrestException catch (e) {
-      if (['PGRST202', '42883', '42P01'].contains(e.code)) return false;
+      if (['PGRST202', '42883', '42P01'].contains(e.code)) {
+        var complete = true;
+        for (final p in rows) {
+          if (p['category'] != '동네모임') {
+            complete = false;
+            continue;
+          }
+          try {
+            final r = Map<String, dynamic>.from(
+              await client.rpc(
+                'meetup_participation',
+                params: {'p_post': p['id']},
+              ) as Map,
+            );
+            p.addAll({
+              'member_count': r['count'],
+              'max_participants': r['max_participants'],
+              'joined': r['joined'],
+              'participants': r['participants'],
+            });
+          } on PostgrestException catch (e) {
+            if (!['PGRST202', '42883', '42P01'].contains(e.code)) rethrow;
+            complete = false;
+          }
+        }
+        return complete;
+      }
       rethrow;
     }
   }
 
-  Future<void> participate(String id, bool value) => client.rpc(
-    'meetup_participate',
-    params: {'target': id, 'participating': value},
-  );
+  Future<void> participate(String id, bool value) async {
+    try {
+      await client.rpc(
+        'meetup_participate',
+        params: {'target': id, 'participating': value},
+      );
+    } on PostgrestException catch (e) {
+      if (!['PGRST202', '42883'].contains(e.code)) rethrow;
+      await client.rpc(
+        value ? 'meetup_join' : 'meetup_leave',
+        params: {'p_post': id},
+      );
+    }
+  }
+
   Future<void> like(String id, bool value) async {
     if (value) {
-      await client.from('post_likes').upsert({'user_id': uid, 'post_id': id});
+      await client.from('post_likes').upsert({
+        'user_id': uid,
+        'post_id': id,
+      }, ignoreDuplicates: true);
     } else {
       await client
           .from('post_likes')
@@ -54,7 +94,10 @@ class NeighborhoodRepository {
 
   Future<void> block(String id) async {
     if (id == uid) throw StateError('본인은 차단할 수 없어요');
-    await client.from('user_blocks').upsert({'user_id': uid, 'blocked_id': id});
+    await client.from('user_blocks').upsert({
+      'user_id': uid,
+      'blocked_id': id,
+    }, ignoreDuplicates: true);
   }
 
   Future<void> unblock(String id) => client

@@ -8,6 +8,13 @@ import 'package:silver_life/core/meetup_category.dart';
 class FakeBackend {
   static const user = '00000000-0000-0000-0000-000000000001';
   bool failProfile = false, failFavorites = false, failPosts = false;
+  bool failAccountDelete = false;
+  // 동네모임 참여: 테스트 사용자가 참여한(모임장이 아닌) 모임 id와,
+  // 모임마다 이미 참여한 다른 사람 수.
+  final meetupJoined = <String>{};
+  int meetupOthers = 0;
+  int meetupMax = 10;
+  int accountDeletes = 0;
   int postWrites = 0, commentWrites = 0, favoriteWrites = 0, checkinWrites = 0;
   final requests = <Uri>[];
   final profile = <String, dynamic>{
@@ -113,6 +120,11 @@ class FakeBackend {
     favoriteWrites = 0;
     checkinWrites = 0;
     profile['nickname'] = '한결';
+    failAccountDelete = false;
+    meetupJoined.clear();
+    meetupOthers = 0;
+    meetupMax = 10;
+    accountDeletes = 0;
   }
 
   Future<http.Response> handle(http.Request request) async {
@@ -134,6 +146,80 @@ class FakeBackend {
         }, status: 400);
       }
       return response(session);
+    }
+    if (name.startsWith('meetup_') || name == 'my_meetups') {
+      final body =
+          (request.body.isEmpty ? null : jsonDecode(request.body)) as Map? ??
+          {};
+      final postId = body['p_post'] as String?;
+      final meetup = posts.where((p) => p['id'] == postId).firstOrNull;
+      bool isHost(Map p) => p['author_id'] == user;
+      bool joinedTo(Map p) => isHost(p) || meetupJoined.contains(p['id']);
+      bool isPast(Map p) =>
+          !DateTime.parse(p['event_at'] as String).isAfter(DateTime.now());
+      int countOf(Map p) =>
+          1 + meetupOthers + (!isHost(p) && joinedTo(p) ? 1 : 0);
+      http.Response fail(String message) =>
+          response({'message': message, 'code': 'P0001'}, status: 400);
+      switch (name) {
+        case 'my_meetups':
+          return response([
+            for (final p in posts.where(
+              (p) => p['category'] == kMeetupCategory && joinedTo(p),
+            ))
+              {
+                'id': p['id'],
+                'title': p['title'],
+                'event_at': p['event_at'],
+                'facility_name': facilities.first['name'],
+                'is_host': isHost(p),
+                'count': countOf(p),
+                'max_participants': meetupMax,
+              },
+          ]);
+        case 'meetup_participation':
+          if (meetup == null) return fail('모임을 찾을 수 없어요.');
+          return response({
+            'max_participants': meetupMax,
+            'count': countOf(meetup),
+            'joined': joinedTo(meetup),
+            'is_host': isHost(meetup),
+            'is_past': isPast(meetup),
+            'participants': [
+              {
+                'nickname': isHost(meetup) ? profile['nickname'] : '모임장',
+                'is_host': true,
+                'is_me': isHost(meetup),
+              },
+              for (var i = 0; i < meetupOthers; i++)
+                {'nickname': '이웃$i', 'is_host': false, 'is_me': false},
+              if (!isHost(meetup) && joinedTo(meetup))
+                {
+                  'nickname': profile['nickname'],
+                  'is_host': false,
+                  'is_me': true,
+                },
+            ],
+          });
+        case 'meetup_join':
+          if (meetup == null) return fail('모임을 찾을 수 없어요.');
+          if (isPast(meetup)) return fail('이미 지난 모임이에요.');
+          if (countOf(meetup) >= meetupMax) return fail('모집이 마감됐어요.');
+          meetupJoined.add(postId!);
+          return response('');
+        case 'meetup_leave':
+          if (meetup == null) return fail('모임을 찾을 수 없어요.');
+          if (isHost(meetup)) return fail('모임장은 참여를 취소할 수 없어요.');
+          meetupJoined.remove(postId);
+          return response('');
+      }
+    }
+    if (name == 'delete_my_account') {
+      if (failAccountDelete) {
+        return response({'message': 'failed', 'code': 'P0001'}, status: 400);
+      }
+      accountDeletes++;
+      return response('');
     }
     if (name == 'facility_presence') {
       final body = jsonDecode(request.body) as Map;

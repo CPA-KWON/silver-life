@@ -1,3 +1,4 @@
+import 'delete_account.dart';
 import 'sign_out.dart';
 
 import 'package:flutter/material.dart';
@@ -212,6 +213,15 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                   OutlinedButton(
                     onPressed: _confirmSignOut,
                     child: const Text('로그아웃'),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: const BorderSide(color: AppColors.danger),
+                    ),
+                    onPressed: () => confirmAccountDeletion(context),
+                    child: const Text('회원 탈퇴'),
                   ),
                 ],
               ),

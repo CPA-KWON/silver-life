@@ -125,6 +125,7 @@ class _PostState extends State<PostDetailPage> {
     );
     if (!mounted) return;
     if (v == 'report') await showReportFlow(context, postId: widget.postId);
+    if (!mounted) return;
     if (v == 'block' &&
         await activityDialog(
           context,
@@ -140,6 +141,7 @@ class _PostState extends State<PostDetailPage> {
         if (mounted) await activityFailure(context, title: '차단하지 못했어요');
       }
     }
+    if (!mounted) return;
     if (v == 'delete' &&
         await activityDialog(
           context,
@@ -316,6 +318,15 @@ class _PostState extends State<PostDetailPage> {
       final meetup = p?['category'] == kMeetupCategory;
       final own = p?['author_id'] == client.auth.currentUser?.id;
       final ended = p != null && meetupEnded(p);
+      final started =
+          p != null &&
+          (DateTime.tryParse('${p['event_at']}')?.isBefore(DateTime.now()) ??
+              false);
+      final full =
+          p?['member_count'] is num &&
+          (p!['member_count'] as num) >=
+              (p['max_participants'] as num? ?? 10) &&
+          p['joined'] != true;
       return NeighborhoodScreen(
         title: meetup ? '모임 상세' : '게시글',
         tint: meetup ? neighborhoodMint : neighborhoodLavender,
@@ -348,14 +359,16 @@ class _PostState extends State<PostDetailPage> {
                         Expanded(
                           flex: 2,
                           child: ActivityButton(
-                            ended
-                                ? '참여 기간이 끝났어요'
+                            ended || started
+                                ? '지난 모임'
+                                : full
+                                ? '모집 마감'
                                 : own
                                 ? '모임 수정'
                                 : p['joined'] == true
                                 ? '참여 취소'
                                 : '참여하기',
-                            onTap: ended || busy
+                            onTap: ended || started || full || busy
                                 ? null
                                 : own
                                 ? () => menu(p)
@@ -544,11 +557,16 @@ class _PostState extends State<PostDetailPage> {
                         style: petText(19, weight: FontWeight.w500),
                       ),
                     ),
+                    if (own)
+                      Text(
+                        '모임장은 자동으로 참여해요.',
+                        style: petText(15, color: PetColors.secondary),
+                      ),
                     NeighborhoodHeading(
                       '참여하는 이웃',
                       count: p['member_count'] == null
                           ? '확인 필요'
-                          : '${p['member_count']}/${p['meetup_capacity'] ?? 10}명',
+                          : '${p['member_count']}/${p['max_participants'] ?? 10}명',
                     ),
                     ActivityCard(
                       child: Wrap(
@@ -565,7 +583,14 @@ class _PostState extends State<PostDetailPage> {
                                     radius: 18,
                                   ),
                                   const SizedBox(width: 6),
-                                  Text('${r['nickname']}', style: petText(16)),
+                                  Text(
+                                    "${r['nickname']}${r['is_host'] == true
+                                        ? ' (모임장)'
+                                        : r['is_me'] == true
+                                        ? ' (나)'
+                                        : ''}",
+                                    style: petText(16),
+                                  ),
                                 ],
                               )
                           else

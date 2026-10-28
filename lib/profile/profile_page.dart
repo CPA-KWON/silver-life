@@ -12,6 +12,7 @@ import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
 import 'extra_settings_pages.dart';
 import 'sign_out.dart';
+import '../meetup/my_meetups_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, this.activityRepository});
@@ -205,6 +206,12 @@ class _ProfileState extends State<ProfilePage> {
                             isMeetup: true,
                           ),
                         ),
+                        color: PetColors.green,
+                      ),
+                      item(
+                        Icons.groups_outlined,
+                        '참여한 모임',
+                        () => open(const MyMeetupsPage()),
                         color: PetColors.green,
                       ),
                       item(

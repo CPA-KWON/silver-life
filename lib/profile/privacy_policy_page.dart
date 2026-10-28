@@ -5,7 +5,7 @@ import '../ui/design_widgets.dart';
 /// Draft privacy policy text — reviewed for accuracy against what the app
 /// actually collects/stores, but not a substitute for legal review before
 /// the Play Store submission (see README "배포 전 남은 작업").
-const _lastUpdated = '2026-09-21';
+const _lastUpdated = '2026-10-28';
 
 const _sections = <(String, String)>[
   (
@@ -45,8 +45,8 @@ const _sections = <(String, String)>[
   (
     '7. 이용자의 권리와 행사 방법',
     '이용자는 [내 정보 > 회원정보 관리]에서 언제든지 본인의 개인정보를 열람·수정할 수 '
-        '있으며, 로그아웃 및 회원 탈퇴(문의처를 통한 요청)를 통해 개인정보 삭제를 요청할 '
-        '수 있습니다.',
+        '있으며, [내 정보 > 회원정보 관리 > 회원 탈퇴]에서 직접 탈퇴하면 개인정보와 작성한 글·댓글·'
+        '모임, 포인트, 콩이 정보가 지체 없이 삭제됩니다.',
   ),
   (
     '8. 개인정보의 안전성 확보 조치',

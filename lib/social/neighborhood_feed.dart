@@ -296,7 +296,7 @@ class _FeedState extends State<NeighborhoodFeed> {
     final d = DateTime.tryParse('${p['event_at']}')?.toLocal();
     final ended = meetupEnded(p);
     final count = p['member_count'] as num?,
-        capacity = p['meetup_capacity'] as num?;
+        capacity = p['max_participants'] as num?;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: ActivityCard(

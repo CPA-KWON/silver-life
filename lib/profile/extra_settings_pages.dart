@@ -187,21 +187,26 @@ class _DeleteState extends State<DeleteAccountPage> {
           uid = c.auth.currentUser!.id,
           email = c.auth.currentUser!.email!;
       await c.auth.signInWithPassword(email: email, password: password.text);
-      for (final folder in ['posts', 'avatars']) {
-        while (true) {
-          final objects = await c.storage
-              .from(SocialMedia.bucket)
-              .list(
-                path: '$uid/$folder',
-                searchOptions: const SearchOptions(limit: 100),
-              );
-          if (objects.isEmpty) break;
-          await SocialMedia.remove([
-            for (final o in objects) '$uid/$folder/${o.name}',
-          ]);
+      try {
+        for (final folder in ['posts', 'avatars']) {
+          while (true) {
+            final objects = await c.storage
+                .from(SocialMedia.bucket)
+                .list(
+                  path: '$uid/$folder',
+                  searchOptions: const SearchOptions(limit: 100),
+                );
+            if (objects.isEmpty) break;
+            await SocialMedia.remove([
+              for (final o in objects) '$uid/$folder/${o.name}',
+            ]);
+          }
         }
+      } on StorageException catch (e) {
+        // Existing accounts may predate the private-photo bucket.
+        if (e.statusCode != '404') rethrow;
       }
-      await c.rpc('delete_my_account', params: {'confirmation': '회원탈퇴'});
+      await c.rpc('delete_my_account');
       await c.auth.signOut(scope: SignOutScope.local);
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on AuthException {
@@ -248,13 +253,22 @@ class _DeleteState extends State<DeleteAccountPage> {
           ),
         ),
         const NeighborhoodHeading('떠나시는 이유를 알려 주세요'),
-        for (final r in ['쓰기 어려워요', '자주 안 써요', '다른 앱을 써요', '개인정보가 걱정돼요', '기타'])
-          RadioListTile<String>(
-            title: Text(r),
-            value: r,
-            groupValue: reason,
-            onChanged: (v) => setState(() => reason = v),
+        RadioGroup<String>(
+          groupValue: reason,
+          onChanged: (v) => setState(() => reason = v),
+          child: Column(
+            children: [
+              for (final r in [
+                '쓰기 어려워요',
+                '자주 안 써요',
+                '다른 앱을 써요',
+                '개인정보가 걱정돼요',
+                '기타',
+              ])
+                RadioListTile<String>(title: Text(r), value: r),
+            ],
           ),
+        ),
         TextField(
           controller: password,
           obscureText: true,

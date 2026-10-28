@@ -43,7 +43,8 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   bool _isSaving = false;
   late String _topic =
       widget.existingPost?['meetup_topic'] ?? meetupTopics.first;
-  late int _capacity = widget.existingPost?['meetup_capacity'] ?? 10;
+  late int _capacity =
+      widget.existingPost?['max_participants'] ?? kDefaultMaxParticipants;
   late int _duration = widget.existingPost?['duration_minutes'] ?? 60;
 
   late DateTime? _eventDate = _initialEventAt?.toLocal();
@@ -184,7 +185,7 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
         'event_at': eventAt.toUtc().toIso8601String(),
         'facility_id': facilityId,
         'meetup_topic': _topic,
-        'meetup_capacity': _capacity,
+        'max_participants': _capacity,
         'duration_minutes': _duration,
       };
       if (_isEditing) {

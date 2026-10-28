@@ -97,8 +97,9 @@ class _AgencyState extends State<ActivityAgencyPage> {
           : '선택한 신청자에게 승인 상태가 표시돼요.',
       action: action == 'approved' ? '승인하기' : '참여 완료 확인',
       color: PetColors.green,
-    ))
+    )) {
       return;
+    }
     if (!mounted) return;
     setState(() => busy = true);
     try {
@@ -709,8 +710,9 @@ class _ApplicantState extends State<AgencyApplicantPage> {
       title: action == 'approved' ? '신청을 승인할까요?' : '실제 참여 완료를 확인할까요?',
       message: '신청자 화면과 기존 활동 이력에 반영돼요.',
       action: action == 'approved' ? '승인하기' : '참여 완료 확인',
-    ))
+    )) {
       return;
+    }
     if (!mounted) return;
     setState(() => busy = true);
     try {

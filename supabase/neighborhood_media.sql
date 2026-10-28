@@ -16,13 +16,12 @@ create or replace function public.neighborhood_validate_avatar() returns trigger
  if new.avatar_path is not null and new.avatar_path not like new.id::text||'/avatars/%' then raise exception '사진 경로를 확인해 주세요'; end if;return new;end $$;
 drop trigger if exists neighborhood_avatar on public.profiles;
 create trigger neighborhood_avatar before insert or update on public.profiles for each row execute function public.neighborhood_validate_avatar();
-create or replace function public.delete_my_account(confirmation text) returns void language plpgsql security definer set search_path='' as $$
+create or replace function public.delete_my_account() returns void language plpgsql security definer set search_path='' as $$
 declare uid uuid:=auth.uid();begin
  if uid is null then raise exception '로그인이 필요해요' using errcode='42501';end if;
- if confirmation<>'회원탈퇴' then raise exception '탈퇴 확인 문구가 필요해요';end if;
  if exists(select 1 from storage.objects where bucket_id='neighborhood-media' and (storage.foldername(name))[1]=uid::text) then raise exception '먼저 첨부 사진을 정리한 뒤 다시 시도해 주세요';end if;
  delete from auth.users where id=uid;
 end $$;
-revoke all on function public.delete_my_account(text) from public,anon;
-grant execute on function public.delete_my_account(text) to authenticated;
+revoke all on function public.delete_my_account() from public,anon;
+grant execute on function public.delete_my_account() to authenticated;
 commit;

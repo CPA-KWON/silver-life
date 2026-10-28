@@ -13,6 +13,7 @@ import '../community/community_page.dart';
 import '../core/meetup_category.dart';
 import '../facility/nearby_facilities_page.dart';
 import '../meetup/meetup_page.dart';
+import '../meetup/my_meetups_page.dart';
 import '../notices/notice_repository.dart';
 import '../notices/notice_pages.dart';
 import '../pet/pet_preview_controller.dart';
@@ -97,8 +98,25 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<List<ActivityData>> loadMeetups(Map<String, dynamic> profile) async {
+    // Meetups I joined come first (marked "참여 예정"), then the rest of my
+    // district's upcoming meetups. Joined ones may be outside my district.
+    final joined = await loadMyMeetups()
+        .then(
+          (rows) => [
+            for (final m in rows.where(isUpcomingMeetup))
+              <String, dynamic>{
+                'id': m['id'],
+                'title': m['title'],
+                'event_at': m['event_at'],
+                'facilities': {'name': m['facility_name']},
+                'joined': true,
+              },
+          ],
+        )
+        .catchError((_) => <Map<String, dynamic>>[]);
+    final joinedIds = {for (final m in joined) m['id']};
     // Same facility-region filter as the existing meetup list. Public listings
-    // have no participation status: do not label them as the user's enrolments.
+    // carry no participation status, so they are not labelled as joined.
     var query = Supabase.instance.client
         .from('posts')
         .select(
@@ -111,7 +129,10 @@ class _HomeTabState extends State<HomeTab> {
     if (district != null && district != '') {
       query = query.eq('facilities.region_sigungu', district);
     }
-    return List<ActivityData>.from(await query.order('event_at').limit(2));
+    final nearby = List<ActivityData>.from(
+      await query.order('event_at').limit(2 + joined.length),
+    ).where((m) => !joinedIds.contains(m['id']));
+    return [...joined, ...nearby];
   }
 
   Future<List<ActivityData>> loadNews(Map<String, dynamic> profile) async {
@@ -476,6 +497,7 @@ class _HomeTabState extends State<HomeTab> {
                       label: '${meetups[i]['title']}',
                       subtitle:
                           '${when(meetups[i]['event_at'])} · ${meetups[i]['facilities']?['name'] ?? '장소 확인'}',
+                      confirmed: meetups[i]['joined'] == true,
                       onTap: () =>
                           open(PostDetailPage(postId: '${meetups[i]['id']}')),
                     ),

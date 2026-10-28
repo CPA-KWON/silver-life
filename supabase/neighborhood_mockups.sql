@@ -1,7 +1,7 @@
--- Additional mockups: additive schema. Run after existing integration/activity SQL.
+-- Additional mockups: additive schema. Apply account_deletion.sql and meetup_participation.sql from the team first, plus existing integration/activity SQL.
 begin;
 alter table public.posts add column if not exists meetup_topic text not null default '산책·운동';
-alter table public.posts add column if not exists meetup_capacity integer not null default 10 check(meetup_capacity between 2 and 100);
+alter table public.posts add column if not exists max_participants integer not null default 10 check(max_participants between 2 and 30);
 alter table public.posts add column if not exists duration_minutes integer not null default 60 check(duration_minutes between 15 and 1440);
 alter table public.posts add column if not exists meetup_cancelled boolean not null default false;
 alter table public.posts add column if not exists image_paths text[] not null default '{}';
@@ -17,24 +17,13 @@ create table if not exists public.post_likes (
  user_id uuid not null references auth.users on delete cascade,
  post_id uuid not null references public.posts on delete cascade,
  created_at timestamptz not null default now(),primary key(user_id,post_id));
-create table if not exists public.meetup_members (
- user_id uuid not null references auth.users on delete cascade,
- post_id uuid not null references public.posts on delete cascade,
- joined_at timestamptz not null default now(), active boolean not null default true,
- primary key(user_id,post_id));
-create index if not exists meetup_members_post on public.meetup_members(post_id) where active;
 alter table public.user_blocks enable row level security;
 alter table public.post_likes enable row level security;
-alter table public.meetup_members enable row level security;
 drop policy if exists user_blocks_own on public.user_blocks;
 create policy user_blocks_own on public.user_blocks for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());
 drop policy if exists post_likes_own on public.post_likes;
 create policy post_likes_own on public.post_likes for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid() and exists(select 1 from public.posts p where p.id=post_id));
-drop policy if exists meetup_members_own on public.meetup_members;
-create policy meetup_members_own on public.meetup_members for select to authenticated using(user_id=auth.uid());
 grant select,insert,delete on public.user_blocks,public.post_likes to authenticated;
-grant select on public.meetup_members to authenticated;
-revoke insert,update,delete on public.meetup_members from anon,authenticated;
 -- A restrictive policy composes with, and never widens, the existing report policies.
 drop policy if exists posts_blocked_authors on public.posts;
 create policy posts_blocked_authors on public.posts as restrictive for select to authenticated
@@ -51,35 +40,76 @@ begin
  if cardinality(post_ids)>500 then raise exception '요청이 너무 많아요'; end if;
  select coalesce(jsonb_agg(jsonb_build_object('id',p.id,'liked',exists(select 1 from public.post_likes l where l.post_id=p.id and l.user_id=uid),
  'likes',(select count(*) from public.post_likes l where l.post_id=p.id),
- 'joined',p.author_id=uid or exists(select 1 from public.meetup_members m where m.post_id=p.id and m.user_id=uid and m.active),
- 'member_count',1+(select count(*) from public.meetup_members m where m.post_id=p.id and m.user_id<>p.author_id and m.active),
- 'participants',coalesce((select jsonb_agg(jsonb_build_object('nickname',r.nickname)) from public.public_profiles r where
- (r.id=p.author_id or exists(select 1 from public.meetup_members m where m.post_id=p.id and m.user_id=r.id and m.active))
+ 'joined',p.author_id=uid or exists(select 1 from public.meetup_participants m where m.post_id=p.id and m.user_id=uid),
+ 'member_count',(select count(*) from public.meetup_participants m where m.post_id=p.id),
+ 'participants',coalesce((select jsonb_agg(jsonb_build_object('nickname',r.nickname,'is_host',r.id=p.author_id,'is_me',r.id=uid)) from public.public_profiles r where
+ (r.id=p.author_id or exists(select 1 from public.meetup_participants m where m.post_id=p.id and m.user_id=r.id))
  and not exists(select 1 from public.user_blocks b where b.user_id=uid and b.blocked_id=r.id)),'[]'::jsonb)
  )),'[]'::jsonb) into result from public.posts p
  where p.id=any(post_ids) and (p.author_id=uid or not public.post_is_hidden(p.id))
  and not exists(select 1 from public.user_blocks b where b.user_id=uid and b.blocked_id=p.author_id);
  return result;
 end $$;
+-- Use the team's canonical participant table and RPCs; no second membership store.
 create or replace function public.meetup_participate(target uuid,participating boolean) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare uid uuid:=auth.uid(); p public.posts; n integer;
+declare uid uuid:=auth.uid(); p public.posts; is_joined boolean;
 begin
- if uid is null then raise exception '로그인이 필요해요' using errcode='42501'; end if;
+ if uid is null then raise exception '로그인이 필요해요' using errcode='42501';end if;
  select * into p from public.posts where id=target for update;
- if p.id is null or p.category<>'동네모임' or public.post_is_hidden(target)
- or exists(select 1 from public.user_blocks b where b.user_id=uid and b.blocked_id=p.author_id) then raise exception '모임을 확인할 수 없어요'; end if;
- if p.meetup_cancelled or p.event_at<=now() then raise exception '끝나거나 취소된 모임은 참여 상태를 바꿀 수 없어요'; end if;
- if p.author_id=uid then
-  if not participating then raise exception '개설자는 모임 수정에서 모임을 취소해 주세요'; end if;
- else
-  if participating then
-   select 1+count(*) into n from public.meetup_members where post_id=target and active and user_id<>p.author_id;
-   if n>=p.meetup_capacity and not exists(select 1 from public.meetup_members where post_id=target and user_id=uid and active) then raise exception '모집 정원이 찼어요'; end if;
-   insert into public.meetup_members(user_id,post_id) values(uid,target) on conflict(user_id,post_id) do update set active=true,joined_at=now();
-  else update public.meetup_members set active=false where user_id=uid and post_id=target; end if;
- end if;
+ if p.id is null or p.category<>'동네모임' or (p.author_id<>uid and public.post_is_hidden(target))
+ or exists(select 1 from public.user_blocks b where b.user_id=uid and b.blocked_id=p.author_id) then raise exception '모임을 확인할 수 없어요';end if;
+ if p.meetup_cancelled or p.event_at<=now() then raise exception '끝나거나 취소된 모임은 참여 상태를 바꿀 수 없어요';end if;
+ select exists(select 1 from public.meetup_participants where post_id=target and user_id=uid) into is_joined;
+ if participating and not is_joined then perform public.meetup_join(target);
+ elsif not participating and is_joined then perform public.meetup_leave(target);end if;
  return public.neighborhood_state(array[target]);
+end $$;
+-- Also guard old app versions calling the team's join RPC directly.
+create or replace function public.neighborhood_membership_guard() returns trigger language plpgsql security definer set search_path='' as $$
+declare p public.posts;begin
+ select * into p from public.posts where id=new.post_id for update;
+ if auth.uid() is not null and (p.meetup_cancelled or exists(select 1 from public.user_blocks b where b.user_id=new.user_id and b.blocked_id=p.author_id)) then raise exception '참여할 수 없는 모임이에요';end if;
+ return new;end $$;
+drop trigger if exists neighborhood_membership_guard on public.meetup_participants;
+create trigger neighborhood_membership_guard before insert on public.meetup_participants for each row execute function public.neighborhood_membership_guard();
+create or replace function public.meetup_participation(p_post uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  u uuid := auth.uid();
+  m public.posts;
+begin
+  if u is null then
+    raise exception '로그인이 필요해요.' using errcode = '42501';
+  end if;
+  select * into m from public.posts where id = p_post;
+  if not found or m.category <> '동네모임'
+     or (m.author_id <> u and public.post_is_hidden(m.id))
+     or exists(select 1 from public.user_blocks b where b.user_id=u and b.blocked_id=m.author_id) then
+    raise exception '모임을 찾을 수 없어요.' using errcode = 'P0001';
+  end if;
+  return jsonb_build_object(
+    'max_participants', m.max_participants,
+    'count', (select count(*) from public.meetup_participants where post_id = m.id),
+    'joined', exists (select 1 from public.meetup_participants
+                      where post_id = m.id and user_id = u),
+    'is_host', m.author_id = u,
+    'is_past', m.meetup_cancelled or m.event_at is null or m.event_at <= now(),
+    'participants', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'nickname', coalesce(pp.nickname, '알 수 없음'),
+               'is_host', mp.user_id = m.author_id,
+               'is_me', mp.user_id = u)
+             order by (mp.user_id = m.author_id) desc, mp.joined_at)
+      from public.meetup_participants mp
+      left join public.public_profiles pp on pp.id = mp.user_id
+      where mp.post_id = m.id), '[]'::jsonb)
+  );
 end $$;
 -- Lock the post during edits too; cannot shrink capacity below actual attendees.
 create or replace function public.neighborhood_validate_post() returns trigger
@@ -87,7 +117,7 @@ language plpgsql security definer set search_path='' as $$
 begin
  if new.category='동네모임' then
   if new.meetup_topic not in('산책·운동','바둑·장기','노래·취미','배움','봉사') then raise exception '모임 분야를 확인해 주세요'; end if;
-  if new.meetup_capacity < (select 1+count(*) from public.meetup_members where post_id=new.id and active and user_id<>new.author_id) then raise exception '참여 인원보다 정원을 줄일 수 없어요'; end if;
+  if new.max_participants < (select count(*) from public.meetup_participants where post_id=new.id) then raise exception '참여 인원보다 정원을 줄일 수 없어요'; end if;
  end if;
  if cardinality(new.image_paths)>5 or exists(select 1 from unnest(new.image_paths) path where path not like new.author_id::text||'/posts/%') then raise exception '사진 경로를 확인해 주세요'; end if;
  return new;
@@ -126,7 +156,7 @@ begin
  if draft_key is not null and not exists(select 1 from public.activity_program_drafts d where d.id=draft_key and d.org_id=(data->>'org_id')::uuid) then raise exception '임시 저장 수정 권한이 없어요' using errcode='42501';end if;
  if is_draft and result is null then
   if draft_key is null then insert into public.activity_program_drafts(org_id,data) values((data->>'org_id')::uuid,data-'draft_id') returning id into result;
-  else update public.activity_program_drafts set data=data-'draft_id',updated_at=now() where id=draft_key returning id into result;end if;
+  else update public.activity_program_drafts set data=$1-'draft_id',updated_at=now() where id=draft_key returning id into result;end if;
   return result;
  end if;
  if method not in('app','phone','visit') then raise exception '신청 방법을 확인해 주세요';end if;
