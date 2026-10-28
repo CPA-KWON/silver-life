@@ -129,12 +129,13 @@ lib/ 밖의 중요한 파일
 | 테이블 | 용도 | 칸 (실제 이름) |
 |---|---|---|
 | `profiles` | 회원 정보 | id(=로그인 계정 id), name, nickname(중복 불가), birth_year, region_sido, region_sigungu, created_at |
-| `posts` | 커뮤니티 글 **+ 동네모임** | id, author_id, category, title, content, created_at, event_at, facility_id |
+| `posts` | 커뮤니티 글 **+ 동네모임** | id, author_id, category, title, content, created_at, event_at, facility_id, max_participants(모임 최대 인원 2~30, 기본 10) |
 | `comments` | 댓글 | id, post_id, author_id, content, created_at |
 | `facilities` | 시설 (공공데이터로 미리 넣은 것 + 사용자가 체크인·모임 장소로 고른 것) | id, name, address, lat, lng, category, telephone, region_sido, region_sigungu, created_at — (name, address) 조합은 중복 불가 |
 | `favorites` | 즐겨찾기 | id, user_id, name, address, telephone, lat, lng, category, created_at — ⚠️ `facility_id`가 **없고** 시설 정보를 통째로 복사해 저장 |
 | `checkins` | "나 여기 있음" 체크인 | id, user_id, facility_id, checked_in_at — 한 사람당 시설별 1개, 앱에서 3시간 지나면 안 셈 |
 | `reports` | 게시글·모임·댓글 신고 | id, reporter_id, post_id 또는 comment_id(둘 중 하나만), reason(욕설·비방/광고/사기 의심/기타), created_at — 같은 사람이 같은 대상 1번만 |
+| `meetup_participants` | 동네모임 참여자 (`meetup_participation.sql`) | post_id, user_id, joined_at — 모임장은 모임 만들 때 자동 포함. 앱은 직접 읽기·쓰기 불가, `meetup_join`/`meetup_leave`/`meetup_participation`/`my_meetups` 함수로만 사용. 닉네임은 public_profiles에서만 |
 | `welfare_programs` | 복지관 정기 프로그램 (안내용, 신청은 전화·방문) | facility_name, title, category, schedule, target, fee, capacity 등 — 원본 표 `welfare_programs (sangdo)`, `welfare_programs (heuksuk)`에서 `supabase/welfare_programs.sql`로 다시 채움. 로그인한 사람만 읽기. 시설 상세 화면이 시설 **이름**으로 연결(띄어쓰기·"어르신"·"노인"·"시립" 등은 빼고 비교) |
 | `point_wallets` | 포인트 지갑 (`attendance_points.sql`) | user_id, balance(보유), total_earned(누적 획득), last_attended_on, current_streak, updated_at |
 | `attendance_days` | 날짜별 출석 이력 | user_id, attended_on(한국 날짜), streak, points — 사람·날짜당 1줄 |
@@ -170,6 +171,7 @@ lib/ 밖의 중요한 파일
 - 동네모임 만들기·수정, 시설을 모임 장소로 지정, 예정/지난 모임
 - 홈(다가오는 모임, 최근 글), 내 정보, 내 글 관리, 개인정보처리방침
 - 게시글·모임·댓글 신고하기(사유 4가지, 중복 신고 불가, 3건 이상 숨김)
+- 동네모임 참여하기·취소, 참여자 닉네임 목록, 최대 인원(2~30명), 모집 마감, 내 정보 "참여한 모임"
 - 회원 탈퇴(내 정보 > 회원정보 관리 > 회원 탈퇴, 경고 2번 → DB 함수 `delete_my_account`가 본인 계정만 삭제 → 로그인 화면). 구글 플레이용 안내 페이지 `docs/account-deletion.html`
 - 출석체크(하루 1번 출석도장, 연속 출석 보상, 월별 달력)와 포인트 배지(모든 탭 상단 오른쪽 🪙 P)
 - 홈에 즐겨찾는 시설 3개, 모임 장소를 즐겨찾기에서 고르기
@@ -177,7 +179,7 @@ lib/ 밖의 중요한 파일
 ### 남은 할 일 (우선순위 순)
 1. [x] 네이버 지역검색 서버 연결 (사용자 승인한 기존 키를 비공개 서버 설정에 등록 완료)
 2. [ ] 모든 테이블 RLS 점검
-3. [ ] 동네모임 **참여하기 / 참여 취소 / 참여자 목록 / 최대 인원**
+3. [x] 동네모임 **참여하기 / 참여 취소 / 참여자 목록 / 최대 인원** (정원·지난 모임·신고 숨김은 DB 함수가 막음, 내 정보 "참여한 모임", 홈에 참여 모임 먼저)
 4. [ ] 시연 지역 공공데이터(경로당·복지관·병원·약국)를 `facilities`에 미리 넣기
 5. [x] 게시글·모임·댓글 **신고하기** (3건 이상 숨김, 대시보드 `report_summary`에서 확인)
 6. [ ] 실제 기기에서 시니어 UI 점검 (공통 글씨·버튼 크기 보완 및 자동 확대 검사 완료)

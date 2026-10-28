@@ -434,9 +434,13 @@ void main() {
     }
     await tap(t, find.text('${target.day}').last);
     await tap(t, find.text('확인'));
+    expect(find.text('10명'), findsOneWidget);
+    await tap(t, find.text('10명'));
+    await tap(t, find.text('12명').last);
     await tap(t, find.text('등록하기'));
     expect(backend.postWrites, 1);
     expect(backend.posts.single['facility_id'], 'facility');
+    expect(backend.posts.single['max_participants'], 12);
     await finish(t);
   });
   testWidgets('meetup place can be chosen from favorite facilities', (t) async {

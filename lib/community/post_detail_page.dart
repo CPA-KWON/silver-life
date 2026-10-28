@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/meetup_category.dart';
 import '../core/report.dart';
+import '../meetup/meetup_participation.dart';
 import '../meetup/new_meetup_page.dart';
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
@@ -48,6 +49,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
         .from('posts')
         .select(
           'id, title, content, category, created_at, event_at, author_id, '
+          'max_participants, '
           'facilities(id, name, address, lat, lng, category, telephone), '
           'profiles(nickname)',
         )
@@ -68,6 +70,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         'title': post['title'],
                         'content': post['content'],
                         'event_at': post['event_at'],
+                        'max_participants': post['max_participants'],
                         'facility': post['facilities'],
                       },
                     )
@@ -368,6 +371,10 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         if (post['event_at'] != null) ...[
                           const SizedBox(height: 12),
                           _meetupCard(post, textTheme),
+                        ],
+                        if (post['category'] == kMeetupCategory) ...[
+                          const SizedBox(height: 12),
+                          MeetupParticipationCard(postId: widget.postId),
                         ],
                       ],
                     );

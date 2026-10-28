@@ -46,16 +46,35 @@ void main() {
     expect(find.text('아직 게시글이 없습니다.'), findsOneWidget);
     await finish(t);
   });
+  testWidgets('home lists meetups I joined first, marked 참여 예정', (t) async {
+    final later = DateTime.now().add(const Duration(days: 5)).toUtc();
+    backend.posts.addAll([
+      backend.post(id: 'nearby', meetup: true)
+        ..['author_id'] = 'neighbor'
+        ..['title'] = '가까운 모임',
+      backend.post(id: 'joined', meetup: true)
+        ..['author_id'] = 'neighbor'
+        ..['title'] = '내가 참여한 모임'
+        ..['event_at'] = later.toIso8601String(),
+    ]);
+    backend.meetupJoined.add('joined');
+    await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
+    final joinedTop = t.getTopLeft(find.text('내가 참여한 모임')).dy;
+    expect(joinedTop, lessThan(t.getTopLeft(find.text('가까운 모임')).dy));
+    expect(find.text('참여 예정'), findsOneWidget);
+    await finish(t);
+  });
   testWidgets(
     'local meetup and news use existing detail routes with honest source labels',
     (t) async {
       backend.posts.addAll([
-        backend.post(id: 'meetup', meetup: true),
+        backend.post(id: 'meetup', meetup: true)..['author_id'] = 'neighbor',
         backend.post(id: 'news'),
       ]);
       await mount(t, HomeTab(activityRepository: FakeActivityRepository()));
       expect(find.text('복지관 산책 모임'), findsOneWidget);
       expect(find.text('지역 커뮤니티 · 자유게시판'), findsOneWidget);
+      // 남의 모임은 참여 전까지 "참여 예정"으로 표시하지 않는다.
       expect(find.text('참여 예정'), findsNothing);
       final calls = backend.requests
           .where((u) => u.path.endsWith('/posts'))

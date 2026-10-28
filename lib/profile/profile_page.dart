@@ -11,6 +11,7 @@ import '../activity/activity_hub_page.dart';
 import '../activity/activity_repository.dart';
 import '../activity/activity_agency_page.dart';
 import '../facility/nearby_facilities_page.dart';
+import '../meetup/my_meetups_page.dart';
 import '../ui/design_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -123,6 +124,16 @@ class _ProfilePageState extends State<ProfilePage> {
                         isMeetup: true,
                       ),
                     ),
+                  ),
+                ),
+                _MenuRow(
+                  icon: Icons.groups_outlined,
+                  iconColor: AppColors.mintText,
+                  badgeColor: AppColors.mintTint,
+                  title: '참여한 모임',
+                  subtitle: '내가 참여한 동네모임 모아보기',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MyMeetupsPage()),
                   ),
                 ),
               ],

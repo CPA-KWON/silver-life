@@ -44,6 +44,9 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
       ? null
       : TimeOfDay.fromDateTime(_initialEventAt!.toLocal());
   late FacilityResult? _eventFacility = _initialFacility;
+  late int _maxParticipants =
+      (widget.existingPost?['max_participants'] as num?)?.toInt() ??
+      kDefaultMaxParticipants;
 
   void _finish(bool changed) {
     if (widget.onFinished != null) {
@@ -187,6 +190,7 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
         'content': _contentController.text.trim(),
         'event_at': eventAt.toUtc().toIso8601String(),
         'facility_id': facilityId,
+        'max_participants': _maxParticipants,
       };
       if (_isEditing) {
         await client
@@ -197,6 +201,22 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
         await client.from('posts').insert({...data, 'author_id': userId});
       }
       if (mounted) _finish(true);
+    } on PostgrestException catch (e) {
+      // 최대 인원을 현재 참여자 수보다 줄이면 DB가 이유를 알려준다.
+      if (mounted) {
+        final action = _isEditing ? '수정' : '등록';
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                e.code == 'P0001'
+                    ? e.message
+                    : '모임을 $action하지 못했어요. 다시 시도해 주세요.',
+              ),
+            ),
+          );
+      }
     } catch (e) {
       if (mounted) {
         final action = _isEditing ? '수정' : '등록';
@@ -249,6 +269,28 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
                 value: _eventFacility == null ? '장소 선택' : _eventFacility!.name,
                 hasValue: _eventFacility != null,
                 onTap: _pickFacility,
+              ),
+              const SizedBox(height: 8),
+              SectionCard(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: DropdownButtonFormField<int>(
+                  initialValue: _maxParticipants,
+                  decoration: const InputDecoration(
+                    labelText: '최대 인원 (모임장 포함)',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  items: [
+                    for (var n = kMinParticipants; n <= kMaxParticipants; n++)
+                      DropdownMenuItem(value: n, child: Text('$n명')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _maxParticipants = value);
+                  },
+                ),
               ),
               const SizedBox(height: 12),
               SectionCard(
