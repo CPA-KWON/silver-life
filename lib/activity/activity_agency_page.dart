@@ -4,6 +4,7 @@ import '../ui/design_widgets.dart';
 import '../notices/notice_pages.dart';
 import 'activity_repository.dart';
 import 'activity_widgets.dart';
+import 'activity_design.dart';
 import 'activity_forms.dart';
 import 'activity_detail_page.dart';
 import 'activity_hub_page.dart';
@@ -87,6 +88,44 @@ class _ActivityAgencyPageState extends State<ActivityAgencyPage> {
     }
   }
 
+  Future<void> reject(String id) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('반려 사유 입력'),
+        content: TextField(
+          controller: controller,
+          maxLength: 300,
+          decoration: const InputDecoration(hintText: '신청자에게 전달할 이유를 적어 주세요'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('다음'),
+          ),
+        ],
+      ),
+    );
+    final reason = controller.text.trim();
+    // Dispose after the dialog's reverse transition has removed its text field.
+    Future<void>.delayed(const Duration(seconds: 1), controller.dispose);
+    if (confirmed != true || !mounted) return;
+    if (reason.isEmpty) {
+      await activityFailure(
+        context,
+        title: '반려 사유를 적어 주세요',
+        message: '신청자가 이유를 알 수 있도록 간단히 적어 주세요.',
+      );
+      return;
+    }
+    await run('신청을 반려할까요?', () => repo.rejectWithReason(id, reason));
+  }
+
   Widget menu(AgencySection value, IconData icon, String subtitle) =>
       ActivityMenuLink(
         title: agencySectionTitle(value),
@@ -158,6 +197,10 @@ class _ActivityAgencyPageState extends State<ActivityAgencyPage> {
                 Text(
                   '신청번호 ${e['id']}\n${activityStatuses[e['status']]} · ${activityMoney(e['final_fee'])}',
                 ),
+                if ((e['application_note'] as String? ?? '').isNotEmpty)
+                  Text('기관에 하고 싶은 말: ${e['application_note']}'),
+                if ((e['rejection_reason'] as String? ?? '').isNotEmpty)
+                  Text('반려 사유: ${e['rejection_reason']}'),
                 if (e['experience_snapshot'] != null) ...[
                   const SizedBox(height: 8),
                   ExpansionTile(
@@ -182,12 +225,7 @@ class _ActivityAgencyPageState extends State<ActivityAgencyPage> {
                   ),
                 if (['applied', 'approved'].contains(e['status']))
                   OutlinedButton(
-                    onPressed: busy
-                        ? null
-                        : () => run(
-                            '신청을 반려할까요?',
-                            () => repo.manage(e['id'], 'rejected'),
-                          ),
+                    onPressed: busy ? null : () => reject(e['id']),
                     child: const Text('신청 반려'),
                   ),
                 if (e['status'] == 'approved')

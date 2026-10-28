@@ -70,9 +70,10 @@ void main() {
       await mount(t, MainShell(activityRepository: r));
       await tap(t, find.text('맞춤 활동 찾기'));
       expect(find.byType(ActivitySectionPage), findsOneWidget);
+      await visible(t, find.text('전체 프로그램 탐색'));
       expect(find.text('전체 프로그램 탐색'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
-      await tap(t, find.byType(BackButton));
+      await tap(t, find.byTooltip('뒤로'));
       expect(find.byType(ActivityHubPage), findsOneWidget);
       await finish(t);
     },
@@ -147,10 +148,10 @@ void main() {
         t,
         ActivitySectionPage(section: ActivitySection.experience, repository: r),
       );
-      await tap(t, find.text('경험 나눔 지원 현황'));
+      await tap(t, find.text('지원 현황'));
       expect(find.text('산책 경험 나눔'), findsOneWidget);
       expect(find.text('가벼운 산책'), findsNothing);
-      await tap(t, find.byType(BackButton));
+      await tap(t, find.byTooltip('뒤로'));
       await tap(t, find.text('내 경험 관리'));
       await tap(t, find.text('나눌 경험 등록'));
       expect(find.textContaining('내 경험은 나만 볼 수 있어요.'), findsOneWidget);
@@ -195,7 +196,7 @@ void main() {
         await tap(t, find.text(label));
         expect(find.text(label), findsOneWidget);
         expect(t.takeException(), isNull);
-        await tap(t, find.byType(BackButton));
+        await tap(t, find.byTooltip('뒤로'));
       }
       await tap(t, find.text('경험 나눔 관리'));
       await tap(t, find.text('경험 나눔 모집 관리'));

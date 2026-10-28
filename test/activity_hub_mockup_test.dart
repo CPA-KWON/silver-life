@@ -87,7 +87,7 @@ void main() {
     expect(find.text('스마트폰 배우기'), findsNothing);
     await t.enterText(find.widgetWithText(TextField, '프로그램 검색'), '없는 활동');
     await t.pumpAndSettle();
-    expect(find.text('현재 모집 중인 프로그램이 없어요.'), findsOneWidget);
+    expect(find.text('“없는 활동” 프로그램이 지금은 없어요'), findsOneWidget);
     await finish(t);
   });
   testWidgets(

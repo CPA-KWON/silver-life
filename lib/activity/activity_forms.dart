@@ -1,3 +1,5 @@
+export 'activity_personal_forms.dart';
+
 import 'package:flutter/material.dart';
 
 import '../facility/facility_search_page.dart';
@@ -136,197 +138,6 @@ class _ActivitySaveFormState extends State<ActivitySaveForm> {
   );
 }
 
-class ActivityPreferencesPage extends StatefulWidget {
-  const ActivityPreferencesPage({
-    super.key,
-    this.initial,
-    this.repository,
-    this.placePicker = pickActivityPlace,
-  });
-  final ActivityData? initial;
-  final ActivityRepository? repository;
-  final ActivityPlacePicker placePicker;
-  @override
-  State<ActivityPreferencesPage> createState() =>
-      _ActivityPreferencesPageState();
-}
-
-class _ActivityPreferencesPageState extends State<ActivityPreferencesPage> {
-  late final repo = widget.repository ?? ActivityRepository();
-  late Set<String> interests = Set<String>.from(
-    widget.initial?['interests'] ?? [activityCategories.first],
-  );
-  late int radius = widget.initial?['radius_km'] ?? 3,
-      minutes = widget.initial?['max_minutes'] ?? 120,
-      level = widget.initial?['difficulty'] ?? 1;
-  late String transport = widget.initial?['transport'] ?? '도보',
-      participation = widget.initial?['participation'] ?? '무관';
-  late bool expand = widget.initial?['expand_choices'] ?? true;
-  FacilityResult? place;
-  Future<void> choose() async {
-    final p = await widget.placePicker(context);
-    if (mounted && p != null) setState(() => place = p);
-  }
-
-  Future<void> save() async {
-    if (interests.isEmpty) throw StateError('관심 분야를 선택해주세요.');
-    if (place == null && widget.initial == null) {
-      throw StateError('기준 장소를 선택해주세요.');
-    }
-    await repo.preferences({
-      'place_name': place?.name ?? widget.initial!['place_name'],
-      'lat': place?.lat ?? widget.initial!['lat'],
-      'lng': place?.lng ?? widget.initial!['lng'],
-      'radius_km': radius,
-      'interests': interests.toList(),
-      'transport': transport,
-      'participation': participation,
-      'max_minutes': minutes,
-      'difficulty': level,
-      'expand_choices': expand,
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => ActivitySaveForm(
-    title: '활동 설정',
-    onSave: save,
-    children: [
-      const Text('내가 편하게 참여할 수 있는 범위를 정해요. 거리는 기준 장소에서의 직선거리예요.'),
-      const SizedBox(height: 12),
-      OutlinedButton.icon(
-        onPressed: choose,
-        icon: const Icon(Icons.place_outlined),
-        label: Text(place?.name ?? widget.initial?['place_name'] ?? '기준 장소 선택'),
-      ),
-      const SizedBox(height: 12),
-      activitySelect<int>(
-        '이동 가능 거리',
-        radius,
-        [1, 3, 5, 10, 20],
-        (v) => setState(() => radius = v),
-        describe: (v) => '$v km',
-      ),
-      const Text('관심 분야'),
-      Wrap(
-        spacing: 6,
-        children: [
-          for (final c in activityCategories)
-            FilterChip(
-              label: Text(c),
-              selected: interests.contains(c),
-              onSelected: (v) => setState(() {
-                v ? interests.add(c) : interests.remove(c);
-              }),
-            ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      activitySelect('이동수단', transport, [
-        '도보',
-        '대중교통',
-        '자동차',
-      ], (v) => setState(() => transport = v)),
-      activitySelect('참여 방식', participation, [
-        '무관',
-        '혼자',
-        '함께',
-      ], (v) => setState(() => participation = v)),
-      activitySelect<int>(
-        '최대 활동시간',
-        minutes,
-        [30, 60, 120, 240, 480],
-        (v) => setState(() => minutes = v),
-        describe: (v) => '$v 분',
-      ),
-      activitySelect<int>(
-        '활동 난이도',
-        level,
-        [1, 2, 3],
-        (v) => setState(() => level = v),
-        describe: (v) => ['쉬움', '보통', '도전'][v - 1],
-      ),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('새로운 활동도 만나기'),
-        subtitle: const Text('끄면 익숙한 동네 활동을 추천해요. 이동 범위는 자동으로 넓히지 않아요.'),
-        value: expand,
-        onChanged: (v) => setState(() => expand = v),
-      ),
-    ],
-  );
-}
-
-class ActivityExperiencePage extends StatefulWidget {
-  const ActivityExperiencePage({
-    super.key,
-    this.existing,
-    this.initialCategory,
-    this.repository,
-  });
-  final ActivityData? existing;
-  final String? initialCategory;
-  final ActivityRepository? repository;
-  @override
-  State<ActivityExperiencePage> createState() => _ActivityExperiencePageState();
-}
-
-class _ActivityExperiencePageState extends State<ActivityExperiencePage> {
-  late final fields = {
-    for (final k in [
-      'title',
-      'description',
-      'available_time',
-      'preferred_place',
-      'activity_type',
-    ])
-      k: TextEditingController(text: widget.existing?[k] ?? ''),
-  };
-  late String category =
-      widget.existing?['category'] ??
-      widget.initialCategory ??
-      activityCategories.first;
-  late bool active = widget.existing?['active'] ?? true;
-  @override
-  void dispose() {
-    for (final c in fields.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => ActivitySaveForm(
-    title: widget.existing == null ? '나눌 경험 등록' : '나눌 경험 수정',
-    onSave: () => (widget.repository ?? ActivityRepository()).experience({
-      for (final e in fields.entries) e.key: e.value.text.trim(),
-      'category': category,
-      'active': active,
-    }, id: widget.existing?['id']),
-    children: [
-      const Text('내 경험은 나만 볼 수 있어요. 모집에 지원하면 해당 기관에 지원 당시의 내용이 전달돼요.'),
-      const SizedBox(height: 12),
-      activityInput(fields['title']!, '나눌 경험'),
-      activitySelect(
-        '분야',
-        category,
-        activityCategories,
-        (v) => setState(() => category = v),
-      ),
-      activityInput(fields['description']!, '경험 설명', lines: 4),
-      activityInput(fields['available_time']!, '가능한 시간'),
-      activityInput(fields['preferred_place']!, '선호 장소'),
-      activityInput(fields['activity_type']!, '활동 형태'),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('경험 나눔 참여 가능'),
-        value: active,
-        onChanged: (v) => setState(() => active = v),
-      ),
-    ],
-  );
-}
-
 class ActivityProgramForm extends StatefulWidget {
   const ActivityProgramForm({
     super.key,
@@ -348,6 +159,9 @@ class ActivityProgramForm extends StatefulWidget {
 class _ActivityProgramFormState extends State<ActivityProgramForm> {
   final title = TextEditingController(),
       description = TextEditingController(),
+      targetAudience = TextEditingController(),
+      preparations = TextEditingController(),
+      floorGuide = TextEditingController(),
       capacity = TextEditingController(text: '10'),
       fee = TextEditingController(text: '0');
   late String? org = widget.organizations.firstOrNull?['id'];
@@ -359,7 +173,15 @@ class _ActivityProgramFormState extends State<ActivityProgramForm> {
   DateTime? start, end, deadline;
   @override
   void dispose() {
-    for (final c in [title, description, capacity, fee]) {
+    for (final c in [
+      title,
+      description,
+      capacity,
+      fee,
+      targetAudience,
+      preparations,
+      floorGuide,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -414,6 +236,9 @@ class _ActivityProgramFormState extends State<ActivityProgramForm> {
       'org_id': org,
       'title': title.text.trim(),
       'description': description.text.trim(),
+      'target_audience': targetAudience.text.trim(),
+      'preparations': preparations.text.trim(),
+      'floor_guide': floorGuide.text.trim(),
       'kind': kind,
       'category': category,
       'place_name': place!.name,
@@ -455,6 +280,20 @@ class _ActivityProgramFormState extends State<ActivityProgramForm> {
             ),
             activityInput(title, '프로그램 이름'),
             activityInput(description, '활동 안내', lines: 4),
+            for (final field in [
+              (targetAudience, '참여 대상'),
+              (preparations, '준비물'),
+              (floorGuide, '층별 안내'),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: field.$1,
+                  maxLines: field.$2 == '층별 안내' ? 3 : 1,
+                  maxLength: 2000,
+                  decoration: InputDecoration(labelText: '${field.$2} (선택)'),
+                ),
+              ),
             activitySelect(
               '활동 분야',
               category,

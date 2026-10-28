@@ -81,8 +81,8 @@ void main() {
     await tap(t, find.text('내 정보'));
     await tap(t, find.text('나의 활동'));
     expect(find.text('아직 신청한 활동이 없어요.'), findsOneWidget);
-    await tap(t, find.byType(BackButton));
-    await tap(t, find.byType(BackButton));
+    await tap(t, find.byTooltip('뒤로'));
+    await tap(t, find.byTooltip('뒤로'));
     expect(find.text('다가오는 모임'), findsOneWidget);
     expect(find.text('이번 주 활동 현황'), findsNothing);
     await finish(t);
@@ -166,10 +166,10 @@ void main() {
     expect(find.byIcon(Icons.arrow_back), findsOneWidget);
     expect(find.text('테스트 복지관'), findsWidgets);
     expect(find.byTooltip('즐겨찾기'), findsOneWidget);
-    await tap(t, find.byType(BackButton));
+    await tap(t, find.byTooltip('뒤로'));
     expect(find.byType(FacilityDetailPage), findsNothing);
     expect(find.byIcon(Icons.arrow_back), findsOneWidget);
-    await tap(t, find.byType(BackButton));
+    await tap(t, find.byTooltip('뒤로'));
     expect(find.text('시설 열기'), findsOneWidget);
     await finish(t);
   });
@@ -215,7 +215,7 @@ void main() {
       await tap(t, find.text('지도에서 장소 찾기'));
       await tap(t, find.text('장소 선택 취소'));
       expect(find.text('보존할 제목'), findsOneWidget);
-      await tap(t, find.byType(BackButton).last);
+      await tap(t, find.byTooltip('뒤로').last);
       expect(
         identical(map, t.element(find.byKey(const ValueKey('map')))),
         true,
@@ -229,7 +229,7 @@ void main() {
       await mount(t, ProfilePage(activityRepository: FakeActivityRepository()));
       await tap(t, find.text('회원정보 관리'));
       backend.profile['nickname'] = '변경 닉네임';
-      await tap(t, find.byType(BackButton));
+      await tap(t, find.byTooltip('뒤로'));
       await t.drag(find.byType(ListView).last, const Offset(0, 1500));
       await t.pumpAndSettle();
       expect(find.text('변경 닉네임'), findsOneWidget);
@@ -355,7 +355,7 @@ void main() {
     ]) {
       await tap(t, find.text(label));
       expect(t.takeException(), isNull);
-      await tap(t, find.byType(BackButton));
+      await tap(t, find.byTooltip('뒤로'));
     }
     await finish(t);
   });

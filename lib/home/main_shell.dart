@@ -1,3 +1,5 @@
+import '../activity/activity_design.dart';
+
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
@@ -268,9 +270,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return AttendanceScope(
       controller: _attendance,
-      child: PetNavigationScope(
-        navigator: Navigator.of(context),
-        child: _buildScaffold(context),
+      child: ActivityPetScope(
+        pet: _petPreview,
+        onOpenPet: _openPet,
+        child: PetNavigationScope(
+          navigator: Navigator.of(context),
+          child: _buildScaffold(context),
+        ),
       ),
     );
   }

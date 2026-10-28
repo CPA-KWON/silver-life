@@ -52,6 +52,8 @@ class FakeActivityRepository extends ActivityRepository {
     if (fail) throw StateError('offline');
     return {
       'preferences': pref,
+      'benefits': benefits,
+      'mission_rewards': missionRewards,
       'programs': programs,
       'recommendations': programs
           .where((p) => p['kind'] == 'activity')
@@ -83,6 +85,8 @@ class FakeActivityRepository extends ActivityRepository {
     };
   }
 
+  @override
+  Future<ActivityData> applicant() async => {'nickname': '테스트 사용자'};
   @override
   Future<void> preferences(ActivityData data) async {
     pref = data;
@@ -159,6 +163,66 @@ class FakeActivityRepository extends ActivityRepository {
       'sponsored': false,
       'status': 'open',
     });
+  }
+
+  final missionRewards = <ActivityData>[];
+  @override
+  Future<ActivityData> claimProgramMission(int stage) async {
+    final m = missions.firstWhere((m) => m['stage'] == stage);
+    if (m['status'] != 'completed') throw StateError('incomplete');
+    final ref = 'program-mission:${m['week_start']}:$stage';
+    if (missionRewards.any((r) => r['reference'] == ref)) {
+      return {'already': true, 'points': 0, 'experience': 0};
+    }
+    final r = {
+      'reference': ref,
+      'points': stage == 1
+          ? 50
+          : stage == 2
+          ? 100
+          : 0,
+      'experience': stage == 3 ? 30 : 0,
+    };
+    missionRewards.add(r);
+    return {...r, 'already': false};
+  }
+
+  final favorites = <String>{};
+  String? lastNote;
+  final benefits = <ActivityData>[];
+  @override
+  Future<bool> isFavorite(String id) async => favorites.contains(id);
+  @override
+  Future<void> favorite(String id, bool value) async {
+    value ? favorites.add(id) : favorites.remove(id);
+  }
+
+  @override
+  Future<void> applyWithNote(
+    String id, {
+    required String experienceId,
+    String note = '',
+  }) async {
+    lastNote = note;
+    await apply(id, experienceId: experienceId);
+    applications.last['application_note'] = note;
+  }
+
+  @override
+  Future<void> rejectWithReason(String id, String reason) async {
+    await manage(id, 'rejected');
+    applications.firstWhere((e) => e['id'] == id)['rejection_reason'] = reason;
+  }
+
+  @override
+  Future<List<ActivityData>> missionChoices(int stage) async => programs
+      .where((p) => !missions.any((m) => m['program_id'] == p['id']))
+      .toList();
+  @override
+  Future<void> replaceMission(int stage, String id) async {
+    final mission = missions.firstWhere((m) => m['stage'] == stage);
+    mission['program_id'] = id;
+    mission['program'] = programs.firstWhere((p) => p['id'] == id);
   }
 
   @override

@@ -37,27 +37,33 @@ Future<void> mount(WidgetTester t, Widget page, {double scale = 1}) async {
   await t.pumpAndSettle();
 }
 
-Future<void> tap(WidgetTester t, Finder f) async {
-  if (find.byType(SnackBar).evaluate().isNotEmpty) {
-    await t.pump(const Duration(seconds: 5));
-  }
+Finder verticalScrollable() => find.byElementPredicate((e) {
+  final w = e.widget;
+  return w is Scrollable &&
+      (w.axisDirection == AxisDirection.down ||
+          w.axisDirection == AxisDirection.up) &&
+      e.findAncestorWidgetOfExactType<EditableText>() == null;
+}).last;
+Future<void> visible(WidgetTester t, Finder f) async {
   if (f.evaluate().isEmpty) {
+    t.state<ScrollableState>(verticalScrollable()).position.jumpTo(0);
+    await t.pumpAndSettle();
     await t.scrollUntilVisible(
       f,
       180,
-      scrollable: find
-          .byWidgetPredicate(
-            (w) =>
-                w is Scrollable &&
-                (w.axisDirection == AxisDirection.down ||
-                    w.axisDirection == AxisDirection.up),
-          )
-          .last,
+      scrollable: verticalScrollable(),
       maxScrolls: 40,
     );
   } else {
     await t.ensureVisible(f.last);
   }
+}
+
+Future<void> tap(WidgetTester t, Finder f) async {
+  if (find.byType(SnackBar).evaluate().isNotEmpty) {
+    await t.pump(const Duration(seconds: 5));
+  }
+  await visible(t, f);
   await t.pumpAndSettle();
   await t.tap(f.last);
   await t.pumpAndSettle();
@@ -67,7 +73,7 @@ Future<void> fill(WidgetTester t, String label, String value) async {
   final f = find.byWidgetPredicate(
     (w) => w is TextField && w.decoration?.labelText == label,
   );
-  await t.ensureVisible(f);
+  await visible(t, f);
   await t.enterText(f, value);
   await t.pump();
 }

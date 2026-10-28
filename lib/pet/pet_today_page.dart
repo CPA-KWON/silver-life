@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../activity/activity_hub_page.dart';
+import '../activity/activity_weekly_page.dart';
 import '../activity/activity_detail_page.dart';
 import 'pet_design.dart';
 import 'pet_preview_controller.dart';
@@ -126,314 +127,342 @@ class _TodayState extends State<PetTodayPage> {
   }
 
   @override
-  Widget build(BuildContext c) => ListenableBuilder(
-    listenable: widget.pet,
-    builder: (c, _) {
-      final pet = widget.pet;
-      return PetScreen(
-        colors: const [PetColors.background, PetColors.background],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PetHeader(widget.missionsOnly ? '주간 미션' : '오늘의 활동', pet: pet),
-            if (widget.missionsOnly && !pet.ready) ...[
-              PetCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      pet.error == null
-                          ? '미션 정보를 확인하고 있어요'
-                          : '미션 정보를 불러오지 못했어요',
-                      style: petText(20),
-                    ),
-                    const SizedBox(height: 12),
-                    PetPrimary(
-                      pet.busy ? '확인 중' : '다시 확인하기',
-                      onTap: pet.busy ? null : pet.load,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (widget.missionsOnly && pet.ready && !pet.adopted) ...[
-              PetCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('콩이를 입양하면 미션 보상을 받을 수 있어요', style: petText(20)),
-                    const SizedBox(height: 12),
-                    PetPrimary('반려동물 만나기', onTap: widget.onOpenPet),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (!widget.missionsOnly || pet.ready && pet.adopted)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFDFF0FB), Color(0xFFF0ECFF)],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 80,
-                      child: PetPhoto(pet: pet, height: 86, mood: 'happy'),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
+  Widget build(BuildContext c) => widget.missionsOnly
+      ? ActivityWeeklyMissionsPage(
+          pet: widget.pet,
+          onOpenPet: widget.onOpenPet,
+          onOpenProgramMissions: widget.onOpenProgramMissions,
+        )
+      : ListenableBuilder(
+          listenable: widget.pet,
+          builder: (c, _) {
+            final pet = widget.pet;
+            return PetScreen(
+              colors: const [PetColors.background, PetColors.background],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PetHeader(widget.missionsOnly ? '주간 미션' : '오늘의 활동', pet: pet),
+                  if (widget.missionsOnly && !pet.ready) ...[
+                    PetCard(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('${pet.name}에게 줄 보상을 모아요', style: petText(19)),
                           Text(
-                            '오늘 받은 보상',
-                            style: petText(16, color: PetColors.secondary),
+                            pet.error == null
+                                ? '미션 정보를 확인하고 있어요'
+                                : '미션 정보를 불러오지 못했어요',
+                            style: petText(20),
                           ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 5,
-                            children: [
-                              PetPill(
-                                '+ ${pet.todayPoints} P',
-                                color: PetColors.yellow,
-                                ink: const Color(0xFF946100),
-                              ),
-                              PetPill('+ ${pet.todayExperience} EXP'),
-                            ],
+                          const SizedBox(height: 12),
+                          PetPrimary(
+                            pet.busy ? '확인 중' : '다시 확인하기',
+                            onTap: pet.busy ? null : pet.load,
                           ),
                         ],
                       ),
                     ),
                   ],
-                ),
-              ),
-            if (!widget.missionsOnly || pet.ready) ...[
-              const SizedBox(height: 24),
-              _section('출석 · 주간 미션'),
-              PetCard(
-                padding: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        _badge(
-                          Icons.check_box_outlined,
-                          PetColors.mint,
-                          PetColors.green,
+                  if (widget.missionsOnly && pet.ready && !pet.adopted) ...[
+                    PetCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('콩이를 입양하면 미션 보상을 받을 수 있어요', style: petText(20)),
+                          const SizedBox(height: 12),
+                          PetPrimary('반려동물 만나기', onTap: widget.onOpenPet),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (!widget.missionsOnly || pet.ready && pet.adopted)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFDFF0FB), Color(0xFFF0ECFF)],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('오늘 출석', style: petText(20)),
-                              Text(
-                                pet.attendanceRewarded
-                                    ? '출석 완료 · 보상을 받았어요'
-                                    : pet.attended
-                                    ? '출석 완료 · 성장 경험치를 받아주세요'
-                                    : '오늘도 출석하고 함께 자라요',
-                                style: petText(15, color: PetColors.secondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        TextButton(
-                          onPressed:
-                              !pet.adopted || pet.attendanceRewarded || pet.busy
-                              ? null
-                              : () => reward('attendance'),
-                          child: Text(
-                            pet.attendanceRewarded
-                                ? '✓ 받음'
-                                : pet.attended
-                                ? '받기'
-                                : '출석',
-                            style: petText(
-                              15,
-                              color: pet.attended
-                                  ? PetColors.muted
-                                  : PetColors.blue,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: PetPhoto(
+                              pet: pet,
+                              height: 86,
+                              mood: 'happy',
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Divider(height: 1, color: PetColors.line),
-                    ),
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Text('이번 주 미션', style: petText(18)),
-                        PetPill(
-                          '${pet.missions.where((m) => m['claimed'] == true).length}/3단계 완료',
-                          color: const Color(0xFFF0F3F6),
-                          ink: PetColors.secondary,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    LayoutBuilder(
-                      builder: (c, b) {
-                        final narrow =
-                            b.maxWidth < 300 ||
-                            MediaQuery.textScalerOf(c).scale(1) > 1.35;
-                        return Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (var i = 0; i < 3; i++)
-                              SizedBox(
-                                width: narrow
-                                    ? b.maxWidth
-                                    : (b.maxWidth - 16) / 3,
-                                child: _mission(i),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (widget.missionsOnly) ...[
-              const SizedBox(height: 16),
-              Text(
-                '함께 활동은 기관이 참여 완료로 확인한 함께 참여 프로그램으로 집계해요.',
-                style: petText(15, color: PetColors.secondary),
-              ),
-              if (widget.onOpenProgramMissions != null) ...[
-                const SizedBox(height: 18),
-                OutlinedButton.icon(
-                  onPressed: widget.onOpenProgramMissions,
-                  icon: const Icon(Icons.route_outlined),
-                  label: const Text('프로그램별 주간 미션 보기'),
-                ),
-              ],
-            ],
-            if (!widget.missionsOnly) ...[
-              const SizedBox(height: 24),
-              _section('동네 프로그램'),
-              PetCard(
-                padding: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (pet.programs.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          '신청한 프로그램이 없어요. 가까운 활동을 찾아보세요.',
-                          style: petText(
-                            17,
-                            color: PetColors.secondary,
-                            weight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    for (final p in pet.programs) ...[
-                      _program(p),
-                      if (p != pet.programs.last)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          child: Divider(height: 1, color: PetColors.line),
-                        ),
-                    ],
-                    const SizedBox(height: 14),
-                    PetCard(
-                      color: const Color(0xFFF5F8FB),
-                      padding: 12,
-                      child: Text(
-                        'ⓘ 신청만으로는 보상이 지급되지 않아요.\n기관에서 참여를 확인한 뒤 지급돼요.',
-                        style: petText(15, color: PetColors.secondary),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    PetPrimary('내 주변 프로그램 찾기', onTap: programs, light: true),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Wrap(
-                spacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('광고 보상', style: petText(22)),
-                  Text(
-                    '원할 때만 · 오늘 ${2 - pet.ads}회 남음',
-                    style: petText(14, color: PetColors.muted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              PetCard(
-                padding: 16,
-                child: Row(
-                  children: [
-                    _badge(
-                      Icons.play_arrow_rounded,
-                      PetColors.yellow,
-                      PetColors.orange,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('짧은 광고 보기', style: petText(19)),
-                          const SizedBox(height: 5),
-                          const PetPill(
-                            '+ 30 P',
-                            color: PetColors.yellow,
-                            ink: Color(0xFF946100),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${pet.name}에게 줄 보상을 모아요',
+                                  style: petText(19),
+                                ),
+                                Text(
+                                  '오늘 받은 보상',
+                                  style: petText(
+                                    16,
+                                    color: PetColors.secondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 5,
+                                  children: [
+                                    PetPill(
+                                      '+ ${pet.todayPoints} P',
+                                      color: PetColors.yellow,
+                                      ink: const Color(0xFF946100),
+                                    ),
+                                    PetPill('+ ${pet.todayExperience} EXP'),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    TextButton(
-                      onPressed: adLoading || pet.ads >= 2 ? null : ad,
-                      child: Text(
-                        adLoading
-                            ? '준비 중'
-                            : pet.ads >= 2
-                            ? '내일 다시'
-                            : pet.pendingAd != null
-                            ? '보상 받기'
-                            : '보기',
-                        style: petText(17, color: PetColors.blue),
+                  if (!widget.missionsOnly || pet.ready) ...[
+                    const SizedBox(height: 24),
+                    _section('출석 · 주간 미션'),
+                    PetCard(
+                      padding: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              _badge(
+                                Icons.check_box_outlined,
+                                PetColors.mint,
+                                PetColors.green,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('오늘 출석', style: petText(20)),
+                                    Text(
+                                      pet.attendanceRewarded
+                                          ? '출석 완료 · 보상을 받았어요'
+                                          : pet.attended
+                                          ? '출석 완료 · 성장 경험치를 받아주세요'
+                                          : '오늘도 출석하고 함께 자라요',
+                                      style: petText(
+                                        15,
+                                        color: PetColors.secondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              TextButton(
+                                onPressed:
+                                    !pet.adopted ||
+                                        pet.attendanceRewarded ||
+                                        pet.busy
+                                    ? null
+                                    : () => reward('attendance'),
+                                child: Text(
+                                  pet.attendanceRewarded
+                                      ? '✓ 받음'
+                                      : pet.attended
+                                      ? '받기'
+                                      : '출석',
+                                  style: petText(
+                                    15,
+                                    color: pet.attended
+                                        ? PetColors.muted
+                                        : PetColors.blue,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Divider(height: 1, color: PetColors.line),
+                          ),
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              Text('이번 주 미션', style: petText(18)),
+                              PetPill(
+                                '${pet.missions.where((m) => m['claimed'] == true).length}/3단계 완료',
+                                color: const Color(0xFFF0F3F6),
+                                ink: PetColors.secondary,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          LayoutBuilder(
+                            builder: (c, b) {
+                              final narrow =
+                                  b.maxWidth < 300 ||
+                                  MediaQuery.textScalerOf(c).scale(1) > 1.35;
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (var i = 0; i < 3; i++)
+                                    SizedBox(
+                                      width: narrow
+                                          ? b.maxWidth
+                                          : (b.maxWidth - 16) / 3,
+                                      child: _mission(i),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                  if (widget.missionsOnly) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      '함께 활동은 기관이 참여 완료로 확인한 함께 참여 프로그램으로 집계해요.',
+                      style: petText(15, color: PetColors.secondary),
+                    ),
+                    if (widget.onOpenProgramMissions != null) ...[
+                      const SizedBox(height: 18),
+                      OutlinedButton.icon(
+                        onPressed: widget.onOpenProgramMissions,
+                        icon: const Icon(Icons.route_outlined),
+                        label: const Text('프로그램별 주간 미션 보기'),
+                      ),
+                    ],
+                  ],
+                  if (!widget.missionsOnly) ...[
+                    const SizedBox(height: 24),
+                    _section('동네 프로그램'),
+                    PetCard(
+                      padding: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (pet.programs.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                '신청한 프로그램이 없어요. 가까운 활동을 찾아보세요.',
+                                style: petText(
+                                  17,
+                                  color: PetColors.secondary,
+                                  weight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          for (final p in pet.programs) ...[
+                            _program(p),
+                            if (p != pet.programs.last)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 14),
+                                child: Divider(
+                                  height: 1,
+                                  color: PetColors.line,
+                                ),
+                              ),
+                          ],
+                          const SizedBox(height: 14),
+                          PetCard(
+                            color: const Color(0xFFF5F8FB),
+                            padding: 12,
+                            child: Text(
+                              'ⓘ 신청만으로는 보상이 지급되지 않아요.\n기관에서 참여를 확인한 뒤 지급돼요.',
+                              style: petText(15, color: PetColors.secondary),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          PetPrimary(
+                            '내 주변 프로그램 찾기',
+                            onTap: programs,
+                            light: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text('광고 보상', style: petText(22)),
+                        Text(
+                          '원할 때만 · 오늘 ${2 - pet.ads}회 남음',
+                          style: petText(14, color: PetColors.muted),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    PetCard(
+                      padding: 16,
+                      child: Row(
+                        children: [
+                          _badge(
+                            Icons.play_arrow_rounded,
+                            PetColors.yellow,
+                            PetColors.orange,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('짧은 광고 보기', style: petText(19)),
+                                const SizedBox(height: 5),
+                                const PetPill(
+                                  '+ 30 P',
+                                  color: PetColors.yellow,
+                                  ink: Color(0xFF946100),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: adLoading || pet.ads >= 2 ? null : ad,
+                            child: Text(
+                              adLoading
+                                  ? '준비 중'
+                                  : pet.ads >= 2
+                                  ? '내일 다시'
+                                  : pet.pendingAd != null
+                                  ? '보상 받기'
+                                  : '보기',
+                              style: petText(17, color: PetColors.blue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (pet.isPreview)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        '디자인 미리보기 · 실제 데이터는 변경되지 않아요',
+                        style: petText(14, color: PetColors.muted),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            ],
-            if (pet.isPreview)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(
-                  '디자인 미리보기 · 실제 데이터는 변경되지 않아요',
-                  style: petText(14, color: PetColors.muted),
-                ),
-              ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      );
-    },
-  );
+            );
+          },
+        );
   Widget _section(String s) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: Text(s, style: petText(22)),

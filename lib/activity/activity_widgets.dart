@@ -3,30 +3,14 @@ import 'package:flutter/material.dart';
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
+import 'activity_program_card.dart';
+import 'activity_design.dart';
 
 Future<bool> activityConfirm(
   BuildContext context,
   String title,
   String message,
-) async =>
-    await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    ) ??
-    false;
+) => activityDialog(context, title: title, message: message);
 void activityMessage(BuildContext context, String text) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -71,55 +55,6 @@ class ActivityProgramCard extends StatelessWidget {
   final String? label;
   final Color color;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: SectionCard(
-      color: color,
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(26),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (label != null)
-                Text(
-                  label!,
-                  style: Theme.of(context).textTheme.labelLarge
-                      ?.copyWith(color: AppColors.primary),
-                ),
-              if (program['sponsored'] == true)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    '기관 후원 · 우선 노출',
-                    style: TextStyle(color: AppColors.primary),
-                  ),
-                ),
-              Text(
-                program['title'] ?? '',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${program['org_name'] ?? ''} · ${program['category'] ?? ''}',
-              ),
-              Text(
-                '${program['place_name'] ?? ''} · ${activityDate(program['starts_at'])}',
-              ),
-              Text(
-                '${activityMoney(program['fee'])} · ${program['enrolled'] ?? 0}/${program['capacity']}명${program['distance_km'] == null ? '' : ' · ${(program['distance_km'] as num).toStringAsFixed(1)}km'}',
-              ),
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Icon(Icons.chevron_right, color: AppColors.textTertiary),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      ActivityListingCard(program: program, onTap: onTap, label: label);
 }

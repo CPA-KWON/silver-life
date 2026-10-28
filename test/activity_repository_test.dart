@@ -55,9 +55,10 @@ void main() {
       ) as Map<String, dynamic>;
       expect(body('activity_program_detail'), {'program_id': 'program'});
       expect(body('activity_plan_week'), {'rebuild_unstarted': true});
-      expect(body('activity_apply'), {
+      expect(body('activity_apply_with_note'), {
         'target_program': 'program',
         'target_experience': 'experience',
+        'application_note': '',
       });
       expect(body('activity_cancel'), {'enrollment': 'enrollment'});
       expect(body('activity_manage'), {
