@@ -75,19 +75,22 @@ class _HomeTabState extends State<HomeTab> {
         .from('profiles')
         .select('nickname, region_sido, region_sigungu')
         .eq('id', client.auth.currentUser!.id)
-        .single();
-    final activity = repo.home().then<ActivityData?>(
-      (v) => v,
-      onError: (_) => null,
-    );
+        .single()
+        .timeout(const Duration(seconds: 10));
+    final activity = repo
+        .home()
+        .timeout(const Duration(seconds: 20))
+        .then<ActivityData?>((v) => v, onError: (_) => null);
     final news = loadNews(profile)
+        .timeout(const Duration(seconds: 12))
         .then<List<ActivityData>?>((v) => v, onError: (_) => null);
     final meetups = loadMeetups(profile)
+        .timeout(const Duration(seconds: 12))
         .then<List<ActivityData>?>((v) => v, onError: (_) => null);
-    final official = notices.feed().then<List<NoticeData>?>(
-      (v) => v,
-      onError: (_) => null,
-    );
+    final official = notices
+        .feed()
+        .timeout(const Duration(seconds: 12))
+        .then<List<NoticeData>?>((v) => v, onError: (_) => null);
     return (
       nickname: profile['nickname'] as String,
       activity: await activity,

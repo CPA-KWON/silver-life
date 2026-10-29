@@ -221,6 +221,22 @@ class FakeBackend {
       accountDeletes++;
       return response('');
     }
+    if (name == 'facility_guide') return response({});
+    if (name == 'facility_check_in') {
+      final b = jsonDecode(request.body) as Map;
+      checkins.removeWhere(
+        (r) =>
+            r['facility_id'] == b['target_facility'] &&
+            r['user_id'] == profile['id'],
+      );
+      checkins.add({
+        'user_id': profile['id'],
+        'facility_id': b['target_facility'],
+        'checked_in_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      checkinWrites++;
+      return response('');
+    }
     if (name == 'facility_presence') {
       final body = jsonDecode(request.body) as Map;
       final active = checkins

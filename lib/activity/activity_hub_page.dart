@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
@@ -18,9 +17,9 @@ import 'activity_detail_page.dart';
 import 'activity_design.dart';
 import 'saved_programs_page.dart';
 import 'activity_program_card.dart';
+import 'activity_place_match.dart';
 import 'activity_welfare_catalog.dart';
 import 'activity_welfare_detail.dart';
-import '../facility/welfare_programs.dart' show facilityNameMatches;
 
 part 'activity_section_views.dart';
 

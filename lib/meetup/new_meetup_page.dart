@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../facility/facility_repository.dart';
 import '../facility/facility_search_page.dart';
+import '../facility/facility_flow.dart';
 import '../facility/naver_local_search.dart';
 import '../core/meetup_category.dart';
 import 'meetup_place_sheet.dart';
@@ -111,8 +112,10 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
     // No transition animation: FacilityPickerPage contains a NaverMap
     // (native PlatformView), and animating it in/out during a route
     // transition is known to corrupt Flutter's render tree.
-    final picked = widget.facilityPicker != null
-        ? await widget.facilityPicker!()
+    final mapPicker =
+        widget.facilityPicker ?? FacilityPickerScope.maybeOf(context);
+    final picked = mapPicker != null
+        ? await mapPicker()
         : await Navigator.of(context).push<FacilityResult>(
             PageRouteBuilder<FacilityResult>(
               transitionDuration: Duration.zero,

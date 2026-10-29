@@ -3,6 +3,7 @@ export 'activity_personal_forms.dart';
 import 'package:flutter/material.dart';
 
 import '../facility/facility_search_page.dart';
+import '../facility/facility_flow.dart';
 import '../facility/naver_local_search.dart';
 import '../ui/design_widgets.dart';
 import 'activity_repository.dart';
@@ -12,6 +13,7 @@ import '../social/social_form_widgets.dart';
 
 typedef ActivityPlacePicker = Future<FacilityResult?> Function(BuildContext);
 Future<FacilityResult?> pickActivityPlace(BuildContext c) =>
+    FacilityPickerScope.maybeOf(c)?.call() ??
     Navigator.of(c).push<FacilityResult>(
       PageRouteBuilder(
         transitionDuration: Duration.zero,

@@ -6,9 +6,10 @@ import '../app_theme.dart';
 import '../attendance/attendance_controller.dart';
 import '../attendance/attendance_dialog.dart';
 import '../attendance/attendance_repository.dart';
-import '../attendance/point_badge.dart';
 import '../community/community_page.dart';
 import '../facility/facility_search_page.dart';
+import '../facility/facility_flow.dart';
+import '../facility/naver_local_search.dart';
 import '../meetup/meetup_page.dart';
 import '../activity/activity_hub_page.dart';
 import '../activity/activity_repository.dart';
@@ -49,6 +50,16 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _index = 0;
+  final _facilityKey = GlobalKey<FacilitySearchPageState>();
+  void _showFacilities(List<FacilityResult> places, bool detail) {
+    setState(() => _index = 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _facilityKey.currentState?.showFacilities(places, detail: detail);
+      }
+    });
+  }
+
   late final _petPreview =
       widget.petController ?? PetPreviewController(repository: PetRepository());
   StreamSubscription<AuthState>? _petAuth;
@@ -286,104 +297,97 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       backgroundColor: _index == 0 ? _homeSurface : AppColors.background,
       body: SafeArea(
         bottom: false,
-        child: RetainedMapTab(
-          selected: _index == 1,
-          mapBuilder: (_, active) =>
-              widget.facilityPage ??
-              Scaffold(
-                appBar: AppBar(
-                  title: const Text('시설 찾기'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              NearbyFacilitiesPage(loader: widget.nearbyLoader),
-                        ),
-                      ),
-                      child: const Text('주변 시설'),
-                    ),
-                    const PointBadge(),
-                    const SizedBox(width: 8),
-                  ],
+        child: FacilityMapScope(
+          open: _showFacilities,
+          child: RetainedMapTab(
+            selected: _index == 1,
+            mapBuilder: (_, active) =>
+                widget.facilityPage ??
+                Scaffold(
+                  body: FacilitySearchPage(
+                    key: _facilityKey,
+                    showHeader: true,
+                    nearbyPageBuilder: (_) =>
+                        NearbyFacilitiesPage(loader: widget.nearbyLoader),
+                    isActive: active,
+                    showDetailBackButton: true,
+                  ),
                 ),
-                body: FacilitySearchPage(
-                  isActive: active,
-                  showDetailBackButton: true,
-                ),
-              ),
-          child: Stack(
-            children: [
-              if (_index != 0 && _index != 2) _buildPage(),
-              Offstage(
-                offstage: _index != 0,
-                child: TickerMode(
-                  enabled: _index == 0,
-                  child: NavigatorPopHandler<Object?>(
+            child: Stack(
+              children: [
+                if (_index != 0 && _index != 2) _buildPage(),
+                Offstage(
+                  offstage: _index != 0,
+                  child: TickerMode(
                     enabled: _index == 0,
-                    onPopWithResult: (_) {
-                      if (_index == 0) _homeNavigator.currentState?.maybePop();
-                    },
-                    child: Navigator(
-                      key: _homeNavigator,
-                      observers: [_homeObserver],
-                      onGenerateRoute: (_) => MaterialPageRoute<void>(
-                        builder: (_) {
-                          // Always construct the home entry, even if another tab
-                          // was selected before this navigator finished building.
-                          return HomeTab(
-                            activityRepository: widget.activityRepository,
-                            refreshListenable: _homeRefresh,
-                            petPreview: _petPreview,
-                            onAttendanceChanged: _syncAttendancePet,
-                            onOpenPet: _openPet,
-                            onOpenActivity: (section) => _openActivity(
-                              ActivitySectionPage(
-                                section: section,
-                                repository: widget.activityRepository,
+                    child: NavigatorPopHandler<Object?>(
+                      enabled: _index == 0,
+                      onPopWithResult: (_) {
+                        if (_index == 0) {
+                          _homeNavigator.currentState?.maybePop();
+                        }
+                      },
+                      child: Navigator(
+                        key: _homeNavigator,
+                        observers: [_homeObserver],
+                        onGenerateRoute: (_) => MaterialPageRoute<void>(
+                          builder: (_) {
+                            // Always construct the home entry, even if another tab
+                            // was selected before this navigator finished building.
+                            return HomeTab(
+                              activityRepository: widget.activityRepository,
+                              refreshListenable: _homeRefresh,
+                              petPreview: _petPreview,
+                              onAttendanceChanged: _syncAttendancePet,
+                              onOpenPet: _openPet,
+                              onOpenActivity: (section) => _openActivity(
+                                ActivitySectionPage(
+                                  section: section,
+                                  repository: widget.activityRepository,
+                                ),
                               ),
-                            ),
-                            onOpenProgram: (id) => _openActivity(
-                              ActivityDetailPage(
-                                programId: id,
-                                repository: widget.activityRepository,
+                              onOpenProgram: (id) => _openActivity(
+                                ActivityDetailPage(
+                                  programId: id,
+                                  repository: widget.activityRepository,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (_activityVisited)
-                Offstage(
-                  offstage: _index != 2,
-                  child: TickerMode(
-                    enabled: _index == 2,
-                    child: NavigatorPopHandler<Object?>(
+                if (_activityVisited)
+                  Offstage(
+                    offstage: _index != 2,
+                    child: TickerMode(
                       enabled: _index == 2,
-                      onPopWithResult: (_) {
-                        final navigator = _activityNavigator.currentState;
-                        if (_index == 2 && navigator != null) {
-                          navigator.maybePop();
-                        }
-                      },
-                      child: Navigator(
-                        key: _activityNavigator,
-                        onGenerateRoute: (_) => MaterialPageRoute<void>(
-                          builder: (_) => ActivityHubPage(
-                            repository: widget.activityRepository,
-                            petController: _petPreview,
-                            onOpenPet: _openPet,
-                            onAttendanceChanged: _syncAttendancePet,
+                      child: NavigatorPopHandler<Object?>(
+                        enabled: _index == 2,
+                        onPopWithResult: (_) {
+                          final navigator = _activityNavigator.currentState;
+                          if (_index == 2 && navigator != null) {
+                            navigator.maybePop();
+                          }
+                        },
+                        child: Navigator(
+                          key: _activityNavigator,
+                          onGenerateRoute: (_) => MaterialPageRoute<void>(
+                            builder: (_) => ActivityHubPage(
+                              repository: widget.activityRepository,
+                              petController: _petPreview,
+                              onOpenPet: _openPet,
+                              onAttendanceChanged: _syncAttendancePet,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

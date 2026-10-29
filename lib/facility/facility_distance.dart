@@ -19,15 +19,22 @@ Future<Position?> loadFacilityPosition() async {
       if (last != null &&
           DateTime.now().difference(last.timestamp).abs() <=
               const Duration(minutes: 2) &&
+          last.accuracy >= 0 &&
           last.accuracy <= 100) {
         return last;
       }
     } catch (_) {
       // A missing cached fix must not prevent a fresh GPS request.
     }
-    return await Geolocator.getCurrentPosition(
+    final fresh = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(timeLimit: Duration(seconds: 8)),
     );
+    return fresh.accuracy >= 0 &&
+            fresh.accuracy <= 100 &&
+            DateTime.now().difference(fresh.timestamp).abs() <=
+                const Duration(minutes: 2)
+        ? fresh
+        : null;
   } catch (_) {
     return null;
   }

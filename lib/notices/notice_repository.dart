@@ -14,13 +14,16 @@ class NoticeRepository {
     await client.rpc('institution_notice_detail', params: {'p_id': id}),
   );
   Future<String> save(NoticeData data, {String? id}) async => await client.rpc(
-    'institution_notice_save',
+    'institution_notice_save_v2',
     params: {'p_data': data, 'p_id': id},
   ) as String;
   Future<void> publish(String id, bool value) => client.rpc(
     'institution_notice_publish',
     params: {'p_id': id, 'p_published': value},
   );
+  Future<List<NoticeData>> programs(String org) async => List<NoticeData>.from(
+    await client.from('activity_programs').select().eq('org_id', org),
+  ).where((p) => p['draft'] != true).toList();
   Future<NoticeData> region() async => await client
       .from('profiles')
       .select('region_sido,region_sigungu')

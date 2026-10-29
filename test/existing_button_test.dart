@@ -1,5 +1,9 @@
+import 'dart:async';
+
+import 'package:silver_life/activity/activity_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:silver_life/auth/login_page.dart';
@@ -14,6 +18,7 @@ import 'package:silver_life/meetup/meetup_page.dart';
 import 'package:silver_life/meetup/new_meetup_page.dart';
 import 'package:silver_life/profile/profile_page.dart';
 import 'package:silver_life/facility/facility_search_page.dart';
+import 'package:silver_life/facility/facility_flow.dart';
 import 'package:silver_life/core/phone_call.dart';
 import 'package:silver_life/core/region_picker.dart';
 import 'package:silver_life/core/korea_regions.dart';
@@ -49,6 +54,26 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets(
+    'a stalled activity request does not leave home loading forever',
+    (t) async {
+      final repo = _StalledActivities();
+      await t.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: HomeTab(activityRepository: repo)),
+        ),
+      );
+      await t.pump();
+      await t.pump();
+      await t.pump(const Duration(seconds: 21));
+      await t.pumpAndSettle();
+      expect(find.textContaining('안녕하세요'), findsOneWidget);
+      expect(find.text('활동 현황을 불러오지 못했어요.'), findsOneWidget);
+      expect(find.text('내 정보'), findsOneWidget);
+      repo.pending.complete({});
+      await finish(t);
+    },
+  );
   testWidgets('home favorite tile opens the existing saved facility list', (
     t,
   ) async {
@@ -73,6 +98,90 @@ void main() {
     expect(find.text('행복경로당'), findsOneWidget);
     await finish(t);
   });
+  testWidgets(
+    'favorite map button uses shared retained map instead of a new native view',
+    (t) async {
+      backend.favorites.add({
+        'id': 'fav',
+        'user_id': FakeBackend.user,
+        'name': testPlace.name,
+        'address': testPlace.address,
+        'telephone': testPlace.telephone,
+        'lat': testPlace.lat,
+        'lng': testPlace.lng,
+        'category': testPlace.category,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      var opened = 0;
+      var details = false;
+      await mount(
+        t,
+        FacilityMapScope(
+          open: (places, detail) {
+            opened = places.length;
+            details = detail;
+          },
+          child: const FavoriteFacilitiesPage(),
+        ),
+      );
+      await tap(t, find.text('지도에서 모두 보기'));
+      expect(opened, 1);
+      expect(details, isFalse);
+      expect(find.byType(FacilitySearchPage), findsNothing);
+      await tap(t, find.text(testPlace.name));
+      expect(details, isTrue);
+      await finish(t);
+    },
+  );
+  testWidgets('facility programs return to the same mounted map element', (
+    t,
+  ) async {
+    await mount(
+      t,
+      const FacilitySearchPage(
+        initialFacility: testPlace,
+        mapPlaceholder: ColoredBox(
+          key: ValueKey('persistent-map'),
+          color: Colors.blue,
+        ),
+        enableRealtime: false,
+      ),
+    );
+    final map = t.element(find.byKey(const ValueKey('persistent-map')));
+    await tap(t, find.text('모두 보기 ›').first);
+    expect(find.text('시설 프로그램'), findsWidgets);
+    expect(
+      t.element(
+        find.byKey(const ValueKey('persistent-map'), skipOffstage: false),
+      ),
+      same(map),
+    );
+    await tap(t, find.byTooltip('뒤로').last);
+    expect(find.byType(FacilityDetailPage), findsOneWidget);
+    expect(t.element(find.byKey(const ValueKey('persistent-map'))), same(map));
+    await finish(t);
+  });
+  testWidgets(
+    'long facility lists keep the map return button visible at the top',
+    (t) async {
+      final key = GlobalKey<FacilitySearchPageState>();
+      await mount(
+        t,
+        FacilitySearchPage(
+          key: key,
+          mapPlaceholder: const ColoredBox(color: Colors.blue),
+          enableRealtime: false,
+        ),
+      );
+      key.currentState!.showFacilities(List.filled(25, testPlace));
+      await t.pumpAndSettle();
+      await tap(t, find.text('목록으로 보기 ›'));
+      expect(find.text('지도에서 보기').hitTestable(), findsOneWidget);
+      await tap(t, find.text('지도에서 보기'));
+      expect(find.text('지도 주변 시설 25곳'), findsOneWidget);
+      await finish(t);
+    },
+  );
   testWidgets('home profile entry and activity shortcut return to summary', (
     t,
   ) async {
@@ -177,18 +286,32 @@ void main() {
   testWidgets('map facility favorite and presence buttons work', (t) async {
     await mount(
       t,
-      const FacilitySearchPage(
+      FacilitySearchPage(
         initialFacility: testPlace,
+        positionLoader: () async => Position(
+          latitude: 37.5,
+          longitude: 127,
+          timestamp: DateTime.now(),
+          accuracy: 10,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        ),
         mapPlaceholder: ColoredBox(color: Colors.blue),
         enableRealtime: false,
       ),
     );
-    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    expect(find.byTooltip('뒤로'), findsOneWidget);
     await tap(t, find.byTooltip('즐겨찾기'));
     expect(backend.favorites.length, 1);
-    await tap(t, find.text('나 여기 있음'));
+    await tap(t, find.text('체크인'));
+    await tap(t, find.text('체크인하기'));
     expect(backend.checkins.length, 1);
-    await tap(t, find.text('나 여기 있음 취소'));
+    await tap(t, find.text('체크인 취소'));
+    await tap(t, find.text('체크인 취소').last);
     expect(backend.checkins, isEmpty);
     await tap(t, find.byTooltip('즐겨찾기'));
     expect(backend.favorites, isEmpty);
@@ -496,7 +619,8 @@ void main() {
         ),
         scale: 2,
       );
-      await tap(t, find.text('나 여기 있음'));
+      await tap(t, find.text('체크인'));
+      await tap(t, find.text('취소'));
       expect(t.takeException(), isNull);
       await finish(t);
     },
@@ -535,4 +659,10 @@ void main() {
       await finish(t);
     },
   );
+}
+
+class _StalledActivities extends FakeActivityRepository {
+  final pending = Completer<ActivityData>();
+  @override
+  Future<ActivityData> home() => pending.future;
 }

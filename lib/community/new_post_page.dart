@@ -360,7 +360,7 @@ class _NewPostState extends State<NewPostPage> {
                                 index: i,
                                 loading: p.loading,
                                 failed: p.failed,
-                                onTap: () => preview(i),
+                                onTap: busy ? null : () => preview(i),
                                 onRetry: busy ? null : () => retry(p),
                                 onRemove: busy ? null : () => remove(i),
                               ),

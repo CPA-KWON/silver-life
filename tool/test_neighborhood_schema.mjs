@@ -92,5 +92,65 @@ await as(v,async()=>{
 await q("update activity_programs set starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour',deadline=now()-interval '3 hours' where id=$1",[program]);
 await as(v,async()=>{await q("select activity_manage_batch($1::uuid[],'completed','')",[[e1,e2]]);});
 assert.equal((await q("select count(*) n from activity_enrollments where program_id=$1 and status='completed'",[program]))[0].n,2);
-console.log('PASS: drafts/create/publish, phone enrollment denial, capacity edit denial, owner checks, atomic approval/completion, plus requests, private photos, canonical meetup history.');
+await db.exec("alter table public.facilities add column address text default '',add column telephone text default '02-1234-5678'");
+await db.exec(await read('notice_mockups.sql'));
+const noticeId='00000000-0000-4000-8000-000000000071';
+const imagePath=orgId+'/notices/poster.jpg';
+const notice={org_id:orgId,title:'기관 공지',body:'우리 기관의 안내',region_sido:'서울특별시',region_sigungu:'동작구',client_request_id:noticeId,institution_kind:'복지관',important:true,pinned:true,image_paths:[imagePath],linked_programs:[program],publish_at:iso(1)};
+await as(v,async()=>{
+ await q("insert into storage.objects(bucket_id,name) values('neighborhood-media',$1)",[imagePath]);
+ await q('select institution_notice_save_v2($1::jsonb,null)',[JSON.stringify(notice)]);
+ await q('select institution_notice_save_v2($1::jsonb,null)',[JSON.stringify(notice)]);
+ assert.equal((await q('select institution_notice_list() r'))[0].r.length,1);
+ await q('select institution_notice_publish($1,true)',[noticeId]);
+ assert.equal((await q('select institution_notice_detail($1) r',[noticeId]))[0].r.reader_count,0);
+});
+await as(w,async()=>{
+ assert.equal((await q('select institution_notice_feed() r'))[0].r.length,0);
+ assert.equal((await q('select id from institution_notices where id=$1',[noticeId])).length,0);
+ assert.equal((await q('select * from storage.objects where name=$1',[imagePath])).length,0);
+ await assert.rejects(()=>q('select institution_notice_detail($1)',[noticeId]));
+ await assert.rejects(()=>q('select institution_notice_save_v2($1::jsonb,null)',[JSON.stringify(notice)]));
+});
+await as(v,async()=>{await q('select institution_notice_save_v2($1::jsonb,$2)',[JSON.stringify({...notice,publish_at:null}),noticeId]);});
+await as(w,async()=>{
+ assert.equal((await q('select institution_notice_feed() r'))[0].r[0].summary,notice.body);
+ assert.equal((await q('select * from storage.objects where name=$1',[imagePath])).length,1);
+ await q('select institution_notice_detail($1)',[noticeId]);
+ assert.equal((await q('select institution_notice_detail($1) r',[noticeId]))[0].r.reader_count,1);
+ await assert.rejects(()=>q('select * from institution_notice_readers'));
+ await q('delete from storage.objects where name=$1',[imagePath]);
+});
+assert.equal((await q('select * from storage.objects where name=$1',[imagePath])).length,1);
+await as(v,async()=>{await q('select institution_notice_publish($1,false)',[noticeId]);});
+await as(w,async()=>{assert.equal((await q('select * from storage.objects where name=$1',[imagePath])).length,0);});
+await db.exec(await read('notice_mockups.sql'));
+await db.exec(`create table public.checkins(id uuid primary key default gen_random_uuid(),user_id uuid references profiles(id) on delete cascade,facility_id uuid references facilities(id) on delete cascade,checked_in_at timestamptz default now(),unique(user_id,facility_id));alter table checkins enable row level security;grant select,insert,update,delete on checkins to authenticated;create policy own_presence on checkins to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());`);
+await db.exec(await read('facility_mockups.sql'));
+await as(v,async()=>{
+ await q('select facility_guide_save($1,$2::jsonb)',[orgId,JSON.stringify({opening_hours:'평일 09:00~18:00',floor_guide:'1층 입구 → 엘리베이터 → 2층',elevator:true,entry_steps:3,resting_seats:true,image_paths:[imagePath]})]);
+ await assert.rejects(()=>q('select facility_guide_save($1,$2::jsonb)',[orgId,JSON.stringify({image_paths:[v+'/org-proofs/test.jpg']})]));
+});
+await as(w,async()=>{
+ const g=(await q('select facility_guide($1) r',[facility]))[0].r;
+ assert.equal(g.entry_steps,3); assert.equal(g.elevator,true);assert.equal(g.updated_by,undefined);
+ await assert.rejects(()=>q('select updated_by from facility_guides'));
+ await assert.rejects(()=>q('select facility_guide_save($1,$2::jsonb)',[orgId,'{}']));
+ assert.equal((await q('select * from storage.objects where name=$1',[imagePath])).length,1);
+ await assert.rejects(()=>q('select facility_check_in($1,37.6,127,10,now())',[facility]));
+ await assert.rejects(()=>q('select facility_check_in($1,37.5,127,150,now())',[facility]));
+ await assert.rejects(()=>q("select facility_check_in($1,37.5,127,10,now()-interval '3 minutes')",[facility]));
+ await assert.rejects(()=>q("select facility_check_in($1,37.5,127,10,now()+interval '1 minute')",[facility]));
+ await assert.rejects(()=>q("insert into checkins(user_id,facility_id) values($1,$2)",[w,facility]));
+ await q('select facility_check_in($1,37.5,127,10,now())',[facility]);
+ await q('select facility_check_in($1,37.5,127,10,now())',[facility]);
+ assert.equal((await q('select user_id from checkins'))[0].user_id,w);
+ assert.equal((await q('select user_id from checkins')).length,1);
+ await assert.rejects(()=>q("update checkins set checked_in_at=now()"));
+});
+await as(u,async()=>{assert.equal((await q('select user_id from checkins')).length,0);});
+await db.exec("set role anon");await assert.rejects(()=>q('select facility_check_in($1,37.5,127,10,now())',[facility]));await db.exec('reset role');
+await db.exec(await read('facility_mockups.sql'));
+if (process.env.MIGRATION_BUNDLE) await db.exec(await readFile(process.env.MIGRATION_BUNDLE,'utf8'));
+console.log('PASS: drafts, phone enrollment guards, atomic management; membership/proof privacy; notice scheduling/RLS/media/readers; facility guides/ownership, GPS age/accuracy/distance and check-in write/privacy protections; repeatable migrations.');
 await db.close();

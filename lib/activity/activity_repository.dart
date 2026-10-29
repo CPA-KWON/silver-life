@@ -32,14 +32,16 @@ class ActivityRepository {
   String get userId => client.auth.currentUser!.id;
   Future<ActivityData> home() async {
     final data = Map<String, dynamic>.from(
-      await client.rpc('activity_home') as Map,
+      await client.rpc('activity_home').timeout(const Duration(seconds: 10))
+          as Map,
     );
     try {
       data['benefits'] = await client
           .from('activity_benefits')
           .select()
           .eq('user_id', userId)
-          .order('expires_at', ascending: false);
+          .order('expires_at', ascending: false)
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       // Keep the main response usable if the optional history request fails.
       data['benefits_unavailable'] = true;
@@ -49,16 +51,19 @@ class ActivityRepository {
           .from('pet_history')
           .select('reference,points,experience,created_at')
           .eq('user_id', userId)
-          .like('reference', 'program-mission:%');
+          .like('reference', 'program-mission:%')
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       data['mission_rewards_unavailable'] = true;
     }
     try {
-      data['welfare_programs'] = await ActivityWelfareCatalog(client).load(
-        data['preferences'] == null
-            ? null
-            : Map<String, dynamic>.from(data['preferences']),
-      );
+      data['welfare_programs'] = await ActivityWelfareCatalog(client)
+          .load(
+            data['preferences'] == null
+                ? null
+                : Map<String, dynamic>.from(data['preferences']),
+          )
+          .timeout(const Duration(seconds: 10));
     } catch (_) {
       data['welfare_unavailable'] = true;
     }
@@ -71,13 +76,15 @@ class ActivityRepository {
   );
   Future<ActivityData> agency() async {
     final data = Map<String, dynamic>.from(
-      await client.rpc('activity_agency') as Map,
+      await client.rpc('activity_agency').timeout(const Duration(seconds: 10))
+          as Map,
     );
     try {
       data['drafts'] = await client
           .from('activity_program_drafts')
           .select()
-          .order('updated_at', ascending: false);
+          .order('updated_at', ascending: false)
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       data['drafts_unavailable'] = true;
     }

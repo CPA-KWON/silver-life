@@ -121,7 +121,9 @@ class WelfareProgramRepository {
     final future = _all ??= _fetchAll();
     try {
       final all = await future;
-      return all.where((p) => facilityNameMatches(facilityName, p.facilityName)).toList();
+      return all
+          .where((p) => facilityNameMatches(facilityName, p.facilityName))
+          .toList();
     } catch (_) {
       _all = null;
       rethrow;
@@ -174,7 +176,9 @@ class _WelfareProgramsSectionState extends State<WelfareProgramsSection> {
       builder: (context, snapshot) {
         final programs = snapshot.data;
         if (programs == null || programs.isEmpty) {
-          if (snapshot.hasError) debugPrint('welfare_programs: ${snapshot.error}');
+          if (snapshot.hasError) {
+            debugPrint('welfare_programs: ${snapshot.error}');
+          }
           return const SizedBox.shrink();
         }
         return Padding(

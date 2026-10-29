@@ -36,20 +36,23 @@ Future<List<FacilityResult>> searchOwnFacilities({
       .gte('lng', lng - _boxDegrees)
       .lte('lng', lng + _boxDegrees);
 
-  final results = rows.map((row) {
-    final rowLat = (row['lat'] as num).toDouble();
-    final rowLng = (row['lng'] as num).toDouble();
-    return FacilityResult(
-      id: row['id'] as String,
-      name: row['name'] as String,
-      category: row['category'] as String? ?? category,
-      address: row['address'] as String,
-      telephone: row['telephone'] as String? ?? '',
-      lat: rowLat,
-      lng: rowLng,
-      distanceMeters: Geolocator.distanceBetween(lat, lng, rowLat, rowLng),
-    );
-  }).where((r) => r.distanceMeters <= _maxDistanceMeters).toList();
+  final results = rows
+      .map((row) {
+        final rowLat = (row['lat'] as num).toDouble();
+        final rowLng = (row['lng'] as num).toDouble();
+        return FacilityResult(
+          id: row['id'] as String,
+          name: row['name'] as String,
+          category: row['category'] as String? ?? category,
+          address: row['address'] as String,
+          telephone: row['telephone'] as String? ?? '',
+          lat: rowLat,
+          lng: rowLng,
+          distanceMeters: Geolocator.distanceBetween(lat, lng, rowLat, rowLng),
+        );
+      })
+      .where((r) => r.distanceMeters <= _maxDistanceMeters)
+      .toList();
 
   results.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
   return results.take(_maxResults).toList();

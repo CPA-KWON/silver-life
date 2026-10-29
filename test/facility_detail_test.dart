@@ -137,7 +137,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump();
-      expect(find.text('현재 위치에서 약 11.1km · 직선거리'), findsOneWidget);
+      expect(find.textContaining('현재 위치에서 약 11.1km · 직선거리'), findsOneWidget);
       expect(find.textContaining('0.1km'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
@@ -156,7 +156,7 @@ void main() {
     );
     await tester.pump();
     await tester.pump();
-    expect(find.text('현재 위치를 확인하면 거리를 볼 수 있어요'), findsOneWidget);
+    expect(find.textContaining('현재 위치를 확인하면 거리를 볼 수 있어요'), findsOneWidget);
     expect(find.textContaining('0.0km'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -201,7 +201,7 @@ void main() {
       checkins.complete(jsonResponse('{"count":0,"checked_in":false}', 200));
       await tester.pump();
       await tester.pump();
-      expect(find.text('현재 0명 있음'), findsOneWidget);
+      expect(find.text('앱에서 체크인한 이웃 0명 · 최근 3시간'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 20));
@@ -234,12 +234,12 @@ void main() {
       expect(find.text('시설 정보를 불러오지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
       expect(find.text('테스트 시설'), findsWidgets);
       failing = false;
-      await tester.ensureVisible(find.text('다시 시도'));
-      await tester.tap(find.text('다시 시도'));
+      await tester.ensureVisible(find.text('다시 시도').first);
+      await tester.tap(find.text('다시 시도').first);
       await tester.pump();
       await tester.pump();
       expect(find.text('시설 정보를 불러오지 못했어요. 다시 시도해 주세요.'), findsNothing);
-      expect(find.text('현재 0명 있음'), findsOneWidget);
+      expect(find.text('앱에서 체크인한 이웃 0명 · 최근 3시간'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 20));

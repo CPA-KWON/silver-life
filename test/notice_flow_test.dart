@@ -85,7 +85,7 @@ void main() {
       expect(find.text('지역 커뮤니티 · 자유게시판'), findsOneWidget);
       await tap(t, find.text('공식 검증 공지'));
       expect(find.text('검증 기관에서 등록한 내용'), findsOneWidget);
-      await tap(t, find.byTooltip('이전'));
+      await tap(t, find.byTooltip('뒤로'));
       await tap(t, find.text('동네 소식').last);
       expect(find.text('안녕하세요.'), findsOneWidget);
       await finish(t);
@@ -107,7 +107,7 @@ void main() {
       await tap(t, find.text('공지 작성'));
       await fill(t, '제목', '우리 동네 검증 공지');
       await fill(t, '공지 내용', '기관에서 등록한 안내입니다.');
-      await tap(t, find.text('저장하기'));
+      await tap(t, find.text('비공개 저장하기'));
       expect(find.text('공지를 저장했어요'), findsOneWidget);
       expect(r.rows.single['published'], false);
       expect(r.rows.single['region_sigungu'], '강남구');
@@ -143,11 +143,11 @@ void main() {
       await fill(t, '제목', '다시 저장할 제목');
       await fill(t, '공지 내용', '유지되어야 하는 본문');
       await fill(t, '원문 링크 (선택)', 'javascript:alert(1)');
-      await tap(t, find.text('저장하기'));
+      await tap(t, find.text('비공개 저장하기'));
       expect(find.text('https://로 시작하는 원문 주소를 입력해주세요.'), findsOneWidget);
       expect(r.saves, 0);
       await fill(t, '원문 링크 (선택)', 'https://example.org/notice');
-      await tap(t, find.text('저장하기'));
+      await tap(t, find.text('비공개 저장하기'));
       expect(find.text('저장하지 못했어요'), findsOneWidget);
       await tap(t, find.text('확인'));
       expect(find.text('다시 저장할 제목'), findsOneWidget);

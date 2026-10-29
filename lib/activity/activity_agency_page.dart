@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../ui/neighborhood_design.dart';
 import '../notices/notice_pages.dart';
 import 'activity_repository.dart';
+import '../facility/facility_guide_page.dart';
 import 'activity_forms.dart';
 import 'activity_program_card.dart';
 
@@ -224,6 +225,12 @@ class _AgencyState extends State<ActivityAgencyPage> {
               '경험 나눔',
               Icons.favorite_outline,
               () => go(AgencySection.experience),
+            ),
+            shortcut(
+              '시설 안내',
+              Icons.map_outlined,
+              () =>
+                  open(FacilityGuidePage(organizations: widget.organizations)),
             ),
             shortcut(
               '공지',

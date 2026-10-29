@@ -1379,19 +1379,12 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         if (freeOnly && !isFree) return false;
         final place = widget.place;
         if (place != null) {
-          final lat = p['lat'], lng = p['lng'];
-          return p['source'] == 'welfare'
-              ? facilityNameMatches(place.name, '${p['place_name']}')
-              : p['place_name']?.toString().trim() == place.name.trim() &&
-                    lat is num &&
-                    lng is num &&
-                    Geolocator.distanceBetween(
-                          place.lat,
-                          place.lng,
-                          lat.toDouble(),
-                          lng.toDouble(),
-                        ) <=
-                        100;
+          return activityMatchesFacility(
+            p,
+            name: place.name,
+            lat: place.lat,
+            lng: place.lng,
+          );
         }
         return p['kind'] ==
             (widget.section == ActivitySection.programs
@@ -1411,7 +1404,7 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
   Widget build(BuildContext context) => ActivityScreen(
     title: widget.place == null
         ? activitySectionTitle(widget.section)
-        : '앱으로 신청하는 활동',
+        : '시설 프로그램',
     tint: tint,
     child: FutureBuilder<ActivityData>(
       future: future,

@@ -603,33 +603,36 @@ class _AccessState extends State<InstitutionAccessPage> {
   }
 
   @override
-  Widget build(BuildContext c) => NeighborhoodScreen(
-    title: editing ? '기관 담당자 인증' : '인증 심사 상태',
-    tint: const Color(0xFFDCE5EE),
-    child: FutureBuilder<Map<String, dynamic>?>(
-      future: state,
-      builder: (c, s) {
-        if (s.connectionState != ConnectionState.done) {
-          return const NeighborhoodLoading();
-        }
-        if (s.hasError) {
-          return ActivityEmpty(
-            '인증 정보를 불러오지 못했어요',
-            message: '다시 시도해 주세요. 계속되지 않으면 운영자에게 문의해 주세요.',
-            action: '다시 시도',
-            onAction: reload,
+  Widget build(BuildContext c) => PopScope(
+    canPop: !busy,
+    child: NeighborhoodScreen(
+      title: '기관 담당자 인증',
+      tint: const Color(0xFFDCE5EE),
+      child: FutureBuilder<Map<String, dynamic>?>(
+        future: state,
+        builder: (c, s) {
+          if (s.connectionState != ConnectionState.done) {
+            return const NeighborhoodLoading();
+          }
+          if (s.hasError) {
+            return ActivityEmpty(
+              '인증 정보를 불러오지 못했어요',
+              message: '다시 시도해 주세요. 계속되지 않으면 운영자에게 문의해 주세요.',
+              action: '다시 시도',
+              onAction: reload,
+            );
+          }
+          final r = s.data;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: editing
+                ? requestForm()
+                : r == null || r['status'] == 'cancelled'
+                ? intro()
+                : status(r),
           );
-        }
-        final r = s.data;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: editing
-              ? requestForm()
-              : r == null || r['status'] == 'cancelled'
-              ? intro()
-              : status(r),
-        );
-      },
+        },
+      ),
     ),
   );
 }

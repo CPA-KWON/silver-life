@@ -34,7 +34,11 @@ class SocialMedia {
     );
   }
 
-  static Future<String> upload(XFile image, {String folder = 'posts'}) async {
+  static Future<String> upload(
+    XFile image, {
+    String folder = 'posts',
+    String? owner,
+  }) async {
     final c = Supabase.instance.client, bytes = await image.readAsBytes();
     if (bytes.length > 10 * 1024 * 1024) {
       throw StateError('사진은 10MB 이하로 골라 주세요.');
@@ -59,7 +63,7 @@ class SocialMedia {
       throw StateError('JPG·PNG·WebP 사진을 골라 주세요.');
     }
     final path =
-        '${c.auth.currentUser!.id}/$folder/${DateTime.now().microsecondsSinceEpoch}.${mime.split('/').last}';
+        '${owner ?? c.auth.currentUser!.id}/$folder/${DateTime.now().microsecondsSinceEpoch}.${mime.split('/').last}';
     await c.storage
         .from(bucket)
         .uploadBinary(

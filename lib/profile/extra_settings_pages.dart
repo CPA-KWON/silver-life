@@ -207,7 +207,20 @@ class _DeleteState extends State<DeleteAccountPage> {
         if (e.statusCode != '404') rethrow;
       }
       await c.rpc('delete_my_account');
-      await c.auth.signOut(scope: SignOutScope.local);
+      // Account deletion already committed. A local cleanup failure must never
+      // misreport it as an incorrect password or claim the account still exists.
+      try {
+        await c.auth.signOut(scope: SignOutScope.local);
+      } catch (_) {
+        if (mounted) {
+          await activityFailure(
+            context,
+            title: '계정은 삭제됐어요',
+            message: '앱을 완전히 닫은 뒤 다시 열어 주세요.',
+          );
+        }
+        return;
+      }
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on AuthException {
       if (mounted) await activityFailure(context, title: '비밀번호를 확인해 주세요');
@@ -216,7 +229,7 @@ class _DeleteState extends State<DeleteAccountPage> {
         await activityFailure(
           context,
           title: '탈퇴하지 못했어요',
-          message: '계정은 유지돼요. 잠시 후 다시 시도해 주세요.',
+          message: '연결이 끊겨 결과를 확인하지 못했어요. 다시 로그인해 계정 상태를 확인해 주세요.',
         );
       }
     } finally {

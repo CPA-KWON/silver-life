@@ -26,3 +26,10 @@
 - 현재 코드 전체 Flutter 테스트 155개 통과. 정적 분석 지적 없음. Android debug 빌드/기존 데이터 보존 설치 확인. tool/test_neighborhood_schema.mjs에서 canonical 모임 이력, 비공개 사진/재직 자료, 인증 요청 재시도/타인 차단/본인 승인 금지, 운영자 승인, 프로그램 임시 저장/발행/정원/권한/전화 신청 차단/일괄 처리 원자성을 격리 검증.
 - neighborhood_mockups.sql, neighborhood_media.sql, meetup_history.sql, institution_access_requests.sql은 운영 미적용. 기존 Supabase 문자 인증은 비활성인 것을 설정 읽기로 확인. 실제 SMS 발송에는 별도 발송 서비스 설정 필요, 사용자에게 계정 보유 여부 질문 중. 비밀키 출력/커밋 없음.
 - 남은 작업: 시설/공지 목업 정리, 운영 SQL 적용과 Android 전체 시나리오/시각 비교, 실물 걸음 센서/운영 광고 등 외부 설정 한계 구분. 사용자가 전체 구현 후 큰 문제 없으면 CPA-KWON/silver-life main push를 승인했으며 아직 push하지 않았다.
+
+## 시설·공지 후속 검증 및 운영 반영
+
+- 2026-10-29 시설/공지/즐겨찾기 목업과 연결 보완 완료. 최신 검증은 docs/mockup_release_20261029.md를 따른다.
+- 추가 SQL 전체를 운영 SQL Editor에서 한 트랜잭션으로 적용하고 새 RPC/권한/RLS/비공개 bucket을 확인했다. 위 checkpoint의 미적용 표시는 당시 기록이다.
+- 사용자가 문자 발송 서비스 계정이 없다고 답했다. 실제 문자 인증은 준비 중으로 유지하며 설정 절차를 문서화했다.
+- 전체 Flutter 테스트 163개 및 정적 검사/Android 빌드 통과. main push 직전 화면/동선 최종 확인 중.
