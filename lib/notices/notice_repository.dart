@@ -15,6 +15,26 @@ NoticeData publicNoticeData(NoticeData row) => {
   'pinned': false,
 };
 
+/// Public-source rows and partner organizations spell the same centre with or
+/// without spaces and "시립/구립" prefixes.
+String institutionKey(Object? name) => '${name ?? ''}'
+    .replaceAll(RegExp(r'\s+'), '')
+    .replaceFirst(RegExp(r'^(서울특별시립|서울시립|시립|구립)'), '');
+
+/// A notice counts as 새 소식 for seven days including the day it was posted.
+const newNoticeDays = 7;
+bool isNewNotice(NoticeData n, {DateTime? now}) {
+  final at = DateTime.tryParse('${n['published_at'] ?? ''}');
+  if (at == null) return false;
+  final age = (now ?? DateTime.now()).difference(at);
+  return !age.isNegative && age.inDays < newNoticeDays;
+}
+
+int _newestFirst(NoticeData a, NoticeData b) =>
+    (DateTime.tryParse('${b['published_at']}') ?? DateTime(1970)).compareTo(
+      DateTime.tryParse('${a['published_at']}') ?? DateTime(1970),
+    );
+
 class NoticeRepository {
   NoticeRepository({this.supabase, this.regionResolver});
   final NeighborhoodRegionResolver? regionResolver;
@@ -65,15 +85,35 @@ class NoticeRepository {
     preferenceRevision++;
   }
 
-  Future<List<NoticeData>> homeFeed() async {
-    NoticeData? preferred;
-    try {
-      preferred = await preferredInstitution();
-    } catch (_) {
-      return feed();
-    }
-    return preferred == null ? feed() : publicFeed(institution: preferred);
+  /// Notices of one chosen institution: homepage-collected notices plus the
+  /// approved partner organization's own notices with the same name. Partner
+  /// rows are optional extras, so their failure never hides public notices.
+  Future<List<NoticeData>> institutionFeed(
+    NoticeData institution, {
+    bool archive = false,
+  }) async {
+    final key = institutionKey(institution['institution_name']);
+    final region = (
+      sido: '${institution['region_sido']}',
+      sigungu: '${institution['region_sigungu']}',
+    );
+    final results = await Future.wait([
+      publicFeed(archive: archive, institution: institution),
+      if (!archive)
+        _partnerFeed(region).then(
+          (rows) => [
+            for (final n in rows)
+              if (institutionKey(n['org_name']) == key) n,
+          ],
+          onError: (_) => <NoticeData>[],
+        ),
+    ]);
+    return [for (final rows in results) ...rows]..sort(_newestFirst);
   }
+
+  /// Browsing district only (GPS or 동작구 fallback), never eligibility.
+  Future<NeighborhoodRegion> currentRegion() =>
+      (regionResolver ?? NeighborhoodRegionResolver.shared).resolve();
 
   Future<List<NoticeData>> feed() async {
     final region = await (regionResolver ?? NeighborhoodRegionResolver.shared)
@@ -133,10 +173,7 @@ class NoticeRepository {
         );
         if (order != 0) return order;
       }
-      return (DateTime.tryParse('${b['published_at']}') ?? DateTime(1970))
-          .compareTo(
-            DateTime.tryParse('${a['published_at']}') ?? DateTime(1970),
-          );
+      return _newestFirst(a, b);
     });
     return rows;
   }

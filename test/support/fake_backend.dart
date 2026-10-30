@@ -47,7 +47,12 @@ class FakeBackend {
       comments = <Map<String, dynamic>>[],
       favorites = <Map<String, dynamic>>[],
       checkins = <Map<String, dynamic>>[],
-      reports = <Map<String, dynamic>>[];
+      reports = <Map<String, dynamic>>[],
+          // 내 복지관: 지정 기록, 홈페이지 수집 공지, 기관 직접 등록 공지.
+          myNoticeInstitutions =
+          <Map<String, dynamic>>[],
+      publicNotices = <Map<String, dynamic>>[],
+      partnerNotices = <Map<String, dynamic>>[];
   Map<String, dynamic> post({String id = 'post', bool meetup = false}) => {
     'id': id,
     'title': meetup ? '복지관 산책 모임' : '동네 소식',
@@ -118,6 +123,9 @@ class FakeBackend {
     favorites.clear();
     checkins.clear();
     reports.clear();
+    myNoticeInstitutions.clear();
+    publicNotices.clear();
+    partnerNotices.clear();
     requests.clear();
     postWrites = 0;
     commentWrites = 0;
@@ -335,6 +343,9 @@ class FakeBackend {
       'facilities': facilities,
       'checkins': checkins,
       'reports': reports,
+      'my_notice_institutions': myNoticeInstitutions,
+      'public_institution_notices': publicNotices,
+      'institution_notices': partnerNotices,
     };
     final table = tables[name];
     if (table == null) {

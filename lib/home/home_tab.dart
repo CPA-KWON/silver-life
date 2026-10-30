@@ -28,7 +28,6 @@ typedef HomeData = ({
   ActivityData? activity,
   List<ActivityData>? meetups,
   List<ActivityData>? news,
-  List<NoticeData>? notices,
 });
 
 class HomeTab extends StatefulWidget {
@@ -109,16 +108,11 @@ class _HomeTabState extends State<HomeTab> {
     final meetups = loadMeetups(browsingRegion)
         .timeout(const Duration(seconds: 12))
         .then<List<ActivityData>?>((v) => v, onError: (_) => null);
-    final official = notices
-        .homeFeed()
-        .timeout(const Duration(seconds: 12))
-        .then<List<NoticeData>?>((v) => v, onError: (_) => null);
     final result = (
       nickname: profile['nickname'] as String,
       activity: await activity,
       meetups: await meetups,
       news: await news,
-      notices: await official,
     );
     _loadedAt = DateTime.now();
     return result;
@@ -245,7 +239,6 @@ class _HomeTabState extends State<HomeTab> {
     required String empty,
     required String failure,
     required List<ActivityData>? rows,
-    required bool official,
     required VoidCallback onList,
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -257,16 +250,12 @@ class _HomeTabState extends State<HomeTab> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: official
-                  ? const Color(0xFFFFF5E4)
-                  : const Color(0xFFF0EDFF),
+              color: const Color(0xFFF0EDFF),
               borderRadius: BorderRadius.circular(17),
             ),
-            child: Icon(
-              official ? Icons.campaign_outlined : Icons.chat_outlined,
-              color: official
-                  ? const Color(0xFFE78D05)
-                  : const Color(0xFF7450E8),
+            child: const Icon(
+              Icons.chat_outlined,
+              color: Color(0xFF7450E8),
               size: 26,
             ),
           ),
@@ -297,9 +286,7 @@ class _HomeTabState extends State<HomeTab> {
             onTap: onList,
             excludeSemantics: true,
             child: TextButton(
-              key: ValueKey(
-                official ? 'home-official-more' : 'home-community-more',
-              ),
+              key: const ValueKey('home-community-more'),
               onPressed: onList,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.only(left: 6),
@@ -313,11 +300,7 @@ class _HomeTabState extends State<HomeTab> {
       if (rows == null) ActivityInfo(failure, onRetry: reload),
       for (final n in rows?.take(2) ?? <ActivityData>[])
         InkWell(
-          onTap: () => open(
-            official
-                ? NoticeDetailPage(id: n['id'], repository: notices)
-                : PostDetailPage(postId: n['id']),
-          ),
+          onTap: () => open(PostDetailPage(postId: n['id'])),
           borderRadius: BorderRadius.circular(14),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(63, 8, 0, 8),
@@ -327,9 +310,7 @@ class _HomeTabState extends State<HomeTab> {
                 Text('${n['title']}', style: petText(18)),
                 const SizedBox(height: 3),
                 Text(
-                  official
-                      ? '${n['is_public_source'] == true ? '공개 공지' : '기관 공지'} · ${n['org_name']}'
-                      : '지역 커뮤니티 · ${n['category']}',
+                  '지역 커뮤니티 · ${n['category']}',
                   style: petText(
                     14,
                     color: PetColors.secondary,
@@ -582,30 +563,16 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           title('동네 소식'),
-          MyInstitutionNoticeCard(repository: notices, onChanged: reload),
+          MyInstitutionNoticeCard(repository: notices, refreshKey: _loadedAt),
           const SizedBox(height: 12),
           HomeCard(
             padding: 18,
-            child: Column(
-              children: [
-                newsGroup(
-                  label: '기관 공지',
-                  empty: '아직 등록된 기관 공지가 없어요',
-                  failure: '기관 공지를 불러오지 못했어요.',
-                  rows: home.notices,
-                  official: true,
-                  onList: () => open(NoticeListPage(repository: notices)),
-                ),
-                const Divider(height: 26, color: PetColors.line),
-                newsGroup(
-                  label: '지역 커뮤니티',
-                  empty: '아직 우리 동네 글이 없어요',
-                  failure: '커뮤니티 글을 불러오지 못했어요.',
-                  rows: home.news,
-                  official: false,
-                  onList: () => open(const CommunityPage()),
-                ),
-              ],
+            child: newsGroup(
+              label: '지역 커뮤니티',
+              empty: '아직 우리 동네 글이 없어요',
+              failure: '커뮤니티 글을 불러오지 못했어요.',
+              rows: home.news,
+              onList: () => open(const CommunityPage()),
             ),
           ),
           title('더 둘러보기'),

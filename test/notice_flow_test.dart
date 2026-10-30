@@ -10,8 +10,14 @@ import 'support/widget_actions.dart';
 
 class FakeNotices extends NoticeRepository {
   final rows = <NoticeData>[];
-  bool fail = false;
+  bool fail = false, failPreference = false;
   int saves = 0;
+  @override
+  Future<NoticeData?> preferredInstitution() async {
+    if (failPreference) throw StateError('offline');
+    return null;
+  }
+
   @override
   Future<NoticeData> region() async => {
     'region_sido': '서울특별시',
@@ -61,18 +67,9 @@ void main() {
   });
   tearDownAll(() => Supabase.instance.dispose());
   testWidgets(
-    'home separates official source and community and opens correct details',
+    'home shows my institution card beside community and opens community',
     (t) async {
-      final r = FakeNotices()
-        ..rows.add({
-          'id': 'notice',
-          'title': '공식 검증 공지',
-          'body': '검증 기관에서 등록한 내용',
-          'org_name': '검증 복지관',
-          'region_sido': '서울특별시',
-          'region_sigungu': '강남구',
-          'published': true,
-        });
+      final r = FakeNotices();
       backend.posts.add(backend.post());
       await mount(
         t,
@@ -81,16 +78,39 @@ void main() {
           noticeRepository: r,
         ),
       );
-      expect(find.text('기관 공지 · 검증 복지관'), findsOneWidget);
+      expect(find.text('내 복지관 지정하기'), findsOneWidget);
       expect(find.text('지역 커뮤니티 · 자유게시판'), findsOneWidget);
-      await tap(t, find.text('공식 검증 공지'));
-      expect(find.text('검증 기관에서 등록한 내용'), findsOneWidget);
-      await tap(t, find.byTooltip('뒤로'));
+      expect(find.text('기관 공지'), findsNothing);
       await tap(t, find.text('동네 소식').last);
       expect(find.text('안녕하세요.'), findsOneWidget);
       await finish(t);
     },
   );
+  testWidgets('notice written by the institution shows body and phone', (
+    t,
+  ) async {
+    final r = FakeNotices()
+      ..rows.add({
+        'id': 'notice',
+        'title': '공식 검증 공지',
+        'body': '검증 기관에서 등록한 내용',
+        'org_name': '검증 복지관',
+        'telephone': '02-000-0000',
+        'published_at': '2026-10-21T01:00:00Z',
+        'region_sido': '서울특별시',
+        'region_sigungu': '강남구',
+        'published': true,
+      });
+    await mount(t, NoticeDetailPage(id: 'notice', repository: r));
+    expect(find.text('기관 직접 등록'), findsOneWidget);
+    expect(find.text('검증 기관에서 등록한 내용'), findsOneWidget);
+    expect(find.text('담당자가 앱에서 직접 올렸어요'), findsOneWidget);
+    expect(find.text('2026년 10월 21일'), findsOneWidget);
+    expect(find.text('문의 02-000-0000'), findsOneWidget);
+    expect(find.text('기관에 전화 문의'), findsOneWidget);
+    expect(find.text('홈페이지 원문'), findsNothing);
+    await finish(t);
+  });
   testWidgets(
     'institution writes draft then explicitly publishes or stops publication',
     (t) async {
@@ -155,10 +175,10 @@ void main() {
       await finish(t);
     },
   );
-  testWidgets('official source failure does not hide community and can retry', (
+  testWidgets('my institution failure does not hide community and can retry', (
     t,
   ) async {
-    final r = FakeNotices()..fail = true;
+    final r = FakeNotices()..failPreference = true;
     backend.posts.add(backend.post());
     await mount(
       t,
@@ -167,11 +187,11 @@ void main() {
         noticeRepository: r,
       ),
     );
-    expect(find.text('기관 공지를 불러오지 못했어요.'), findsOneWidget);
+    expect(find.text('저장한 복지관을 확인하지 못했어요'), findsOneWidget);
     expect(find.text('지역 커뮤니티 · 자유게시판'), findsOneWidget);
-    r.fail = false;
-    await tap(t, find.text('다시 시도'));
-    expect(find.text('아직 등록된 기관 공지가 없어요'), findsOneWidget);
+    r.failPreference = false;
+    await tap(t, find.text('다시 불러오기'));
+    expect(find.text('내 복지관 지정하기'), findsOneWidget);
     await finish(t);
   });
 }
