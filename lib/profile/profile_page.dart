@@ -16,6 +16,7 @@ import 'privacy_policy_page.dart';
 import 'extra_settings_pages.dart';
 import 'sign_out.dart';
 import '../meetup/my_meetups_page.dart';
+import '../social/friends_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key, this.activityRepository});
@@ -238,6 +239,13 @@ class _ProfileState extends State<ProfilePage> {
                         '참여한 모임',
                         () => open(const MyMeetupsPage()),
                         color: PetColors.green,
+                      ),
+                      item(
+                        Icons.people_outline,
+                        '친구',
+                        () => open(const FriendsPage()),
+                        color: PetColors.green,
+                        subtitle: '친구 추가 · 친구는 지금 어디에?',
                       ),
                       item(
                         Icons.local_florist_outlined,
