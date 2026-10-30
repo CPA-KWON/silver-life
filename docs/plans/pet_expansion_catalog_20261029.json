@@ -1,0 +1,305 @@
+{
+  "status": "design_request_not_live",
+  "items": [
+    {
+      "id": "dog_walk_vest",
+      "species": "dog",
+      "category": "clothing",
+      "name": "동네 산책 조끼",
+      "slot": "body",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_flower_cardigan",
+      "species": "dog",
+      "category": "clothing",
+      "name": "꽃무늬 가디건",
+      "slot": "body",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_raincoat",
+      "species": "dog",
+      "category": "clothing",
+      "name": "노란 우비",
+      "slot": "body",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_winter_coat",
+      "species": "dog",
+      "category": "clothing",
+      "name": "겨울 누빔 코트",
+      "slot": "body",
+      "acquisition": "Play",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_outing_overall",
+      "species": "dog",
+      "category": "clothing",
+      "name": "나들이 멜빵옷",
+      "slot": "body",
+      "acquisition": "Play",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_walk_hat",
+      "species": "dog",
+      "category": "accessory",
+      "name": "산책 챙모자",
+      "slot": "head",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_flower_pin",
+      "species": "dog",
+      "category": "accessory",
+      "name": "꽃 장식",
+      "slot": "head",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_ribbon",
+      "species": "dog",
+      "category": "accessory",
+      "name": "체크 리본",
+      "slot": "neck",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_first_walk_badge",
+      "species": "dog",
+      "category": "accessory",
+      "name": "첫 산책 배지",
+      "slot": "badge",
+      "acquisition": "활동",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "dog_outing_scarf",
+      "species": "dog",
+      "category": "accessory",
+      "name": "나들이 스카프",
+      "slot": "neck",
+      "acquisition": "Play",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_walk_vest",
+      "species": "cat",
+      "category": "clothing",
+      "name": "고양이 산책 조끼",
+      "slot": "body",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_stripe_knit",
+      "species": "cat",
+      "category": "clothing",
+      "name": "줄무늬 니트",
+      "slot": "body",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_raincoat",
+      "species": "cat",
+      "category": "clothing",
+      "name": "연두 우비",
+      "slot": "body",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_flower_cardigan",
+      "species": "cat",
+      "category": "clothing",
+      "name": "꽃 가디건",
+      "slot": "body",
+      "acquisition": "Play",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_outing_overall",
+      "species": "cat",
+      "category": "clothing",
+      "name": "나들이 멜빵옷",
+      "slot": "body",
+      "acquisition": "Play",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_beret",
+      "species": "cat",
+      "category": "accessory",
+      "name": "귀가 보이는 베레모",
+      "slot": "head",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_flower_pin",
+      "species": "cat",
+      "category": "accessory",
+      "name": "작은 꽃핀",
+      "slot": "head",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_ribbon",
+      "species": "cat",
+      "category": "accessory",
+      "name": "체크 리본",
+      "slot": "neck",
+      "acquisition": "P",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_first_walk_badge",
+      "species": "cat",
+      "category": "accessory",
+      "name": "첫 산책 배지",
+      "slot": "badge",
+      "acquisition": "활동",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    },
+    {
+      "id": "cat_moon_scarf",
+      "species": "cat",
+      "category": "accessory",
+      "name": "달무늬 스카프",
+      "slot": "neck",
+      "acquisition": "Play",
+      "stages": [
+        "baby",
+        "junior",
+        "adult"
+      ],
+      "status": "planned",
+      "price": null
+    }
+  ]
+}

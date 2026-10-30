@@ -11,7 +11,13 @@ import '../social/photo_widgets.dart';
 import 'community_page.dart' show kPostCategories;
 
 class NewPostPage extends StatefulWidget {
-  const NewPostPage({super.key, this.existingPost, this.onFinished});
+  const NewPostPage({
+    super.key,
+    this.existingPost,
+    this.onFinished,
+    this.onCreated,
+  });
+  final ValueChanged<String>? onCreated;
   final Map<String, dynamic>? existingPost;
   final ValueChanged<bool>? onFinished;
   @override
@@ -44,6 +50,7 @@ class _NewPostState extends State<NewPostPage> {
       photos.any((p) => p.file != null) ||
       originals.join('|') != photos.map((p) => p.path).join('|');
   void finish(bool v) {
+    if (v && !editing) widget.onCreated?.call(postId);
     widget.onFinished != null
         ? widget.onFinished!(v)
         : Navigator.pop(context, v);

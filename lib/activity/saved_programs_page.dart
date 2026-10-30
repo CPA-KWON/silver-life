@@ -41,7 +41,8 @@ Future<List<ActivityData>> loadSavedPrograms() async {
     }
   }
   if (external.isNotEmpty) {
-    final catalog = await ActivityWelfareCatalog(c).load(null);
+    final catalog = await ActivityWelfareCatalog(c)
+        .load(null, includeClosed: true);
     for (final f in external) {
       rows.add(
         catalog.where((p) => p['id'] == f['program_key']).firstOrNull ??

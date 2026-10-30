@@ -434,7 +434,7 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         icon: Icons.card_giftcard_outlined,
         color: PetColors.purple,
         rows: [
-          ('포인트', '+${result['points']} P'),
+          ('포인트', '+${pointAmount(result['points'] as num?)} P'),
           ('성장 경험치', '+${result['experience']} EXP'),
         ],
         secondary: '닫기',
@@ -514,7 +514,9 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
           Align(
             alignment: Alignment.centerLeft,
             child: PetPill(
-              stage == 3 ? '+ 30 EXP' : '+ ${stage == 1 ? 50 : 100} P',
+              stage == 3
+                  ? '+ 30 EXP'
+                  : '+ ${pointAmount(stage == 1 ? 50 : 100)} P',
               color: stage == 3 ? PetColors.lavender : PetColors.yellow,
               ink: stage == 3 ? PetColors.purple : PetColors.orange,
             ),
@@ -712,7 +714,7 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
         message: '기관에서 확인한 참여 기록으로 지급해요.',
         icon: Icons.card_giftcard_outlined,
         rows: [
-          ('포인트', '+${outcome.points} P'),
+          ('포인트', '+${pointAmount(outcome.points)} P'),
           ('성장 경험치', '+${outcome.experience} EXP'),
         ],
         secondary: '닫기',
@@ -1186,7 +1188,7 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              for (final v in ['전체', '앱으로 신청', '전화·방문'])
+              for (final v in ['전체', '앱으로 신청', '전화·방문', '기관 홈페이지'])
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
@@ -1271,15 +1273,22 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
           message: q.isEmpty
               ? '다른 분야도 살펴보거나\n나중에 다시 확인해 주세요'
               : '다른 이름으로 찾아보거나\n분야를 바꿔서 확인해 보세요',
-          action: '분야 전체 보기',
+          action: '필터 초기화',
           onAction: () => setState(() {
             categoryFilter = null;
             keyword.clear();
+            methodFilter = '전체';
+            freeOnly = false;
+            sort = '가까운 순';
           }),
-          secondary: widget.section == ActivitySection.recruitment
+          secondary: widget.place != null
+              ? '다른 시설 프로그램 보기'
+              : widget.section == ActivitySection.recruitment
               ? '내 경험 보기'
               : '추천 조건 설정',
-          onSecondary: () => widget.section == ActivitySection.recruitment
+          onSecondary: () => widget.place != null
+              ? section(ActivitySection.programs)
+              : widget.section == ActivitySection.recruitment
               ? section(ActivitySection.myExperiences)
               : settings(d),
         ),
@@ -1370,7 +1379,10 @@ class _ActivitySectionPageState extends State<ActivitySectionPage> {
             p['source'] == 'welfare' ||
             ['phone', 'visit'].contains(p['application_method']);
         if (methodFilter == '앱으로 신청' && isExternal ||
-            methodFilter == '전화·방문' && !isExternal) {
+            methodFilter == '전화·방문' &&
+                (!isExternal || p['application_method'] == 'external') ||
+            methodFilter == '기관 홈페이지' &&
+                p['application_method'] != 'external') {
           return false;
         }
         final isFree = p['source'] == 'welfare'

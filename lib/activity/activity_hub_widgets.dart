@@ -1,3 +1,5 @@
+import '../core/points.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -22,7 +24,9 @@ class ActivityWalletPill extends StatelessWidget {
     button: true,
     excludeSemantics: true,
     onTap: onTap,
-    label: balance == null ? '포인트와 출석체크 열기' : '보유 포인트 $balance포인트, 출석체크 열기',
+    label: balance == null
+        ? '포인트와 출석체크 열기'
+        : '보유 포인트 ${pointAmount(balance)}포인트, 출석체크 열기',
     child: Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(32),
@@ -58,7 +62,7 @@ class ActivityWalletPill extends StatelessWidget {
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
-                  balance == null ? '포인트' : '${petNumber(balance!)} P',
+                  balance == null ? '포인트' : '${pointAmount(balance!)} P',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: petText(18),

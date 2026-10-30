@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
+import 'pet_design.dart';
 import 'pet_preview_controller.dart';
 import 'pet_scene.dart';
 
@@ -45,8 +46,13 @@ class _PetCharacterState extends State<PetCharacter> {
     return Column(
       children: [
         GestureDetector(
-          onHorizontalDragUpdate: widget.interactive && !native3d
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: widget.interactive
               ? (d) {
+                  if (native3d) {
+                    _scene.currentState?.rotateBy(d.delta.dx);
+                    return;
+                  }
                   drag += d.delta.dx;
                   if (drag.abs() > 45) {
                     setState(() => angle = (angle + (drag > 0 ? 1 : 3)) % 4);
@@ -62,39 +68,23 @@ class _PetCharacterState extends State<PetCharacter> {
               height: widget.height,
               width: double.infinity,
               child: native3d
-                  ? PetScene(
-                      key: _scene,
-                      stage: pet.assetStage,
-                      outfit: widget.outfit ?? pet.worn,
-                      motion: motion,
-                      entrance: _entrance,
-                      interactive: widget.interactive,
+                  ? IgnorePointer(
+                      child: PetScene(
+                        key: _scene,
+                        stage: pet.assetStage,
+                        species: pet.species,
+                        outfit: widget.outfit ?? pet.worn,
+                        motion: motion,
+                        entrance: _entrance,
+                        interactive: false,
+                      ),
                     )
-                  : motion != null &&
-                        pet.stage == 0 &&
-                        (widget.outfit ?? pet.worn).isEmpty &&
-                        !MediaQuery.disableAnimationsOf(context)
-                  ? Image.asset(
-                      'assets/pet/motion/$motion.gif',
-                      fit: BoxFit.contain,
-                      excludeFromSemantics: true,
-                    )
-                  : Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.asset(
-                          'assets/pet/${pet.assetStage}/$view.png',
-                          fit: BoxFit.contain,
-                          excludeFromSemantics: true,
-                        ),
-                        for (final id in ['knit', 'hat', 'flower'])
-                          if ((widget.outfit ?? pet.worn).contains(id))
-                            Image.asset(
-                              'assets/pet/${pet.assetStage}/${id}_$view.png',
-                              fit: BoxFit.contain,
-                              excludeFromSemantics: true,
-                            ),
-                      ],
+                  : PetPhoto(
+                      pet: pet,
+                      height: widget.height,
+                      view: view,
+                      outfit: widget.outfit,
+                      mood: motion,
                     ),
             ),
           ),

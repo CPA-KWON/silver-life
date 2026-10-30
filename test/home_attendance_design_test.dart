@@ -1,3 +1,5 @@
+import 'package:silver_life/attendance/attendance_dialog.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -132,7 +134,7 @@ void main() {
       expect(find.textContaining('이번 주 4일 출석'), findsOneWidget);
       expect(find.bySemanticsLabel('10월 21일, 출석 전'), findsOneWidget);
       expect(find.bySemanticsLabel('10월 23일, 출석 완료'), findsOneWidget);
-      expect(find.text('오늘 출석 완료!  +1P 받았어요'), findsOneWidget);
+      expect(find.text('오늘 출석 완료!  +100P 받았어요'), findsOneWidget);
       expect(find.textContaining('+10P'), findsNothing);
       await finish(t);
     },
@@ -159,7 +161,7 @@ void main() {
     await t.pumpAndSettle();
     expect(r.paidCount, 1);
     expect(synced, 1);
-    expect(find.text('오늘 출석 완료!  +1P 받았어요'), findsOneWidget);
+    expect(find.text('오늘 출석 완료!  +100P 받았어요'), findsOneWidget);
     expect(find.textContaining('이번 주 1일 출석'), findsOneWidget);
     await finish(t);
   });
@@ -174,7 +176,7 @@ void main() {
       r.failure = FakeCheckInFailure.afterServer;
       await tap(t, find.byKey(const ValueKey('home-attendance-action')));
       expect(r.paidCount, 1);
-      expect(find.text('오늘 출석 완료!  +1P 받았어요'), findsOneWidget);
+      expect(find.text('오늘 출석 완료!  +100P 받았어요'), findsOneWidget);
       await finish(t);
     },
   );
@@ -203,7 +205,7 @@ void main() {
     r.today = DateTime(2026, 10, 26);
     await c.refresh();
     await t.pumpAndSettle();
-    expect(find.text('출석체크하고 1P 받기'), findsOneWidget);
+    expect(find.text('출석체크하고 500P 받기'), findsOneWidget);
     expect(find.bySemanticsLabel('오늘, 10월 26일, 출석 전'), findsOneWidget);
     expect(find.textContaining('이번 주 0일 출석'), findsOneWidget);
     await finish(t);
@@ -258,7 +260,7 @@ void main() {
       expect(pet.points, 1);
       expect(pet.experience, 10);
       await tap(t, find.byKey(const ValueKey('home-points')));
-      expect(find.text('매일매일 출석체크'), findsOneWidget);
+      expect(find.byType(AttendanceDialog), findsOneWidget);
       await tap(t, find.text('닫기'));
       expect(r.paidCount, 1);
       expect(pet.experience, 10);

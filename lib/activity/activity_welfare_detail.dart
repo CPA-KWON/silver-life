@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../ui/neighborhood_design.dart';
 import '../core/phone_call.dart';
+import '../core/public_source.dart';
+import '../facility/welfare_program_status.dart';
 import 'activity_map_page.dart';
 import 'activity_repository.dart';
 
@@ -15,7 +17,7 @@ class ActivityWelfareDetailPage extends StatefulWidget {
 
 class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
   bool? favorite;
-  bool busy = false;
+  bool busy = false, favoriteFailed = false;
   @override
   void initState() {
     super.initState();
@@ -30,12 +32,19 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
           .select('program_key')
           .eq('user_id', c.auth.currentUser!.id)
           .eq('program_key', '${widget.program['id']}');
-      if (mounted) setState(() => favorite = r.isNotEmpty);
-    } catch (_) {}
+      if (mounted) {
+        setState(() {
+          favorite = r.isNotEmpty;
+          favoriteFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => favoriteFailed = true);
+    }
   }
 
   Future<void> toggle() async {
-    if (busy) return;
+    if (busy || favorite == null) return;
     setState(() => busy = true);
     try {
       final c = Supabase.instance.client,
@@ -74,6 +83,8 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
     final p = widget.program,
         raw = Map<String, dynamic>.from(p['raw_program'] as Map? ?? {}),
         phone = '${p['telephone'] ?? ''}'.trim();
+    final source = publicSourceUri(raw['source_url']),
+        available = welfareProgramVisible(raw);
     final apply = '${raw['how_to_apply'] ?? ''}',
         visit =
             p['application_method'] == 'visit' ||
@@ -83,6 +94,7 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
       '비용': p['display_fee'],
       '일정': p['display_schedule'],
       '운영 기간': raw['period'],
+      '접수 마감일': raw['registration_ends_on'],
       '준비물': raw['preparations'],
       '모집': raw['capacity'] == null
           ? null
@@ -94,12 +106,34 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
       tint: neighborhoodAmber,
       actions: [
         IconButton(
-          tooltip: '관심 프로그램 저장',
-          onPressed: busy ? null : toggle,
-          icon: Icon(
-            favorite == true ? Icons.favorite : Icons.favorite_border,
-            color: PetColors.pink,
-          ),
+          tooltip: favoriteFailed
+              ? '관심 상태 다시 불러오기'
+              : favorite == null
+              ? '관심 상태 확인 중'
+              : favorite == true
+              ? '관심 프로그램 해제'
+              : '관심 프로그램 저장',
+          onPressed: busy
+              ? null
+              : favoriteFailed
+              ? load
+              : favorite == null
+              ? null
+              : toggle,
+          icon: favorite == null && !favoriteFailed
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  favoriteFailed
+                      ? Icons.refresh
+                      : favorite == true
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: PetColors.pink,
+                ),
         ),
       ],
       bottom: Row(
@@ -116,10 +150,18 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
           Expanded(
             flex: 2,
             child: ActivityButton(
-              visit ? '접수 문의' : '전화로 신청 문의',
-              icon: Icons.phone_outlined,
+              source != null
+                  ? '기관 홈페이지 확인'
+                  : visit
+                  ? '접수 문의'
+                  : '전화로 신청 문의',
+              icon: source != null ? Icons.open_in_new : Icons.phone_outlined,
               color: PetColors.green,
-              onTap: phone.isEmpty ? null : () => callFacility(c, phone),
+              onTap: source != null
+                  ? () => openPublicSource(c, source)
+                  : phone.isEmpty
+                  ? null
+                  : () => callFacility(c, phone),
             ),
           ),
         ],
@@ -139,7 +181,13 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
                 fontSize: 12,
               ),
               PetPill(
-                visit ? '방문 신청' : '전화·방문 신청',
+                !available
+                    ? '모집 마감'
+                    : source != null
+                    ? '기관 홈페이지 신청'
+                    : visit
+                    ? '방문 신청'
+                    : '전화·방문 신청',
                 color: Colors.white,
                 ink: PetColors.orange,
                 fontSize: 12,
@@ -153,7 +201,13 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  visit ? '이 프로그램은 방문해서 신청해요' : '이 프로그램은 기관에 문의해 신청해요',
+                  !available
+                      ? '현재 접수가 마감된 프로그램이에요'
+                      : source != null
+                      ? '기관 홈페이지에서 신청해요'
+                      : visit
+                      ? '이 프로그램은 방문해서 신청해요'
+                      : '이 프로그램은 기관에 문의해 신청해요',
                   style: petText(21, color: const Color(0xFF935713)),
                 ),
                 const SizedBox(height: 8),
@@ -197,7 +251,12 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
                     ),
                   ),
                 if (phone.isNotEmpty)
-                  ActivityCard(child: Text(phone, style: petText(23))),
+                  ActivityButton(
+                    '기관 문의 $phone',
+                    light: true,
+                    icon: Icons.phone_outlined,
+                    onTap: () => callFacility(c, phone),
+                  ),
                 if (phone.isEmpty)
                   Text(
                     '등록된 전화번호가 없어요. 아래 접수 방법과 기관 안내를 확인해 주세요.',
@@ -263,9 +322,36 @@ class _WelfareDetailState extends State<ActivityWelfareDetailPage> {
               ),
             ),
           ],
+          if (source != null) ...[
+            const SizedBox(height: 14),
+            ActivityCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('출처 · 기관 공식 홈페이지', style: petText(17)),
+                  Text(
+                    source.host,
+                    style: petText(14, color: PetColors.secondary),
+                  ),
+                  if (raw['source_verified_at'] != null)
+                    Text(
+                      '정보 확인 ${'${raw['source_verified_at']}'.split('T').first} · 잔여석은 원문 확인',
+                      style: petText(14, color: PetColors.secondary),
+                    ),
+                  ActivityButton(
+                    '원문에서 모집 상태 확인',
+                    light: true,
+                    onTap: () => openPublicSource(c, source),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Text(
-            '전화·방문으로 접수한 내역은 기관에서 확인해 주세요. 앱 신청 내역에는 표시되지 않아요.',
+            source != null
+                ? '기관 홈페이지에서 접수한 내역은 해당 기관에서 확인해 주세요. 앱 신청 내역·참여 보상에는 자동으로 연결되지 않아요.'
+                : '전화·방문으로 접수한 내역은 기관에서 확인해 주세요. 앱 신청 내역에는 표시되지 않아요.',
             style: petText(14, color: PetColors.secondary),
           ),
         ],

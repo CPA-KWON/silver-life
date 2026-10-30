@@ -61,7 +61,7 @@ void main() {
       await p.run('ad_claim');
       await p.run('ad_claim');
       await expectLater(p.run('ad_claim'), throwsStateError);
-      expect(p.points, 110);
+      expect(p.points, 90);
     },
   );
   final backend = FakeBackend();

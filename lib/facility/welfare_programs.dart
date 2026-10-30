@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_theme.dart';
 import '../core/phone_call.dart';
 import '../ui/design_widgets.dart';
+import 'welfare_program_status.dart';
 
 /// One row of `welfare_programs` (supabase/welfare_programs.sql): a regular
 /// program a welfare center runs, shown for information only — signing up
@@ -24,6 +25,10 @@ class WelfareProgram {
     this.place,
     this.hours,
     this.note,
+    this.sourceStatus,
+    this.registrationStartsOn,
+    this.registrationEndsOn,
+    this.programEndsOn,
   });
 
   factory WelfareProgram.fromRow(Map<String, dynamic> row) => WelfareProgram(
@@ -41,6 +46,10 @@ class WelfareProgram {
     place: row['place'] as String?,
     hours: row['hours'] as String?,
     note: row['note'] as String?,
+    sourceStatus: row['source_status'] as String?,
+    registrationStartsOn: row['registration_starts_on'] as String?,
+    registrationEndsOn: row['registration_ends_on'] as String?,
+    programEndsOn: row['program_ends_on'] as String?,
   );
 
   final String facilityName;
@@ -57,6 +66,16 @@ class WelfareProgram {
   final String? place;
   final String? hours;
   final String? note;
+  final String? sourceStatus,
+      registrationStartsOn,
+      registrationEndsOn,
+      programEndsOn;
+  bool get isAvailable => welfareProgramVisible({
+    'source_status': sourceStatus,
+    'registration_starts_on': registrationStartsOn,
+    'registration_ends_on': registrationEndsOn,
+    'program_ends_on': programEndsOn,
+  });
 
   static const weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
   static final _weeklyPattern = RegExp(r'^(?:매주\s*)?([월화수목금토일])요일');
@@ -116,13 +135,23 @@ bool facilityNameMatches(String facilityName, String programFacilityName) {
 /// next facility opened instead of being cached.
 class WelfareProgramRepository {
   static Future<List<WelfareProgram>>? _all;
+  static DateTime? _cachedAt;
 
   static Future<List<WelfareProgram>> programsFor(String facilityName) async {
+    if (_cachedAt == null ||
+        DateTime.now().difference(_cachedAt!) > const Duration(minutes: 5)) {
+      _all = null;
+      _cachedAt = DateTime.now();
+    }
     final future = _all ??= _fetchAll();
     try {
       final all = await future;
       return all
-          .where((p) => facilityNameMatches(facilityName, p.facilityName))
+          .where(
+            (p) =>
+                p.isAvailable &&
+                facilityNameMatches(facilityName, p.facilityName),
+          )
           .toList();
     } catch (_) {
       _all = null;
@@ -131,11 +160,17 @@ class WelfareProgramRepository {
   }
 
   static Future<List<WelfareProgram>> _fetchAll() async {
-    final rows = await Supabase.instance.client
-        .from('welfare_programs')
-        .select()
-        .order('id')
-        .timeout(const Duration(seconds: 10));
+    final rows = <Map<String, dynamic>>[];
+    for (var offset = 0; ; offset += 500) {
+      final page = await Supabase.instance.client
+          .from('welfare_programs')
+          .select()
+          .order('id')
+          .range(offset, offset + 499)
+          .timeout(const Duration(seconds: 10));
+      rows.addAll(page);
+      if (page.length < 500) break;
+    }
     return rows.map(WelfareProgram.fromRow).toList();
   }
 }

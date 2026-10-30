@@ -1,9 +1,14 @@
+import '../core/points.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'pet_preview_controller.dart';
+import 'pet_catalog.dart';
+import 'pet_character.dart';
+import 'pet_scene.dart';
 
 /// Fullscreen pet routes belong to the signed-in Navigator, so sign-out removes them.
 class PetNavigationScope extends InheritedWidget {
@@ -130,8 +135,8 @@ class PetPoints extends StatelessWidget {
   Widget build(BuildContext c) => Semantics(
     button: true,
     label: pet.isPreview
-        ? '디자인 미리보기 포인트 ${pet.points}'
-        : '보유 포인트 ${pet.points}',
+        ? '디자인 미리보기 포인트 ${pointAmount(pet.points)}'
+        : '보유 포인트 ${pointAmount(pet.points)}',
     child: InkWell(
       borderRadius: BorderRadius.circular(40),
       onTap: () => showDialog<void>(
@@ -181,7 +186,7 @@ class PetPoints extends StatelessWidget {
                   style: petText(12, color: PetColors.secondary),
                 ),
               ),
-            Flexible(child: Text(petNumber(pet.points), style: petText(18))),
+            Flexible(child: Text(pointAmount(pet.points), style: petText(18))),
           ],
         ),
       ),
@@ -400,6 +405,8 @@ class PetPhoto extends StatelessWidget {
     this.outfit,
     this.mood,
     this.silhouette = false,
+    this.live3d = false,
+    this.interactive = false,
   });
   final PetPreviewController pet;
   final double height;
@@ -408,11 +415,66 @@ class PetPhoto extends StatelessWidget {
   final Set<String>? outfit;
   final String? mood;
   final bool silhouette;
+  final bool live3d, interactive;
   @override
   Widget build(BuildContext c) {
+    if (live3d && PetScene.supported) {
+      return LayoutBuilder(
+        builder: (c, b) => RepaintBoundary(
+          child: PetCharacter(
+            pet: pet,
+            height: b.maxHeight.isFinite
+                ? math.min(height, b.maxHeight)
+                : height,
+            motion: mood,
+            interactive: interactive,
+            outfit: outfit,
+            showControls: false,
+          ),
+        ),
+      );
+    }
     final s = stage ?? pet.stage;
     final folder = ['baby', 'junior', 'adult'][s];
     final clothes = outfit ?? pet.worn;
+    // List/card thumbnails stay images. Only the large interactive stage owns a WebView.
+    final decodeWidth = (height * MediaQuery.devicePixelRatioOf(c))
+        .ceil()
+        .clamp(128, 1536);
+    if (pet.isCat || clothes.any((id) => PetItem.find(id) != null)) {
+      final age = ['baby', 'teen', 'adult'][s];
+      final items = clothes.map(PetItem.find).whereType<PetItem>().toList();
+      final fitting = items.isEmpty ? null : items.last;
+      final suffix = switch (mood) {
+        'greeting' || 'hello' => 'greet',
+        'eating' => 'eat',
+        'happy' => 'happy',
+        'walk' => 'walk',
+        _ => null,
+      };
+      final asset = fitting != null && suffix == null
+          ? fitting.fitting(s, angle: view)
+          : pet.isCat
+          ? 'assets/pet/expansion/cat_${age}_${suffix ?? (view == 'angle' ? '34' : view)}.png'
+          : 'assets/pet/$folder/$view.png';
+      Widget picture = Image.asset(
+        asset,
+        cacheWidth: decodeWidth,
+        fit: BoxFit.contain,
+        excludeFromSemantics: true,
+      );
+      if (silhouette) {
+        picture = ColorFiltered(
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          child: picture,
+        );
+      }
+      return Semantics(
+        image: true,
+        label: '${pet.name ?? pet.defaultName} ${pet.stageName}',
+        child: SizedBox(height: height, width: double.infinity, child: picture),
+      );
+    }
     final body = mood == 'greeting'
         ? 'assets/pet/$folder/greeting.png'
         : mood == 'hello' && s == 0
@@ -428,10 +490,16 @@ class PetPhoto extends StatelessWidget {
         if (view == 'angle' && mood == null)
           Image.asset(
             'assets/pet/$folder/angle_shadow.png',
+            cacheWidth: decodeWidth,
             fit: BoxFit.contain,
             excludeFromSemantics: true,
           ),
-        Image.asset(body, fit: BoxFit.contain, excludeFromSemantics: true),
+        Image.asset(
+          body,
+          cacheWidth: decodeWidth,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+        ),
         for (final id in ['knit', 'winter', 'hat', 'flower'])
           if (mood == null && clothes.contains(id))
             if (id == 'winter')
@@ -460,12 +528,14 @@ class PetPhoto extends StatelessWidget {
                 ]),
                 child: Image.asset(
                   'assets/pet/$folder/knit_$view.png',
+                  cacheWidth: decodeWidth,
                   fit: BoxFit.contain,
                 ),
               )
             else
               Image.asset(
                 'assets/pet/$folder/${id}_$view.png',
+                cacheWidth: decodeWidth,
                 fit: BoxFit.contain,
               ),
       ],
@@ -610,12 +680,18 @@ class PetStats extends StatelessWidget {
 }
 
 class FoodDrawing extends StatelessWidget {
-  const FoodDrawing(this.id, {super.key, this.size = 48});
+  const FoodDrawing(this.id, {super.key, this.size = 48, this.isCat = false});
   final String id;
   final double size;
+  final bool isCat;
   @override
-  Widget build(BuildContext c) =>
-      CustomPaint(size: Size(size, size), painter: _FoodPainter(id));
+  Widget build(BuildContext c) => isCat && id != 'food'
+      ? Icon(
+          id == 'cake' ? Icons.soup_kitchen : Icons.set_meal,
+          size: size,
+          color: id == 'sweet' ? PetColors.blue : PetColors.orange,
+        )
+      : CustomPaint(size: Size(size, size), painter: _FoodPainter(id));
 }
 
 class _FoodPainter extends CustomPainter {

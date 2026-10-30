@@ -1,3 +1,6 @@
+import 'package:silver_life/attendance/attendance_controller.dart';
+import 'package:silver_life/attendance/attendance_repository.dart';
+
 import 'dart:async';
 
 import 'package:silver_life/activity/activity_repository.dart';
@@ -39,6 +42,30 @@ void main() {
     await backend.signIn();
   });
   tearDownAll(() => Supabase.instance.dispose());
+  testWidgets('profile statistics and wallet share the 100P denomination', (
+    t,
+  ) async {
+    final c = AttendanceController()
+      ..status = AttendanceStatus(
+        today: DateTime(2026, 10, 30),
+        attendedToday: true,
+        streak: 1,
+        balance: 4,
+        totalEarned: 4,
+        todayPoints: 1,
+      );
+    addTearDown(c.dispose);
+    await mount(
+      t,
+      AttendanceScope(
+        controller: c,
+        child: ProfilePage(activityRepository: FakeActivityRepository()),
+      ),
+    );
+    expect(find.text('400'), findsOneWidget);
+    expect(find.text('4'), findsNothing);
+    await finish(t);
+  });
   testWidgets(
     'home keeps greeting when activities fail and retry restores summary',
     (t) async {
@@ -196,18 +223,18 @@ void main() {
     expect(find.text('이번 주 활동 현황'), findsNothing);
     await finish(t);
   });
-  testWidgets('community and meetup region failures have usable retry', (
+  testWidgets('community and meetup feed failures have usable retry', (
     t,
   ) async {
-    backend.failProfile = true;
+    backend.failPosts = true;
     await mount(t, const CommunityPage());
     await tap(t, find.text('다시 시도'));
-    backend.failProfile = false;
+    backend.failPosts = false;
     await tap(t, find.text('다시 시도'));
     expect(find.text('우리 동네에 아직 글이 없어요'), findsOneWidget);
-    backend.failProfile = true;
+    backend.failPosts = true;
     await mount(t, const MeetupPage());
-    backend.failProfile = false;
+    backend.failPosts = false;
     await tap(t, find.text('다시 시도'));
     expect(find.textContaining('우리 동네에 아직 모임이 없어요'), findsOneWidget);
     await finish(t);
@@ -526,17 +553,21 @@ void main() {
     }
     await finish(t);
   });
-  testWidgets('community new post save returns and refreshes list', (t) async {
-    await mount(t, const CommunityPage());
-    await tap(t, find.text('글쓰기'));
-    await tap(t, find.text('자유게시판'));
-    await fill(t, '제목', '새 동네 글');
-    await fill(t, '내용', '이웃에게 알립니다');
-    await tap(t, find.text('글 올리기'));
-    expect(backend.postWrites, 1);
-    expect(find.text('새 동네 글'), findsOneWidget);
-    await finish(t);
-  });
+  testWidgets(
+    'community new post opens its saved detail across region filters',
+    (t) async {
+      await mount(t, const CommunityPage());
+      await tap(t, find.text('글쓰기'));
+      await tap(t, find.text('자유게시판'));
+      await fill(t, '제목', '새 동네 글');
+      await fill(t, '내용', '이웃에게 알립니다');
+      await tap(t, find.text('글 올리기'));
+      expect(backend.postWrites, 1);
+      expect(find.byType(PostDetailPage), findsOneWidget);
+      expect(find.text('새 동네 글'), findsOneWidget);
+      await finish(t);
+    },
+  );
   testWidgets(
     'meetup creation validates required date/place and preserves full capacity range',
     (t) async {

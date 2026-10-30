@@ -64,7 +64,7 @@ $$;
 -- 연속 출석일에 따른 그날 총 지급 포인트(보너스는 더하지 않고 대체).
 create or replace function public.attendance_points_for(streak integer)
 returns integer language sql immutable set search_path = '' as $$
-  select case streak when 30 then 10 when 14 then 5 when 7 then 3 else 1 end;
+  select case streak when 30 then 50 when 14 then 25 when 7 then 15 else 5 end;
 $$;
 
 create or replace function public.attendance_status_for(p_user uuid, p_today date)

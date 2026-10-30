@@ -192,11 +192,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   void _refreshPoints() {
     if (!_petPreview.isPreview && _petPreview.ready && !_petPreview.busy) {
-      unawaited(_attendance.refresh());
+      final status = _attendance.status;
+      final today = DateTime.now().toUtc().add(const Duration(hours: 9));
+      if (status == null ||
+          status.balance != _petPreview.points ||
+          status.today.year != today.year ||
+          status.today.month != today.month ||
+          status.today.day != today.day) {
+        unawaited(_attendance.refresh());
+      }
     }
   }
 
   bool _activityVisited = false;
+  final _socialVisited = <int>{};
   final _activityNavigator = GlobalKey<NavigatorState>();
 
   void _openPet() {
@@ -232,21 +241,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         );
       }
     });
-  }
-
-  Widget _buildPage() {
-    switch (_index) {
-      case 0:
-        return const SizedBox.shrink();
-      case 1:
-        return const SizedBox.shrink();
-      case 2:
-        return const SizedBox.shrink();
-      case 3:
-        return const MeetupPage();
-      default:
-        return const CommunityPage();
-    }
   }
 
   static const _destinations = [
@@ -315,7 +309,19 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
             child: Stack(
               children: [
-                if (_index != 0 && _index != 2) _buildPage(),
+                for (final tab in [3, 4])
+                  Offstage(
+                    key: ValueKey('social-tab-$tab'),
+                    offstage: _index != tab,
+                    child: TickerMode(
+                      enabled: _index == tab,
+                      child: !_socialVisited.contains(tab)
+                          ? const SizedBox.shrink()
+                          : tab == 3
+                          ? MeetupPage(active: _index == tab)
+                          : CommunityPage(active: _index == tab),
+                    ),
+                  ),
                 Offstage(
                   offstage: _index != 0,
                   child: TickerMode(
@@ -405,6 +411,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 if (i == 0 && _index != 0) _homeRefresh.value++;
                 _index = i;
                 if (i == 2) _activityVisited = true;
+                if (i >= 3) _socialVisited.add(i);
               }),
               labelPadding: EdgeInsets.zero,
               destinations: _destinations,

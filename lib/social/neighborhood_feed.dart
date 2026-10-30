@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../ui/neighborhood_design.dart';
+import '../activity/activity_widgets.dart' show ActivityInfo;
 import '../attendance/point_badge.dart';
 import '../core/comment_count.dart';
 import '../core/region_scope.dart';
+import '../core/neighborhood_region.dart';
 import '../core/time_ago.dart';
 import '../core/meetup_category.dart';
 import '../community/post_detail_page.dart';
@@ -32,55 +36,110 @@ bool meetupEnded(SocialData p) =>
         false);
 
 class NeighborhoodFeed extends StatefulWidget {
-  const NeighborhoodFeed({super.key, required this.meetup});
+  const NeighborhoodFeed({super.key, required this.meetup, this.active = true});
+  final bool active;
   final bool meetup;
   @override
   State<NeighborhoodFeed> createState() => _FeedState();
 }
 
 class _FeedState extends State<NeighborhoodFeed> {
-  RegionScope scope = RegionScope.sido;
-  String? sido, sigungu, category;
+  RegionScope scope = RegionScope.sigungu;
+  String? sido = defaultNeighborhood.sido,
+      sigungu = defaultNeighborhood.sigungu,
+      category;
   late Future<List<SocialData>> data = load();
   bool extras = true;
-  Future<List<SocialData>> load() async {
-    final c = Supabase.instance.client;
-    final profile = await c
-        .from('profiles')
-        .select('region_sido,region_sigungu')
-        .eq('id', c.auth.currentUser!.id)
-        .single();
-    sido = profile['region_sido'];
-    sigungu = profile['region_sigungu'];
-    var q = c
-        .from('posts')
-        .select(
-          widget.meetup
-              ? '*,comments(count),facilities!inner(id,name,address,lat,lng,region_sido,region_sigungu),profiles(nickname,region_sigungu)'
-              : '*,comments(count),profiles!inner(nickname,region_sido,region_sigungu)',
-        );
-    q = widget.meetup
-        ? q.eq('category', kMeetupCategory)
-        : q.neq('category', kMeetupCategory);
-    final region = widget.meetup ? 'facilities' : 'profiles';
-    q = q.eq('$region.region_sido', sido!);
-    if (scope == RegionScope.sigungu) {
-      q = q.eq('$region.region_sigungu', sigungu!);
+  bool _extrasLoading = false;
+  DateTime? _loadedAt;
+  List<SocialData>? _lastData;
+  bool _preserveResults = false;
+  int _request = 0;
+  bool _loading = false;
+
+  @override
+  void didUpdateWidget(NeighborhoodFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active &&
+        !oldWidget.active &&
+        !_loading &&
+        (_loadedAt == null ||
+            DateTime.now().difference(_loadedAt!) >
+                const Duration(seconds: 30))) {
+      refresh();
     }
-    if (category != null) {
-      q = q.eq(widget.meetup ? 'meetup_topic' : 'category', category!);
-    }
-    final list = List<SocialData>.from(
-      await q.order(
-        widget.meetup ? 'event_at' : 'created_at',
-        ascending: widget.meetup,
-      ),
-    );
-    extras = await NeighborhoodRepository().enrich(list);
-    return list;
   }
 
-  Future<void> refresh() async {
+  Future<List<SocialData>> load() async {
+    final request = ++_request;
+    _loading = true;
+    final requestedScope = scope, requestedCategory = category;
+    try {
+      final c = Supabase.instance.client;
+      final neighborhood = await NeighborhoodRegionResolver.shared.resolve();
+      sido = neighborhood.sido;
+      sigungu = neighborhood.sigungu;
+      var q = c
+          .from('posts')
+          .select(
+            widget.meetup
+                ? '*,comments(count),facilities!inner(id,name,address,lat,lng,region_sido,region_sigungu),profiles(nickname,region_sigungu)'
+                : '*,comments(count),profiles!inner(nickname,region_sido,region_sigungu)',
+          );
+      q = widget.meetup
+          ? q.eq('category', kMeetupCategory)
+          : q.neq('category', kMeetupCategory);
+      final region = widget.meetup ? 'facilities' : 'profiles';
+      q = q.eq('$region.region_sido', sido!);
+      if (requestedScope == RegionScope.sigungu) {
+        q = q.eq('$region.region_sigungu', sigungu!);
+      }
+      if (requestedCategory != null) {
+        q = q.eq(
+          widget.meetup ? 'meetup_topic' : 'category',
+          requestedCategory,
+        );
+      }
+      final list = List<SocialData>.from(
+        await q
+            .order(
+              widget.meetup ? 'event_at' : 'created_at',
+              ascending: widget.meetup,
+            )
+            .timeout(const Duration(seconds: 10)),
+      );
+      if (request == _request) {
+        _extrasLoading = list.isNotEmpty;
+        extras = true;
+        _lastData = list;
+        _loadedAt = DateTime.now();
+      }
+      unawaited(_enrich(list, request));
+      return list;
+    } finally {
+      if (request == _request) _loading = false;
+    }
+  }
+
+  Future<void> _enrich(List<SocialData> rows, int request) async {
+    var complete = false;
+    try {
+      complete = await NeighborhoodRepository()
+          .enrich(rows)
+          .timeout(const Duration(seconds: 6));
+    } catch (_) {
+      // The public list remains usable when supplementary counts are offline.
+    }
+    if (mounted && request == _request) {
+      setState(() {
+        extras = complete;
+        _extrasLoading = false;
+      });
+    }
+  }
+
+  Future<void> refresh({bool preserveResults = true}) async {
+    _preserveResults = preserveResults;
     final f = load();
     setState(() {
       data = f;
@@ -95,8 +154,30 @@ class _FeedState extends State<NeighborhoodFeed> {
     if (mounted) await refresh();
   }
 
-  Widget create() =>
-      widget.meetup ? const NewMeetupPage() : const NewPostPage();
+  Future<void> compose() async {
+    if (widget.meetup) {
+      await open(const NewMeetupPage());
+      return;
+    }
+    String? created;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NewPostPage(onCreated: (id) => created = id),
+      ),
+    );
+    if (!mounted) return;
+    // A visitor's GPS district may differ from the author's registered region.
+    // Always show the saved post, even if it is outside the current feed filter.
+    if (created != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PostDetailPage(postId: created!)),
+      );
+    }
+    if (mounted) await refresh();
+  }
+
   void rules() => showDialog<void>(
     context: context,
     builder: (c) => AlertDialog(
@@ -127,13 +208,17 @@ class _FeedState extends State<NeighborhoodFeed> {
           ]
         : const [],
     floating: FloatingActionButton.extended(
-      onPressed: () => open(create()),
+      onPressed: compose,
       icon: Icon(widget.meetup ? Icons.add : Icons.edit_outlined),
       label: Text(widget.meetup ? '모임 만들기' : '글쓰기'),
     ),
     child: FutureBuilder<List<SocialData>>(
       future: data,
       builder: (c, s) {
+        final rows =
+            s.connectionState == ConnectionState.waiting && !_preserveResults
+            ? null
+            : s.data ?? (_preserveResults ? _lastData : null);
         return Column(
           children: [
             RegionScopeBar(
@@ -144,7 +229,7 @@ class _FeedState extends State<NeighborhoodFeed> {
                   ? null
                   : (v) {
                       scope = v;
-                      refresh();
+                      refresh(preserveResults: false);
                     },
             ),
             SingleChildScrollView(
@@ -174,7 +259,7 @@ class _FeedState extends State<NeighborhoodFeed> {
                         backgroundColor: Colors.white,
                         onSelected: (_) {
                           category = v == '전체' ? null : v;
-                          refresh();
+                          refresh(preserveResults: false);
                         },
                       ),
                     ),
@@ -182,9 +267,9 @@ class _FeedState extends State<NeighborhoodFeed> {
               ),
             ),
             Expanded(
-              child: s.connectionState != ConnectionState.done
+              child: rows == null && s.connectionState != ConnectionState.done
                   ? const NeighborhoodLoading()
-                  : s.hasError
+                  : rows == null && s.hasError
                   ? ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
@@ -199,91 +284,9 @@ class _FeedState extends State<NeighborhoodFeed> {
                     )
                   : RefreshIndicator(
                       onRefresh: refresh,
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                        children: [
-                          if (!widget.meetup)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: ActivityCard(
-                                onTap: rules,
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.info_outline,
-                                      color: PetColors.purple,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '커뮤니티 이용 규칙',
-                                            style: petText(18),
-                                          ),
-                                          Text(
-                                            '욕설·광고·사기 글은 신고하면 숨겨져요',
-                                            style: petText(
-                                              14,
-                                              color: PetColors.secondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.chevron_right,
-                                      color: PetColors.purple,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          if (s.data!.isEmpty)
-                            ActivityEmpty(
-                              widget.meetup
-                                  ? '우리 동네에 아직 모임이 없어요'
-                                  : '우리 동네에 아직 글이 없어요',
-                              message: widget.meetup
-                                  ? '가까운 이웃과 함께할 첫 모임을 만들어 보세요.'
-                                  : '오늘 있었던 일, 궁금한 점을 편하게 남겨 주세요.',
-                              icon: widget.meetup
-                                  ? Icons.groups_outlined
-                                  : Icons.edit_outlined,
-                              action: widget.meetup ? '모임 만들기' : '첫 글 쓰기',
-                              onAction: () => open(create()),
-                              secondary: '${sido ?? '시/도'} 전체 보기',
-                              onSecondary: () {
-                                scope = RegionScope.sido;
-                                category = null;
-                                refresh();
-                              },
-                            ),
-                          if (widget.meetup) ...[
-                            for (final past in [false, true])
-                              if (s.data!.any(
-                                (p) => meetupEnded(p) == past,
-                              )) ...[
-                                NeighborhoodHeading(
-                                  past ? '지난 모임' : '다가오는 모임',
-                                  count:
-                                      '${s.data!.where((p) => meetupEnded(p) == past).length}개',
-                                ),
-                                for (final p in s.data!.where(
-                                  (p) => meetupEnded(p) == past,
-                                ))
-                                  meetupCard(p),
-                              ],
-                          ] else
-                            for (final p in s.data!) postCard(p),
-                          if (!extras && s.data!.isNotEmpty)
-                            Text(
-                              '참여·공감 현황을 확인할 수 없어요. 잠시 후 새로고침해 주세요.',
-                              style: petText(14, color: PetColors.secondary),
-                            ),
-                        ],
+                      child: _feedList(
+                        rows ?? const [],
+                        refreshFailed: s.hasError,
                       ),
                     ),
             ),
@@ -292,6 +295,90 @@ class _FeedState extends State<NeighborhoodFeed> {
       },
     ),
   );
+  Widget _feedList(List<SocialData> rows, {bool refreshFailed = false}) {
+    final upcoming = widget.meetup
+        ? rows.where((p) => !meetupEnded(p)).toList()
+        : <SocialData>[];
+    final past = widget.meetup
+        ? rows.where(meetupEnded).toList()
+        : <SocialData>[];
+    // Build only visible cards; long feeds no longer construct every card at once.
+    final entries = <Widget Function()>[
+      if (!widget.meetup)
+        () => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: ActivityCard(
+            onTap: rules,
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: PetColors.purple),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('커뮤니티 이용 규칙', style: petText(18)),
+                      Text(
+                        '욕설·광고·사기 글은 신고하면 숨겨져요',
+                        style: petText(14, color: PetColors.secondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: PetColors.purple),
+              ],
+            ),
+          ),
+        ),
+      if (rows.isEmpty)
+        () => ActivityEmpty(
+          widget.meetup ? '우리 동네에 아직 모임이 없어요' : '우리 동네에 아직 글이 없어요',
+          message: widget.meetup
+              ? '가까운 이웃과 함께할 첫 모임을 만들어 보세요.'
+              : '오늘 있었던 일, 궁금한 점을 편하게 남겨 주세요.',
+          icon: widget.meetup ? Icons.groups_outlined : Icons.edit_outlined,
+          action: widget.meetup ? '모임 만들기' : '첫 글 쓰기',
+          onAction: compose,
+          secondary: '${sido ?? '시/도'} 전체 보기',
+          onSecondary: () {
+            scope = RegionScope.sido;
+            category = null;
+            refresh(preserveResults: false);
+          },
+        ),
+      if (widget.meetup) ...[
+        for (final group in [(upcoming, false), (past, true)])
+          if (group.$1.isNotEmpty) ...[
+            () => NeighborhoodHeading(
+              group.$2 ? '지난 모임' : '다가오는 모임',
+              count: '${group.$1.length}개',
+            ),
+            for (final p in group.$1) () => meetupCard(p),
+          ],
+      ] else
+        for (final p in rows) () => postCard(p),
+      if (refreshFailed)
+        () => ActivityInfo('새 소식을 갱신하지 못했어요. 다시 시도해 주세요.', onRetry: refresh),
+      if (_extrasLoading)
+        () => Text(
+          '참여·공감 현황을 확인하고 있어요.',
+          style: petText(14, color: PetColors.secondary),
+        ),
+      if (!extras && rows.isNotEmpty)
+        () => Text(
+          '참여·공감 현황을 확인할 수 없어요. 잠시 후 새로고침해 주세요.',
+          style: petText(14, color: PetColors.secondary),
+        ),
+    ];
+    return ListView.builder(
+      key: PageStorageKey(widget.meetup ? 'meetup-feed' : 'community-feed'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+      itemCount: entries.length,
+      itemBuilder: (_, index) => entries[index](),
+    );
+  }
+
   Widget meetupCard(SocialData p) {
     final d = DateTime.tryParse('${p['event_at']}')?.toLocal();
     final ended = meetupEnded(p);

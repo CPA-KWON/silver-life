@@ -32,11 +32,11 @@ void main() {
   );
 
   test('reward message replaces base points on milestone days', () {
-    expect(attendanceRewardMessage(1, 1), '출석 완료! 1포인트를 획득했어요!');
-    expect(attendanceRewardMessage(7, 3), '🎉 7일 연속 출석 달성! 3포인트 획득!');
-    expect(attendanceRewardMessage(14, 5), '🎉 14일 연속 출석 달성! 5포인트 획득!');
-    expect(attendanceRewardMessage(30, 10), '🎉 30일 연속 출석 달성! 10포인트 획득!');
-    expect(attendanceRewardMessage(31, 1), '출석 완료! 1포인트를 획득했어요!');
+    expect(attendanceRewardMessage(1, 1), '출석 완료! 100포인트를 획득했어요!');
+    expect(attendanceRewardMessage(7, 3), '🎉 7일 연속 출석 달성! 300포인트 획득!');
+    expect(attendanceRewardMessage(14, 5), '🎉 14일 연속 출석 달성! 500포인트 획득!');
+    expect(attendanceRewardMessage(30, 10), '🎉 30일 연속 출석 달성! 1,000포인트 획득!');
+    expect(attendanceRewardMessage(31, 1), '출석 완료! 100포인트를 획득했어요!');
   });
 
   test('upcoming milestones count today only before it is stamped', () {
@@ -68,16 +68,10 @@ void main() {
   ) async {
     final repo = FakeAttendanceRepository()..attendedBefore(4);
     await shell(t, repo);
-    expect(
-      find.text('앞으로 3번 더 출석하면 10월 26일에 ⭐ 7일 연속 달성! (3포인트)'),
-      findsOneWidget,
-    );
+    expect(find.text('7일 연속까지 3일 · 1,500P'), findsOneWidget);
     expect(find.bySemanticsLabel('26일, 계속 출석하면 7일 연속 달성 예정'), findsOneWidget);
-    await tap(t, find.text('출석도장 찍기'));
-    expect(
-      find.text('앞으로 2번 더 출석하면 10월 26일에 ⭐ 7일 연속 달성! (3포인트)'),
-      findsOneWidget,
-    );
+    await tap(t, find.text('출석하기'));
+    expect(find.text('7일 연속까지 2일 · 1,500P'), findsOneWidget);
     await tap(t, find.text('다음 달 ›'));
     expect(find.bySemanticsLabel('2일, 계속 출석하면 14일 연속 달성 예정'), findsOneWidget);
     await finish(t);
@@ -88,20 +82,38 @@ void main() {
   ) async {
     final repo = FakeAttendanceRepository();
     await shell(t, repo);
-    expect(find.text('매일매일 출석체크'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('출석체크'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('2026년 10월'), findsOneWidget);
     expect(
-      t.getTopLeft(find.text('출석도장 찍기')).dy,
+      t.getTopLeft(find.text('출석하기')).dy,
       greaterThan(t.getTopLeft(find.text('2026년 10월')).dy),
     );
     await tap(t, find.text('닫기'));
-    expect(find.text('매일매일 출석체크'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('출석체크'),
+      ),
+      findsNothing,
+    );
     expect(repo.checkInCalls, 0);
     expect(find.bySemanticsLabel('보유 포인트 0포인트, 출석체크 열기'), findsOneWidget);
     // Next app start (same day, still not stamped) asks again.
     await finish(t);
     await shell(t, repo);
-    expect(find.text('매일매일 출석체크'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('출석체크'),
+      ),
+      findsOneWidget,
+    );
     await finish(t);
   });
 
@@ -110,9 +122,9 @@ void main() {
   ) async {
     final repo = FakeAttendanceRepository()..gate = Completer<void>();
     await shell(t, repo);
-    await t.ensureVisible(find.text('출석도장 찍기'));
+    await t.ensureVisible(find.text('출석하기'));
     await t.pumpAndSettle();
-    await t.tap(find.text('출석도장 찍기'));
+    await t.tap(find.text('출석하기'));
     await t.pump();
     await t.tap(find.byType(FilledButton).first, warnIfMissed: false);
     await t.pump();
@@ -120,7 +132,7 @@ void main() {
     await t.pumpAndSettle();
     expect(repo.checkInCalls, 1);
     expect(repo.paidCount, 1);
-    expect(find.text('출석 완료! 1포인트를 획득했어요!'), findsOneWidget);
+    expect(find.text('출석 완료! 100포인트를 획득했어요!'), findsOneWidget);
     expect(find.text('오늘 출석 완료!'), findsOneWidget);
     final button = t.widget<FilledButton>(
       find.ancestor(
@@ -129,9 +141,9 @@ void main() {
       ),
     );
     expect(button.onPressed, isNull);
-    expect(find.text('🔥 1일 연속 출석 달성!'), findsOneWidget);
+    expect(find.text('1일째 연속'), findsOneWidget);
     await tap(t, find.text('닫기'));
-    expect(find.bySemanticsLabel('보유 포인트 1포인트, 출석체크 열기'), findsOneWidget);
+    expect(find.bySemanticsLabel('보유 포인트 100포인트, 출석체크 열기'), findsOneWidget);
     await finish(t);
   });
 
@@ -140,18 +152,18 @@ void main() {
   ) async {
     final repo = FakeAttendanceRepository()..attendedBefore(6);
     await shell(t, repo);
-    expect(find.text('🔥 6일 연속 출석 달성!'), findsOneWidget);
-    expect(find.text('오늘 출석하면 ⭐ 7일 연속 달성! (3포인트)'), findsOneWidget);
-    await tap(t, find.text('출석도장 찍기'));
-    expect(find.text('🎉 7일 연속 출석 달성! 3포인트 획득!'), findsOneWidget);
+    expect(find.text('6일째 연속'), findsOneWidget);
+    expect(find.text('오늘 7일 연속 달성 · 1,500P'), findsOneWidget);
+    await tap(t, find.text('출석하기'));
+    expect(find.text('🎉 7일 연속 출석 달성! 300포인트 획득!'), findsOneWidget);
     expect(
-      find.text('앞으로 7번 더 출석하면 10월 31일에 ⭐ 14일 연속 달성! (5포인트)'),
+      find.text('14일 연속까지 7일 · 2,500P'),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byType(AttendanceDialog),
-        matching: find.text('🪙 9 P'),
+        matching: find.text('900 P'),
       ),
       findsOneWidget,
     );
@@ -166,9 +178,21 @@ void main() {
     final repo = FakeAttendanceRepository()..attendedBefore(2);
     await repo.checkIn();
     await shell(t, repo);
-    expect(find.text('매일매일 출석체크'), findsNothing);
-    await tap(t, find.bySemanticsLabel('보유 포인트 3포인트, 출석체크 열기'));
-    expect(find.text('매일매일 출석체크'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('출석체크'),
+      ),
+      findsNothing,
+    );
+    await tap(t, find.bySemanticsLabel('보유 포인트 300포인트, 출석체크 열기'));
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('출석체크'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('오늘 출석 완료!'), findsOneWidget);
     await tap(t, find.text('‹ 이전 달'));
     expect(find.text('2026년 9월'), findsOneWidget);
@@ -182,15 +206,15 @@ void main() {
     final repo = FakeAttendanceRepository()
       ..failure = FakeCheckInFailure.beforeServer;
     await shell(t, repo);
-    await tap(t, find.text('출석도장 찍기'));
+    await tap(t, find.text('출석하기'));
     expect(
       find.text('출석을 처리하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.'),
       findsOneWidget,
     );
-    expect(find.text('출석도장 찍기'), findsOneWidget);
+    expect(find.text('출석하기'), findsOneWidget);
     repo.failure = FakeCheckInFailure.afterServer;
-    await tap(t, find.text('출석도장 찍기'));
-    expect(find.text('연결이 잠시 끊겼지만 오늘 출석은 정상 처리됐어요. (1포인트)'), findsOneWidget);
+    await tap(t, find.text('출석하기'));
+    expect(find.text('연결이 잠시 끊겼지만 오늘 출석은 정상 처리됐어요. (100포인트)'), findsOneWidget);
     expect(find.text('오늘 출석 완료!'), findsOneWidget);
     expect(repo.paidCount, 1);
     await finish(t);
@@ -201,7 +225,7 @@ void main() {
     await shell(t, repo);
     await tap(t, find.bySemanticsLabel('오늘, 24일, 눌러서 출석도장 찍기'));
     expect(repo.paidCount, 1);
-    expect(find.text('출석 완료! 1포인트를 획득했어요!'), findsOneWidget);
+    expect(find.text('출석 완료! 100포인트를 획득했어요!'), findsOneWidget);
     expect(find.text('오늘 출석 완료!'), findsOneWidget);
     expect(find.bySemanticsLabel('오늘, 24일 출석'), findsOneWidget);
     await finish(t);
@@ -209,7 +233,13 @@ void main() {
 
   testWidgets('attendance setup missing keeps the shell unchanged', (t) async {
     await shell(t, FakeAttendanceRepository(failStatus: true));
-    expect(find.text('매일매일 출석체크'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(AttendanceDialog),
+        matching: find.text('출석체크'),
+      ),
+      findsNothing,
+    );
     expect(find.textContaining(' P'), findsNothing);
     expect(find.byType(NavigationBar), findsOneWidget);
     await finish(t);
@@ -229,8 +259,8 @@ void main() {
       scale: 1.3,
     );
     expect(find.byType(AttendanceDialog), findsOneWidget);
-    await tap(t, find.text('출석도장 찍기'));
-    expect(find.text('출석 완료! 1포인트를 획득했어요!'), findsOneWidget);
+    await tap(t, find.text('출석하기'));
+    expect(find.text('출석 완료! 100포인트를 획득했어요!'), findsOneWidget);
     expect(t.takeException(), isNull);
     await finish(t);
   });

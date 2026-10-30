@@ -49,6 +49,9 @@ class FakeActivityRepository extends ActivityRepository {
   String? lastAction;
   bool benefit = false;
   @override
+  Future<ActivityData> homeSummary() => home();
+
+  @override
   Future<ActivityData> home() async {
     if (fail) throw StateError('offline');
     return {

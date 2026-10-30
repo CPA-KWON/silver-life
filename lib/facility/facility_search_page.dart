@@ -28,6 +28,7 @@ import '../activity/activity_welfare_detail.dart';
 import '../activity/activity_repository.dart';
 import '../social/photo_widgets.dart';
 import 'facility_result_widgets.dart';
+import 'facility_marker.dart';
 import '../ui/neighborhood_design.dart';
 import '../attendance/point_badge.dart';
 import '../core/map_directions.dart';
@@ -127,6 +128,27 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
     if (mounted && widget.isActive) await _searchAtCamera(_category ?? '전체');
   }
 
+  NMarker? _highlighted;
+  String? _highlightedCategory;
+  Future<void> _highlight(NMarker marker, String category) async {
+    final previous = _highlighted, previousCategory = _highlightedCategory;
+    _highlighted = marker;
+    _highlightedCategory = category;
+    final icon = await FacilityMarkerImages.image(category, selected: true);
+    if (!mounted || !identical(_highlighted, marker)) return;
+    if (previous != null &&
+        previousCategory != null &&
+        !identical(previous, marker)) {
+      previous.setIcon(await FacilityMarkerImages.image(previousCategory));
+      previous.setSize(const Size(40, 46));
+      previous.setZIndex(0);
+    }
+    if (!mounted || !identical(_highlighted, marker)) return;
+    marker.setIcon(icon);
+    marker.setSize(const Size(46, 52));
+    marker.setZIndex(10);
+  }
+
   void _chooseResult(FacilityResult r) {
     if (!mounted || !widget.isActive || _isSearching) return;
     if (_placeResult != null) {
@@ -171,6 +193,8 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
     final places = _savedPlaces, c = _controller, version = _searchVersion;
     if (places == null || c == null) return;
     try {
+      _highlighted = null;
+      _highlightedCategory = null;
       await c.clearOverlays(type: NOverlayType.marker);
       if (!mounted || version != _searchVersion) return;
       final markers = <NMarker>{};
@@ -179,14 +203,21 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
           id: '${r.lat},${r.lng},${r.name}',
           position: NLatLng(r.lat, r.lng),
           caption: NOverlayCaption(text: r.name),
-          iconTintColor: facilityColor(r.category),
+          icon: await FacilityMarkerImages.image(r.category),
+          size: const Size(40, 46),
+          isHideCollidedCaptions: true,
+          captionOffset: 4,
         );
         m.setOnTapListener((_) {
           if (mounted && widget.isActive && version == _searchVersion) {
+            unawaited(_highlight(m, r.category));
             _chooseResult(r);
           }
         });
         markers.add(m);
+      }
+      if (!mounted || !identical(c, _controller) || version != _searchVersion) {
+        return;
       }
       await c.addOverlayAll(markers);
       if (!mounted || version != _searchVersion) return;
@@ -459,6 +490,8 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
     try {
       // A new category must never keep the previous category's markers,
       // including when the next server request fails.
+      _highlighted = null;
+      _highlightedCategory = null;
       await controller
           .clearOverlays(type: NOverlayType.marker)
           .timeout(const Duration(seconds: 3));
@@ -510,7 +543,10 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
           id: '${result.lat},${result.lng},${result.name}',
           position: NLatLng(result.lat, result.lng),
           caption: NOverlayCaption(text: result.name),
-          iconTintColor: facilityColor(result.category),
+          icon: await FacilityMarkerImages.image(result.category),
+          size: const Size(40, 46),
+          isHideCollidedCaptions: true,
+          captionOffset: 4,
         );
         marker.setOnTapListener((_) {
           if (!mounted ||
@@ -519,11 +555,17 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
               _activeSearchTerm != searchTerm) {
             return;
           }
+          unawaited(_highlight(marker, result.category));
           _chooseResult(result);
         });
         markers.add(marker);
       }
 
+      if (!mounted ||
+          !identical(controller, _controller) ||
+          version != _searchVersion) {
+        return;
+      }
       if (markers.isNotEmpty) {
         await controller
             .addOverlayAll(markers)
@@ -1071,7 +1113,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   List<Map<String, dynamic>>? _upcomingMeetups;
   Map<String, dynamic>? _guide;
   bool _guideError = false;
-  bool _weekExpanded = false;
+
   bool _loadingDetails = false;
   bool _detailLoadFailed = false;
   int _detailGeneration = 0;
@@ -1698,58 +1740,58 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
           ),
         ),
       const SizedBox(height: 18),
-      FacilityProgramPreview(place: r, onOpen: program, onList: programs),
-      const SizedBox(height: 12),
-      ActivityCard(
-        child: ExpansionTile(
-          maintainState: true,
-          tilePadding: EdgeInsets.zero,
-          title: Text('요일별 기관 프로그램 안내', style: petText(18)),
-          subtitle: Text(
-            '기존 주간 시간표 보기',
-            style: petText(14, color: PetColors.secondary),
+      FacilityProgramPreview(
+        place: r,
+        onOpen: program,
+        onList: programs,
+        hideWhenEmpty: r.category.contains('병원') || r.category.contains('약국'),
+        onBrowseAll: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                const ActivitySectionPage(section: ActivitySection.programs),
           ),
-          onExpansionChanged: (v) => setState(() => _weekExpanded = v),
-          children: _weekExpanded
-              ? [WelfareProgramsSection(facilityName: r.name, telephone: phone)]
-              : const [],
         ),
       ),
-      const NeighborhoodHeading('이 시설 동네 모임', color: PetColors.blue),
-      if (_upcomingMeetups == null)
-        const ActivityCard(child: LinearProgressIndicator())
-      else if (_upcomingMeetups!.isEmpty)
-        const ActivityEmpty('예정된 모임이 없어요', message: '동네 모임에서 새 모임을 찾아보세요.')
-      else
-        ActivityCard(
-          child: Column(
-            children: [
-              for (final m in _upcomingMeetups!)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.event_outlined,
-                    color: PetColors.green,
-                  ),
-                  title: Text('${m['title']}', style: petText(18)),
-                  subtitle: Text(
-                    _formatEventAt('${m['event_at']}'),
-                    style: petText(15, color: PetColors.secondary),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => widget.onOpenPost != null
-                      ? widget.onOpenPost!('${m['id']}')
-                      : Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                PostDetailPage(postId: '${m['id']}'),
+      WelfareProgramsSection(facilityName: r.name, telephone: phone),
+      if ((!r.category.contains('병원') && !r.category.contains('약국')) ||
+          (_upcomingMeetups?.isNotEmpty ?? false)) ...[
+        const NeighborhoodHeading('이 시설 동네 모임', color: PetColors.blue),
+        if (_upcomingMeetups == null)
+          const ActivityCard(child: LinearProgressIndicator())
+        else if (_upcomingMeetups!.isEmpty)
+          const ActivityEmpty('예정된 모임이 없어요', message: '동네 모임에서 새 모임을 찾아보세요.')
+        else
+          ActivityCard(
+            child: Column(
+              children: [
+                for (final m in _upcomingMeetups!)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.event_outlined,
+                      color: PetColors.green,
+                    ),
+                    title: Text('${m['title']}', style: petText(18)),
+                    subtitle: Text(
+                      _formatEventAt('${m['event_at']}'),
+                      style: petText(15, color: PetColors.secondary),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => widget.onOpenPost != null
+                        ? widget.onOpenPost!('${m['id']}')
+                        : Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PostDetailPage(postId: '${m['id']}'),
+                            ),
                           ),
-                        ),
-                ),
-            ],
+                  ),
+              ],
+            ),
           ),
-        ),
+      ],
     ];
     final body = SingleChildScrollView(
       padding: const EdgeInsets.all(16),

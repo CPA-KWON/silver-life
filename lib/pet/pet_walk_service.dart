@@ -15,7 +15,11 @@ class PetWalkService {
     );
   }
 
-  Future<void> start(String session) async {
+  Future<void> start(
+    String session, {
+    DateTime? returnAt,
+    String? petName,
+  }) async {
     if (!supported) throw StateError('현재 기기에서는 걸음 수 기록을 지원하지 않아요.');
     final activity = await Permission.activityRecognition.request();
     final location = await Permission.locationWhenInUse.request();
@@ -23,7 +27,22 @@ class PetWalkService {
     if (!activity.isGranted && !location.isGranted) {
       throw StateError('걸음 수 또는 위치 권한을 허용해주세요.');
     }
-    await channel.invokeMethod('start', {'owner': owner, 'session': session});
+    await channel.invokeMethod('start', {
+      'owner': owner,
+      'session': session,
+      'return_at': returnAt?.millisecondsSinceEpoch ?? 0,
+      'pet_name': petName ?? '반려동물',
+    });
+  }
+
+  Future<void> configureReturn(DateTime? time, String? name) async {
+    if (supported) {
+      await channel.invokeMethod('configure', {
+        'owner': owner,
+        'return_at': time?.millisecondsSinceEpoch ?? 0,
+        'pet_name': name ?? '반려동물',
+      });
+    }
   }
 
   Future<void> pause() => channel.invokeMethod('pause');

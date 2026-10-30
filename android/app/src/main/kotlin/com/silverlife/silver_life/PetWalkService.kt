@@ -18,10 +18,34 @@ class PetWalkService : Service(), SensorEventListener, LocationListener {
     private var baseline: Float? = null
     private var carry = 0
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val reminder = object : Runnable {
+        override fun run() {
+            val due = prefs.getLong("return_at", 0L)
+            if (prefs.getBoolean("active", false) && due > 0 && System.currentTimeMillis() >= due && !prefs.getBoolean("return_notified", false)) {
+                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                if (Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                    if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("pet_walk_return", "산책 귀가 시간", NotificationManager.IMPORTANCE_DEFAULT))
+                    val launch = PendingIntent.getActivity(this@PetWalkService, 1, packageManager.getLaunchIntentForPackage(packageName), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                    val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this@PetWalkService,"pet_walk_return") else Notification.Builder(this@PetWalkService)
+                    nm.notify(502,builder.setContentTitle("괜찮으세요? 귀가 예정 시간이 지났어요")
+                        .setContentText("잠시 쉬거나 가족·지인에게 연락해보세요. 본인 휴대폰에만 알리는 안내예요.")
+                        .setSmallIcon(android.R.drawable.ic_dialog_info).setContentIntent(launch).setAutoCancel(true).build())
+                    prefs.edit().putBoolean("return_notified",true).apply()
+                }
+            }
+            if (prefs.getBoolean("active",false)) handler.postDelayed(this,30000L)
+        }
+    }
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             "stop" -> { prefs.edit().putBoolean("active", false).putBoolean("paused", false).apply(); cleanup(); stopSelf(); return START_NOT_STICKY }
+            "configure" -> {
+                prefs.edit().putLong("return_at",intent.getLongExtra("return_at",0L)).putBoolean("return_notified",false).apply()
+                handler.removeCallbacks(reminder); handler.post(reminder)
+                return START_STICKY
+            }
             "pause" -> { prefs.edit().putBoolean("paused", true).apply(); cleanupSensors(); updateNotification(); return START_STICKY }
             "start" -> {
                 val owner = intent.getStringExtra("owner") ?: ""
@@ -30,7 +54,8 @@ class PetWalkService : Service(), SensorEventListener, LocationListener {
                     prefs.edit().clear().putString("owner", owner).putString("session", session)
                         .putLong("started_at", System.currentTimeMillis()).putInt("steps", 0).apply()
                 }
-                prefs.edit().putBoolean("active", true).putBoolean("paused", false).apply()
+                prefs.edit().putBoolean("active", true).putBoolean("paused", false)
+                    .putLong("return_at",intent.getLongExtra("return_at",0L)).putString("pet_name",intent.getStringExtra("pet_name") ?: "반려동물").apply()
             }
             "resume" -> prefs.edit().putBoolean("paused", false).apply()
         }
@@ -57,13 +82,14 @@ class PetWalkService : Service(), SensorEventListener, LocationListener {
                 } catch (_: SecurityException) { }
             }
         }
+        handler.removeCallbacks(reminder); handler.post(reminder)
         return START_STICKY
     }
     private fun notification(): Notification {
         val launch = PendingIntent.getActivity(this, 0, packageManager.getLaunchIntentForPackage(packageName), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val text = if (prefs.getBoolean("paused", false)) "잠시 쉬고 있어요" else "${prefs.getInt("steps", 0)}걸음 · 화면을 꺼도 기록해요"
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, "pet_walk") else Notification.Builder(this)
-        return builder.setContentTitle("콩이와 산책 중").setContentText(text).setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentIntent(launch).setOngoing(true).build()
+        return builder.setContentTitle("${prefs.getString("pet_name", "반려동물")}와 산책 중").setContentText(text).setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentIntent(launch).setOngoing(true).build()
     }
     private fun updateNotification() { (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(501, notification()) }
     override fun onSensorChanged(event: SensorEvent) {
@@ -81,6 +107,6 @@ class PetWalkService : Service(), SensorEventListener, LocationListener {
             .putFloat("accuracy", location.accuracy).putLong("location_at", System.currentTimeMillis()).apply()
     }
     private fun cleanupSensors() { sensors.unregisterListener(this); try { locations.removeUpdates(this) } catch (_: SecurityException) { }; baseline = null }
-    private fun cleanup() { cleanupSensors(); if (Build.VERSION.SDK_INT >= 24) stopForeground(STOP_FOREGROUND_REMOVE) else stopForeground(true) }
-    override fun onDestroy() { cleanupSensors(); super.onDestroy() }
+    private fun cleanup() { handler.removeCallbacks(reminder); (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(502); cleanupSensors(); if (Build.VERSION.SDK_INT >= 24) stopForeground(STOP_FOREGROUND_REMOVE) else stopForeground(true) }
+    override fun onDestroy() { handler.removeCallbacks(reminder); cleanupSensors(); super.onDestroy() }
 }

@@ -1,3 +1,5 @@
+import '../core/points.dart';
+
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
@@ -74,20 +76,26 @@ class HomeHeader extends StatelessWidget {
         padding: const EdgeInsets.only(left: 8),
         child: Column(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: Color(0x080F2B43), blurRadius: 12),
-                ],
-              ),
-              child: const Icon(
-                Icons.person_outline_rounded,
-                color: AppColors.primary,
-                size: 30,
+            SizedBox(
+              height: 56,
+              child: Center(
+                child: Container(
+                  key: const ValueKey('home-profile-icon'),
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x080F2B43), blurRadius: 12),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.person_outline_rounded,
+                    color: AppColors.primary,
+                    size: 30,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 4),
@@ -102,7 +110,7 @@ class HomeHeader extends StatelessWidget {
       onTap: onCalendar,
       label: status == null
           ? '포인트와 출석체크 열기'
-          : '보유 포인트 ${status.balance}포인트, 출석체크 열기',
+          : '보유 포인트 ${pointAmount(status.balance)}포인트, 출석체크 열기',
       excludeSemantics: true,
       child: TextButton(
         key: const ValueKey('home-points'),
@@ -156,7 +164,7 @@ class HomeHeader extends StatelessWidget {
               const SizedBox(width: 7),
               Flexible(
                 child: Text(
-                  status == null ? '포인트' : '${petNumber(status.balance)} P',
+                  status == null ? '포인트' : '${pointAmount(status.balance)} P',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: petText(17),
@@ -174,6 +182,7 @@ class HomeHeader extends StatelessWidget {
       ),
     );
     final dateLabel = Row(
+      key: const ValueKey('home-date'),
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -208,7 +217,7 @@ class HomeHeader extends StatelessWidget {
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.start,
                           children: [
                             ConstrainedBox(
                               constraints: BoxConstraints(maxWidth: b.maxWidth),
@@ -220,8 +229,17 @@ class HomeHeader extends StatelessWidget {
                       ],
                     )
                   : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: dateLabel),
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: dateLabel,
+                            ),
+                          ),
+                        ),
                         ConstrainedBox(
                           constraints: BoxConstraints(
                             maxWidth: b.maxWidth * .45,
@@ -500,8 +518,8 @@ class _HomeAttendanceCardState extends State<HomeAttendanceCard> {
                                 Flexible(
                                   child: Text(
                                     s.attendedToday
-                                        ? '오늘 출석 완료!${s.todayPoints == null ? '' : '  +${s.todayPoints}P 받았어요'}'
-                                        : '출석체크하고 ${attendanceMilestonePoints[s.streak + 1] ?? 1}P 받기',
+                                        ? '오늘 출석 완료!${s.todayPoints == null ? '' : '  +${pointAmount(s.todayPoints)}P 받았어요'}'
+                                        : '출석체크하고 ${pointAmount(attendanceMilestonePoints[s.streak + 1] ?? attendanceBasePoints)}P 받기',
                                     textAlign: TextAlign.center,
                                     style: petText(
                                       18,

@@ -230,8 +230,10 @@ class _DetailState extends State<ActivityDetailPage> {
     }
     final map = await activityDialog(
       context,
-      title: p['application_method']=='phone'?'전화 신청 안내':'방문 신청 안내',
-      message: p['application_method']=='phone'?'연락처가 아직 등록되지 않았어요. 기관 공식 안내에서 접수 연락처를 확인해 주세요.':'아래 내용을 확인하고 기관에서 접수해 주세요. 접수 여부는 기관에서 확인할 수 있어요.',
+      title: p['application_method'] == 'phone' ? '전화 신청 안내' : '방문 신청 안내',
+      message: p['application_method'] == 'phone'
+          ? '연락처가 아직 등록되지 않았어요. 기관 공식 안내에서 접수 연락처를 확인해 주세요.'
+          : '아래 내용을 확인하고 기관에서 접수해 주세요. 접수 여부는 기관에서 확인할 수 있어요.',
       action: '위치 확인하기',
       secondary: '닫기',
       icon: Icons.location_on_outlined,
@@ -312,7 +314,9 @@ class _DetailState extends State<ActivityDetailPage> {
                       : p['application_method'] == 'phone' &&
                             '${p['contact_phone'] ?? ''}'.trim().isNotEmpty
                       ? '전화로 신청 문의'
-                      : p['application_method']=='phone'?'신청 안내 확인':'방문 신청 안내',
+                      : p['application_method'] == 'phone'
+                      ? '신청 안내 확인'
+                      : '방문 신청 안내',
                   onTap: closed ? null : () => externalApplication(p),
                 )
               : applied
@@ -494,8 +498,12 @@ class _DetailState extends State<ActivityDetailPage> {
                                             ActivityMapPage.hasCoordinates(p)
                                             ? () => Navigator.push(
                                                 context,
-                                                PageRouteBuilder<void>(transitionDuration:Duration.zero,reverseTransitionDuration:Duration.zero,
-                                                  pageBuilder: (_,a,b) =>
+                                                PageRouteBuilder<void>(
+                                                  transitionDuration:
+                                                      Duration.zero,
+                                                  reverseTransitionDuration:
+                                                      Duration.zero,
+                                                  pageBuilder: (_, a, b) =>
                                                       ActivityMapPage(
                                                         program: p,
                                                         mapPlaceholder: widget
@@ -593,7 +601,7 @@ class _DetailState extends State<ActivityDetailPage> {
                               runSpacing: 6,
                               children: [
                                 PetPill(
-                                  '+ 200 P',
+                                  '+ 20,000 P',
                                   color: PetColors.yellow,
                                   ink: Color(0xFF946100),
                                 ),

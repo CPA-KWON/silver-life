@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Creates the native map on its first visit, then keeps only that tab alive.
-/// Other tabs still reload on entry, as they did before map retention.
+/// Feed and navigation retention are handled independently by MainShell.
 class RetainedMapTab extends StatefulWidget {
   const RetainedMapTab({
     super.key,

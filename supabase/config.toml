@@ -5,3 +5,7 @@ verify_jwt = false
 
 [functions.pet-admob-ssv]
 verify_jwt = false
+
+[functions.pet-play-purchase]
+# Keep gateway JWT verification enabled; handler also checks the user with Auth.
+verify_jwt = true

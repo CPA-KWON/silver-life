@@ -57,8 +57,8 @@ Widget _org(NoticeData n) => Row(
         ],
       ),
     ),
-    const PetPill(
-      '공식',
+    PetPill(
+      n['is_public_source'] == true ? '원문 수집' : '공식',
       color: neighborhoodAmber,
       ink: PetColors.orange,
       fontSize: 12,
@@ -136,7 +136,13 @@ class _DetailState extends State<NoticeDetailPage> {
       return NeighborhoodScreen(
         title: '동네 소식',
         tint: neighborhoodAmber,
-        bottom: phone.isEmpty
+        bottom: n?['is_public_source'] == true
+            ? ActivityButton(
+                '기관 원문에서 자세히 보기',
+                icon: Icons.open_in_new,
+                onTap: () => openSource(c, '${n!['source_url']}'),
+              )
+            : phone.isEmpty
             ? null
             : ActivityButton(
                 '기관에 전화',
@@ -167,6 +173,13 @@ class _DetailState extends State<NoticeDetailPage> {
                           spacing: 5,
                           runSpacing: 5,
                           children: [
+                            if (n['is_public_source'] == true)
+                              PetPill(
+                                n['archived'] == true
+                                    ? '지난 공개 공지'
+                                    : '공식 홈페이지 공개 공지',
+                                fontSize: 13,
+                              ),
                             if (n['important'] == true)
                               const PetPill(
                                 '중요',
@@ -190,6 +203,17 @@ class _DetailState extends State<NoticeDetailPage> {
                           '${n['body']}',
                           style: petText(19, weight: FontWeight.w500),
                         ),
+                        if (n['is_public_source'] == true) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            '기관 홈페이지에서 공개된 제목·게시일·원문 링크를 모았어요. 기관 담당자가 앱에 직접 작성한 공지와 구분해 표시해요.',
+                            style: petText(15, color: PetColors.secondary),
+                          ),
+                          Text(
+                            '확인 ${noticeDate(n['source_verified_at'])} · 접수 상태는 원문 확인',
+                            style: petText(14, color: PetColors.secondary),
+                          ),
+                        ],
                         for (final (i, path) in List<String>.from(
                           n['image_paths'] ?? [],
                         ).indexed)
@@ -325,20 +349,58 @@ Future<void> openSource(BuildContext c, String url) async {
 }
 
 class NoticeListPage extends StatefulWidget {
-  const NoticeListPage({super.key, this.repository});
+  const NoticeListPage({
+    super.key,
+    this.repository,
+    this.preferredOnly = false,
+  });
   final NoticeRepository? repository;
+  final bool preferredOnly;
   @override
   State<NoticeListPage> createState() => _ListState();
 }
 
 class _ListState extends State<NoticeListPage> {
   late final repo = widget.repository ?? NoticeRepository();
-  late Future<List<NoticeData>> data = repo.feed();
+  late bool onlyPreferred = widget.preferredOnly;
+  String preferredName = '';
+  late Future<List<NoticeData>> data = load();
   String kind = '전체';
+  bool archive = false, allRegions = false;
+  int visibleCount = 30;
+  Future<List<NoticeData>> load() async {
+    if (onlyPreferred) {
+      final institution = await repo.preferredInstitution();
+      if (mounted) {
+        setState(
+          () => preferredName = '${institution?['institution_name'] ?? ''}',
+        );
+      }
+      return institution == null
+          ? []
+          : repo.publicFeed(archive: archive, institution: institution);
+    }
+    return repo.browse(archive: archive, allRegions: allRegions);
+  }
+
+  Future<void> chooseInstitution() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NoticeInstitutionPicker(repository: repo),
+      ),
+    );
+    if (saved == true && mounted) {
+      setState(() => onlyPreferred = true);
+      await reload();
+    }
+  }
+
   Future<void> reload() async {
-    final f = repo.feed();
+    final f = load();
     setState(() {
       data = f;
+      visibleCount = 30;
     });
     try {
       await f;
@@ -347,8 +409,10 @@ class _ListState extends State<NoticeListPage> {
 
   @override
   Widget build(BuildContext c) => NeighborhoodScreen(
-    title: '동네 소식',
-    subtitle: '기관이 올린 공식 안내예요',
+    title: onlyPreferred ? '내 복지관 소식' : '동네 소식',
+    subtitle: onlyPreferred && preferredName.isNotEmpty
+        ? preferredName
+        : '기관 공지와 공식 홈페이지의 공개 소식을 모았어요',
     tint: neighborhoodAmber,
     child: FutureBuilder<List<NoticeData>>(
       future: data,
@@ -357,6 +421,59 @@ class _ListState extends State<NoticeListPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Wrap(
+              spacing: 6,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('내 복지관'),
+                  selected: onlyPreferred,
+                  onSelected: (_) {
+                    setState(() => onlyPreferred = true);
+                    reload();
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('우리 동네'),
+                  selected: !allRegions && !onlyPreferred,
+                  onSelected: (_) {
+                    setState(() {
+                      allRegions = false;
+                      onlyPreferred = false;
+                    });
+                    reload();
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('전체 지역'),
+                  selected: allRegions && !onlyPreferred,
+                  onSelected: (_) {
+                    setState(() {
+                      allRegions = true;
+                      onlyPreferred = false;
+                    });
+                    reload();
+                  },
+                ),
+                ChoiceChip(
+                  label: const Text('지난 공개 공지'),
+                  selected: archive,
+                  onSelected: (v) {
+                    setState(() => archive = v);
+                    reload();
+                  },
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: chooseInstitution,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('내 복지관 지정·변경'),
+              ),
+            ),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 6,
               runSpacing: 8,
@@ -373,7 +490,7 @@ class _ListState extends State<NoticeListPage> {
             ActivityCard(
               color: const Color(0xFFFFF3DA),
               child: Text(
-                '공식 표시는 확인된 기관만 올릴 수 있어요. 이웃 글은 커뮤니티에 있어요.',
+                '기관이 직접 쓴 공지는 ‘공식’, 홈페이지에서 모은 공지는 ‘원문 수집’으로 표시해요. 접수 가능 여부는 원문을 확인해 주세요.',
                 style: petText(15, color: const Color(0xFF75501A)),
               ),
             ),
@@ -387,14 +504,25 @@ class _ListState extends State<NoticeListPage> {
                 onAction: reload,
               )
             else if (!s.data!.any((n) => kind == '전체' || _kind(n) == kind))
-              const ActivityEmpty(
-                '아직 등록된 기관 공지가 없어요.',
-                message: '새 공지가 올라오면 여기에서 확인할 수 있어요.',
+              ActivityEmpty(
+                onlyPreferred && preferredName.isEmpty
+                    ? '자주 가는 복지관을 지정해 주세요'
+                    : '아직 등록된 기관 공지가 없어요.',
+                message: onlyPreferred
+                    ? '새 공지가 없는 경우 지난 공개 공지도 확인해 보세요.'
+                    : '새 공지가 올라오면 여기에서 확인할 수 있어요.',
+                action: onlyPreferred && preferredName.isEmpty
+                    ? '내 복지관 지정하기'
+                    : null,
+                onAction: onlyPreferred && preferredName.isEmpty
+                    ? chooseInstitution
+                    : null,
               )
             else
-              for (final n in s.data!.where(
-                (n) => kind == '전체' || _kind(n) == kind,
-              ))
+              for (final n
+                  in s.data!
+                      .where((n) => kind == '전체' || _kind(n) == kind)
+                      .take(visibleCount))
                 _card(
                   n,
                   onTap: () => Navigator.push(
@@ -405,8 +533,291 @@ class _ListState extends State<NoticeListPage> {
                     ),
                   ),
                 ),
+            if (s.hasData &&
+                s.data!.where((n) => kind == '전체' || _kind(n) == kind).length >
+                    visibleCount)
+              ActivityButton(
+                '공지 더 보기',
+                light: true,
+                onTap: () => setState(() => visibleCount += 30),
+              ),
           ],
         ),
+      ),
+    ),
+  );
+}
+
+class MyInstitutionNoticeCard extends StatefulWidget {
+  const MyInstitutionNoticeCard({
+    super.key,
+    required this.repository,
+    this.onChanged,
+  });
+  final NoticeRepository repository;
+  final Future<void> Function()? onChanged;
+  @override
+  State<MyInstitutionNoticeCard> createState() => _MyInstitutionCardState();
+}
+
+class _MyInstitutionCardState extends State<MyInstitutionNoticeCard> {
+  late int revision = widget.repository.preferenceRevision;
+  late Future<NoticeData?> preference = widget.repository
+      .preferredInstitution();
+  @override
+  void didUpdateWidget(covariant MyInstitutionNoticeCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.repository != widget.repository ||
+        revision != widget.repository.preferenceRevision) {
+      revision = widget.repository.preferenceRevision;
+      preference = widget.repository.preferredInstitution();
+    }
+  }
+
+  Future<void> openNotices() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            NoticeListPage(repository: widget.repository, preferredOnly: true),
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        preference = widget.repository.preferredInstitution();
+      });
+      await widget.onChanged?.call();
+    }
+  }
+
+  Future<void> choose() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NoticeInstitutionPicker(repository: widget.repository),
+      ),
+    );
+    if (saved == true && mounted) {
+      setState(() {
+        preference = widget.repository.preferredInstitution();
+      });
+      await widget.onChanged?.call();
+    }
+  }
+
+  @override
+  Widget build(BuildContext c) => FutureBuilder<NoticeData?>(
+    future: preference,
+    builder: (c, s) {
+      final n = s.data;
+      final loading = s.connectionState != ConnectionState.done;
+      return ActivityCard(
+        color: const Color(0xFFE9F2FF),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.home_work_outlined,
+              color: PetColors.blue,
+              size: 30,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    n == null ? '내 복지관' : '내 복지관 · ${n['institution_name']}',
+                    style: petText(18),
+                  ),
+                  Text(
+                    loading
+                        ? '지정한 복지관 확인 중'
+                        : s.hasError
+                        ? '저장한 복지관을 다시 확인해 주세요'
+                        : n == null
+                        ? '자주 가는 곳의 소식만 모아보세요'
+                        : '소식을 모아 볼 수 있어요',
+                    style: petText(14, color: PetColors.secondary),
+                  ),
+                  TextButton(
+                    onPressed: loading
+                        ? null
+                        : s.hasError
+                        ? () => setState(() {
+                            preference = widget.repository
+                                .preferredInstitution();
+                          })
+                        : n == null
+                        ? choose
+                        : openNotices,
+                    child: Text(
+                      s.hasError
+                          ? '다시 불러오기'
+                          : n == null
+                          ? '내 복지관 지정하기'
+                          : '우리 복지관 소식 보기',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (n != null)
+              TextButton(onPressed: choose, child: const Text('변경')),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class NoticeInstitutionPicker extends StatefulWidget {
+  const NoticeInstitutionPicker({super.key, required this.repository});
+  final NoticeRepository repository;
+  @override
+  State<NoticeInstitutionPicker> createState() =>
+      _NoticeInstitutionPickerState();
+}
+
+class _NoticeInstitutionPickerState extends State<NoticeInstitutionPicker> {
+  late Future<List<NoticeData>> institutions = widget.repository.institutions();
+  final search = TextEditingController();
+  NoticeData? selected;
+  bool busy = false;
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  Future<void> save() async {
+    if (busy || selected == null) return;
+    setState(() => busy = true);
+    try {
+      await widget.repository.selectInstitution(selected!);
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted) {
+        await activityFailure(
+          context,
+          title: '내 복지관을 저장하지 못했어요',
+          message: '선택한 내용은 유지돼요. 잠시 후 다시 시도해 주세요.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext c) => PopScope(
+    canPop: !busy,
+    child: NeighborhoodScreen(
+      title: '내 복지관 지정',
+      subtitle: '실제로 자주 이용하는 한 곳을 골라 주세요',
+      tint: neighborhoodAmber,
+      bottom: ActivityButton(
+        busy ? '저장 중…' : '내 복지관으로 지정',
+        onTap: selected == null || busy ? null : save,
+      ),
+      child: FutureBuilder<List<NoticeData>>(
+        future: institutions,
+        builder: (c, s) {
+          final q = search.text.replaceAll(' ', '').toLowerCase();
+          final rows = (s.data ?? [])
+              .where(
+                (n) =>
+                    '${n['institution_name']}${n['region_sido']}${n['region_sigungu']}${n['address'] ?? ''}'
+                        .replaceAll(' ', '')
+                        .toLowerCase()
+                        .contains(q),
+              )
+              .toList();
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextField(
+                controller: search,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: '복지관 이름·지역 검색',
+                  prefixIcon: Icon(Icons.search),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '거주지와 이용 자격을 자동으로 판정하지 않아요. 실제 이용 대상은 기관에 확인해 주세요.',
+                style: petText(14, color: PetColors.secondary),
+              ),
+              const SizedBox(height: 16),
+              if (s.connectionState != ConnectionState.done)
+                const SizedBox(height: 260, child: NeighborhoodLoading())
+              else if (s.hasError)
+                ActivityEmpty(
+                  '복지관 목록을 불러오지 못했어요',
+                  action: '다시 시도',
+                  onAction: () => setState(() {
+                    institutions = widget.repository.institutions();
+                  }),
+                )
+              else if (rows.isEmpty)
+                const ActivityEmpty(
+                  '찾는 복지관이 아직 목록에 없어요',
+                  message: '공식 공지 출처가 등록된 기관부터 선택할 수 있어요. 이름이나 지역으로 다시 찾아보세요.',
+                )
+              else
+                for (final n in rows)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ActivityCard(
+                      onTap: busy ? null : () => setState(() => selected = n),
+                      border: BorderSide(
+                        color: identical(selected, n)
+                            ? PetColors.blue
+                            : PetColors.line,
+                        width: identical(selected, n) ? 2 : 1,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            identical(selected, n)
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: PetColors.blue,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${n['institution_name']}',
+                                  style: petText(19),
+                                ),
+                                Text(
+                                  '${n['region_sido']} ${n['region_sigungu']}',
+                                  style: petText(
+                                    15,
+                                    color: PetColors.secondary,
+                                  ),
+                                ),
+                                if (n['address'] != null)
+                                  Text(
+                                    '${n['address']}',
+                                    style: petText(
+                                      14,
+                                      color: PetColors.secondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+            ],
+          );
+        },
       ),
     ),
   );

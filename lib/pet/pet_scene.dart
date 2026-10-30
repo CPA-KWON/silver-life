@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -16,10 +17,12 @@ class PetScene extends StatefulWidget {
     required this.stage,
     required this.outfit,
     this.motion,
+    this.species = 'dog',
     this.interactive = true,
     this.entrance = false,
   });
   final String stage;
+  final String species;
   final Set<String> outfit;
   final String? motion;
   final bool interactive;
@@ -40,7 +43,10 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
     'assets/pet/scene/kongi_scene.js',
   );
   WebViewController? _web;
+  String? _lastConfiguration;
   Timer? _timeout;
+  Timer? _handshake;
+  bool _probing = false;
   bool _ready = false, _failed = false, _imageOnly = false, _foreground = true;
   bool _reduceMotion = false;
   bool _visible = true;
@@ -62,6 +68,38 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
     });
   }
 
+  // The model can finish while the platform channel is still attaching.
+  // Confirm readiness independently until ready/failed, then stop polling.
+  void _connect(WebViewController web) {
+    _web = web;
+    _handshake?.cancel();
+    if (!_visible || !_foreground || _ready || _failed) return;
+    _handshake = Timer.periodic(const Duration(milliseconds: 300), (_) async {
+      if (!mounted || _ready || _failed || _web != web) {
+        _handshake?.cancel();
+        return;
+      }
+      if (_probing || !_visible || !_foreground) return;
+      _probing = true;
+      try {
+        final raw = await web.runJavaScriptReturningResult(
+          'JSON.stringify(window.kongi?.status() ?? {bridge: false})',
+        );
+        dynamic value = raw;
+        for (var i = 0; i < 2 && value is String; i++) {
+          value = jsonDecode(value);
+        }
+        if (value is Map && value['loaded'] == true) {
+          _message(const JavaScriptMessage(message: '{"type":"ready"}'));
+        }
+      } catch (_) {
+        // The local WebView may still be loading; the bounded handshake retries.
+      } finally {
+        _probing = false;
+      }
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -70,11 +108,7 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
     if (_reduceMotion != reduce || _visible != visible) {
       _reduceMotion = reduce;
       _visible = visible;
-      if (!_visible) {
-        _timeout?.cancel();
-      } else if (!_ready && !_failed) {
-        _startTimeout();
-      }
+      _syncPreparation();
       _send();
     }
   }
@@ -82,9 +116,11 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(PetScene oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.stage != widget.stage) {
+    if (oldWidget.stage != widget.stage ||
+        oldWidget.species != widget.species) {
       _ready = _failed = false;
       _web = null;
+      _lastConfiguration = null;
       _entrance = false;
       _startTimeout();
     }
@@ -94,7 +130,18 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
+    _syncPreparation();
     _send();
+  }
+
+  void _syncPreparation() {
+    if (!_visible || !_foreground) {
+      _timeout?.cancel();
+      _handshake?.cancel();
+    } else if (!_ready && !_failed) {
+      _startTimeout();
+      if (_web != null) _connect(_web!);
+    }
   }
 
   Map<String, Object> configuration({bool entrance = false}) => {
@@ -103,8 +150,9 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
         ? 'Jump'
         : switch (widget.motion) {
             'hello' => 'Jump',
-            'eat' => 'Eat',
+            'eat' || 'eating' => 'Eat',
             'walk' => 'Walk',
+            'happy' => 'Happy',
             _ => 'Idle',
           },
     'interactive': widget.interactive,
@@ -116,12 +164,39 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
     final web = _web;
     if (!mounted || !_ready || web == null || _failed) return;
     try {
-      await web.runJavaScript(
-        'window.kongi?.configure(${jsonEncode(configuration(entrance: entrance))});',
-      );
+      final payload = jsonEncode(configuration(entrance: entrance));
+      if (payload == _lastConfiguration) return;
+      await web.runJavaScript('window.kongi?.configure($payload);');
+      _lastConfiguration = payload;
     } catch (_) {
       if (mounted) setState(() => _failed = true);
     }
+  }
+
+  double _pendingRotation = 0;
+  bool _rotationScheduled = false;
+
+  // One update per Flutter frame, with no queued JS calls or widget rebuilds.
+  // Flutter owns the horizontal gesture so vertical drags still scroll the page.
+  void rotateBy(double pixels) {
+    if (!_ready || _failed || _web == null) return;
+    _pendingRotation += pixels;
+    if (_rotationScheduled) return;
+    _rotationScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) async {
+      final delta = _pendingRotation;
+      _pendingRotation = 0;
+      try {
+        if (mounted && _ready && !_failed) {
+          await _web?.runJavaScript('window.kongi?.rotate($delta);');
+        }
+      } catch (_) {
+        if (mounted) setState(() => _failed = true);
+      } finally {
+        _rotationScheduled = false;
+        if (mounted && _pendingRotation != 0) rotateBy(0);
+      }
+    });
   }
 
   Future<void> view(String angle) async {
@@ -138,6 +213,7 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
     final data = jsonDecode(message.message) as Map<String, dynamic>;
     if (data['type'] == 'ready') {
       _timeout?.cancel();
+      _handshake?.cancel();
       setState(() {
         _ready = true;
         _failed = false;
@@ -154,6 +230,7 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
     setState(() {
       _ready = _failed = false;
       _web = null;
+      _lastConfiguration = null;
       _attempt++;
     });
     _startTimeout();
@@ -162,6 +239,7 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
   @override
   void dispose() {
     _timeout?.cancel();
+    _handshake?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _web = null;
     super.dispose();
@@ -176,7 +254,11 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset('assets/pet/${widget.stage}/angle.png'),
+                Image.asset(
+                  widget.species == 'cat'
+                      ? 'assets/pet/expansion/cat_${widget.stage == 'junior' ? 'teen' : widget.stage}_34.png'
+                      : 'assets/pet/${widget.stage}/angle.png',
+                ),
                 for (final id in ['knit', 'hat', 'flower'])
                   if (widget.outfit.contains(id))
                     Image.asset('assets/pet/${widget.stage}/${id}_angle.png'),
@@ -210,9 +292,9 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
           children: [
             if (snapshot.hasData)
               ModelViewer(
-                key: ValueKey('${widget.stage}-$_attempt'),
-                src: 'assets/pet/models/${widget.stage}.glb',
-                alt: '콩이 입체 모델. 손가락을 좌우로 움직여 돌려보세요.',
+                key: ValueKey('${widget.species}-${widget.stage}-$_attempt'),
+                src: 'assets/pet/models/${widget.species}_${widget.stage}.glb',
+                alt: '반려동물 입체 모델. 손가락을 좌우로 움직여 돌려보세요.',
                 ar: false,
                 loading: Loading.eager,
                 autoPlay: false,
@@ -236,7 +318,7 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
                 javascriptChannels: {
                   JavascriptChannel('PetScene', onMessageReceived: _message),
                 },
-                onWebViewCreated: (web) => _web = web,
+                onWebViewCreated: _connect,
               ),
             if (!_ready)
               const ColoredBox(
@@ -245,9 +327,9 @@ class PetSceneState extends State<PetScene> with WidgetsBindingObserver {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(semanticsLabel: '콩이 3D 준비 중'),
+                      CircularProgressIndicator(semanticsLabel: '3D 준비 중'),
                       SizedBox(height: 12),
-                      Text('콩이가 오고 있어요'),
+                      Text('반려동물이 오고 있어요'),
                     ],
                   ),
                 ),

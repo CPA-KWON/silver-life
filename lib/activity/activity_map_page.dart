@@ -9,6 +9,7 @@ import '../ui/neighborhood_design.dart';
 import '../core/map_directions.dart';
 import '../core/phone_call.dart';
 import '../facility/facility_distance.dart';
+import '../facility/facility_marker.dart';
 import 'activity_repository.dart';
 
 class ActivityMapPage extends StatefulWidget {
@@ -119,6 +120,11 @@ class _MapState extends State<ActivityMapPage> {
                                 await controller.addOverlay(
                                   NMarker(
                                     id: 'activity-place',
+                                    icon: await FacilityMarkerImages.image(
+                                      '${p['place_category'] ?? p['place_name'] ?? '복지관'}',
+                                      selected: true,
+                                    ),
+                                    size: const Size(46, 52),
                                     position: NLatLng(
                                       (p['lat'] as num).toDouble(),
                                       (p['lng'] as num).toDouble(),
@@ -184,29 +190,26 @@ class _MapState extends State<ActivityMapPage> {
                       child: const Text('휴대폰 위치 설정 열기'),
                     ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (phone.isNotEmpty)
-                        ActivityButton(
-                          '전화',
-                          color: PetColors.green,
-                          onTap: () => callFacility(c, phone),
-                        ),
-                      if (valid)
-                        ActivityButton(
-                          '길 찾기',
-                          icon: Icons.directions_walk,
-                          onTap: () => openMapDirections(
-                            c,
-                            lat: (p['lat'] as num).toDouble(),
-                            lng: (p['lng'] as num).toDouble(),
-                            name: '${p['place_name']}',
-                          ),
-                        ),
-                    ],
-                  ),
+                  if (valid)
+                    ActivityButton(
+                      '길 찾기',
+                      icon: Icons.directions_walk,
+                      onTap: () => openMapDirections(
+                        c,
+                        lat: (p['lat'] as num).toDouble(),
+                        lng: (p['lng'] as num).toDouble(),
+                        name: '${p['place_name']}',
+                      ),
+                    ),
+                  if (phone.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ActivityButton(
+                      '기관에 전화하기',
+                      light: true,
+                      icon: Icons.phone_outlined,
+                      onTap: () => callFacility(c, phone),
+                    ),
+                  ],
                   TextButton(
                     onPressed: () => Navigator.pop(c),
                     child: const Text('활동 상세로 돌아가기'),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'pet_repository.dart';
+import 'pet_catalog.dart';
 
 class PetOutcome {
   const PetOutcome({
@@ -72,6 +73,20 @@ class PetPreviewController extends ChangeNotifier {
   String? _pendingId, _pendingAction;
   PetJson? _pendingPayload;
 
+  String species = 'dog';
+  bool get isCat => species == 'cat';
+  String get defaultName => isCat ? '나비' : '콩이';
+  List<PetFood> get foods => isCat
+      ? const [
+          PetFood('food', '기본 사료', 0, 1, 0),
+          PetFood('sweet', '촉촉 참치', 0, 2, 5),
+          PetFood('gum', '연어 트릿', 50, 1, 10),
+          PetFood('cake', '닭고기 수프', 120, 3, 20),
+        ]
+      : PetFood.all;
+  bool adsEnabled = false;
+  bool storeEnabled = false;
+  bool expansionEnabled = false;
   bool get adopted => name != null;
   bool get fed => freeFoodUsed > 0;
   bool get attendanceRewarded =>
@@ -168,6 +183,10 @@ class PetPreviewController extends ChangeNotifier {
   void _read(PetJson data) {
     final p = data['pet'] as Map?;
     name = p?['name'] as String?;
+    species = p?['species'] == 'cat' ? 'cat' : 'dog';
+    expansionEnabled = data['expansion'] == true;
+    adsEnabled = data['ads_enabled'] == true;
+    storeEnabled = data['store_enabled'] == true;
     stage = (p?['stage'] as num?)?.toInt() ?? 0;
     experience = (p?['experience'] as num?)?.toInt() ?? 0;
     fullness = (p?['fullness'] as num?)?.toInt() ?? 2;
@@ -251,6 +270,7 @@ class PetPreviewController extends ChangeNotifier {
           throw StateError('이름은 1~6자로 지어주세요.');
         }
         if (adopted) throw StateError('이미 함께하는 반려동물이 있어요.');
+        species = payload['species'] == 'cat' ? 'cat' : 'dog';
         name = v;
         adoptedAt = today;
         stageDates[0] = today;
@@ -262,7 +282,7 @@ class PetPreviewController extends ChangeNotifier {
         }
         name = v;
       case 'feed':
-        final item = PetFood.all.singleWhere((f) => f.id == payload['item']);
+        final item = foods.singleWhere((f) => f.id == payload['item']);
         if (item.id == 'food') {
           if (freeFoodUsed >= 3) throw StateError('오늘의 무료 사료를 모두 먹었어요.');
           freeFoodUsed++;
@@ -282,9 +302,27 @@ class PetPreviewController extends ChangeNotifier {
           p: p,
           xp: xp,
         );
+      case 'preview_purchase':
+        final added = PetItem.find('${payload['item']}');
+        if (added == null || !added.premium || !added.compatible(species)) {
+          throw StateError('테스트 상품을 확인해주세요.');
+        }
+        if (owned.contains(added.id)) return const PetOutcome(already: true);
+        owned.add(added.id);
+        _log('${added.name} 테스트 구매 · 실제 결제 없음', 'purchase');
       case 'buy':
         final id = '${payload['item']}';
         if (owned.contains(id)) return const PetOutcome(already: true);
+        final added = PetItem.find(id);
+        if (added != null) {
+          if (!added.compatible(species)) throw StateError('다른 동물 전용 아이템이에요.');
+          if (stage < added.minStage) throw StateError('성장기가 되면 열려요.');
+          if (added.source != 'points') throw StateError('아이템 획득 방법을 확인해주세요.');
+          _spend(added.price);
+          owned.add(id);
+          _log('${added.name}를 샀어요', 'purchase', p: -added.price);
+          return PetOutcome(points: -added.price);
+        }
         if (id == 'rain') throw StateError('레인코트 착용 자료를 준비하고 있어요.');
         if (id == 'winter' && stage < 1) throw StateError('성장기가 되면 열려요.');
         _spend(itemPrices[id]!);
@@ -294,6 +332,17 @@ class PetPreviewController extends ChangeNotifier {
       case 'wear':
         final selected = (payload['items'] as List).cast<String>().toSet();
         if (!owned.containsAll(selected)) throw StateError('보유한 옷만 입힐 수 있어요.');
+        if (selected.map(PetItem.slotFor).toSet().length != selected.length) {
+          throw StateError('같은 위치에는 하나만 입힐 수 있어요.');
+        }
+        if (selected.any(
+          (id) =>
+              PetItem.find(id) != null &&
+              (!PetItem.find(id)!.compatible(species) ||
+                  stage < PetItem.find(id)!.minStage),
+        )) {
+          throw StateError('지금 입을 수 없는 아이템이에요.');
+        }
         if (selected.contains('knit') && selected.contains('winter')) {
           throw StateError('옷은 한 벌만 입힐 수 있어요.');
         }
@@ -338,6 +387,8 @@ class PetPreviewController extends ChangeNotifier {
       case 'walk_reward':
         if (walked) return const PetOutcome(already: true);
         walked = true;
+        activeWalk = null;
+        owned.add('${species}_first_walk_badge');
         p = 30;
         xp = 10;
         points += p;
@@ -367,7 +418,7 @@ class PetPreviewController extends ChangeNotifier {
       case 'ad_claim':
         if (ads >= 2) throw StateError('오늘 광고 보상을 모두 받았어요.');
         ads++;
-        p = 30;
+        p = 20;
         points += p;
         _log('광고 보상을 받았어요', 'ad', p: p);
       default:
@@ -394,6 +445,7 @@ class PetPreviewController extends ChangeNotifier {
   void reset() {
     if (!isPreview) return;
     name = null;
+    species = 'dog';
     points = 1250;
     experience = stage = freeFoodUsed = ads = 0;
     fullness = 2;

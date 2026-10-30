@@ -173,9 +173,10 @@ class PetAdoptionPage extends StatefulWidget {
 }
 
 class _AdoptionState extends State<PetAdoptionPage> {
-  final name = TextEditingController(text: '콩이');
+  final name = TextEditingController();
   final form = GlobalKey<FormState>();
-  bool complete = false;
+  String? species;
+  bool naming = false, complete = false;
   @override
   void dispose() {
     name.dispose();
@@ -184,8 +185,19 @@ class _AdoptionState extends State<PetAdoptionPage> {
 
   Future<void> adopt() async {
     if (!form.currentState!.validate()) return;
+    final yes = await petDialog(
+      context,
+      title: '${name.text.trim()}를 입양할까요?',
+      message: '함께 활동하며 자라요. 기존 포인트는 그대로예요.',
+      action: '입양하기',
+      secondary: '다시 고르기',
+    );
+    if (!yes || !mounted) return;
     try {
-      await widget.pet.run('adopt', {'name': name.text});
+      await widget.pet.run('adopt', {
+        'name': name.text.trim(),
+        'species': species,
+      });
       if (mounted) setState(() => complete = true);
     } catch (e) {
       if (mounted) await showPetFailure(context, e);
@@ -195,111 +207,193 @@ class _AdoptionState extends State<PetAdoptionPage> {
   @override
   Widget build(BuildContext c) {
     final pet = widget.pet;
-    return PetScreen(
-      fullscreen: false,
-      colors: const [
-        Color(0xFFE1F1FB),
-        Color(0xFFF5F0FF),
-        PetColors.background,
-      ],
-      footer: PetPrimary(
-        complete ? '콩이 만나러 가기' : '이 이름으로 입양하기',
-        onTap: pet.busy
-            ? null
-            : complete
-            ? () => Navigator.pushReplacement(
-                c,
-                MaterialPageRoute<void>(
-                  settings: const RouteSettings(name: 'pet'),
-                  builder: (_) => PetHomePage(pet: pet),
-                ),
-              )
-            : adopt,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PetHeader(
-            '반려동물 입양',
-            trailing: Text(
-              complete ? '2 / 2' : '1 / 2',
-              style: petText(17, color: PetColors.muted),
-            ),
-          ),
-          PetPhoto(pet: pet, height: 260, mood: complete ? 'happy' : null),
-          const SizedBox(height: 12),
-          PetCard(
-            padding: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  complete ? '이제 우리 가족이에요' : '새 친구가 왔어요',
-                  style: petText(16, color: PetColors.blue),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  complete ? '${pet.name}, 반가워요!' : '이름을 지어 주세요',
-                  style: petText(26),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  complete
-                      ? '동네에서 활동하고 매일 돌보며 함께 자라요.'
-                      : '이름은 나중에 성장 기록에서 바꿀 수 있어요.',
-                  style: petText(
-                    17,
-                    color: PetColors.secondary,
-                    weight: FontWeight.w500,
+    final selected = PetPreviewController()..species = species ?? 'dog';
+    return ListenableBuilder(
+      listenable: pet,
+      builder: (c, _) => PetScreen(
+        colors: const [Color(0xFFE8E8FF), PetColors.background],
+        footer: PetPrimary(
+          complete
+              ? '${pet.name} 만나러 가기'
+              : naming
+              ? '이 이름으로 입양하기'
+              : '함께할 친구 선택하기',
+          color: PetColors.purple,
+          onTap: pet.busy
+              ? null
+              : complete
+              ? () => Navigator.pushReplacement(
+                  c,
+                  MaterialPageRoute<void>(
+                    builder: (_) => PetHomePage(pet: pet),
                   ),
-                ),
-                if (!complete) ...[
-                  const SizedBox(height: 18),
-                  Form(
-                    key: form,
-                    child: TextFormField(
-                      controller: name,
-                      maxLength: 6,
-                      style: petText(26),
-                      decoration: const InputDecoration(
-                        counterText: '',
-                        contentPadding: EdgeInsets.all(18),
+                )
+              : naming
+              ? adopt
+              : species == null
+              ? null
+              : () => setState(() {
+                  naming = true;
+                  name.text = species == 'cat' ? '나비' : '콩이';
+                }),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PetHeader(
+              '반려동물 입양',
+              trailing: Text(naming ? '2 / 2' : '1 / 2', style: petText(16)),
+            ),
+            if (!naming) ...[
+              Text('함께할 친구를 골라 주세요', style: petText(26)),
+              const SizedBox(height: 8),
+              Text(
+                '매일 돌보고 동네에서 활동하면 함께 자라요.',
+                style: petText(17, color: PetColors.secondary),
+              ),
+              const SizedBox(height: 20),
+              for (final kind in ['dog', 'cat'])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: InkWell(
+                    onTap: () => setState(() => species = kind),
+                    borderRadius: BorderRadius.circular(24),
+                    child: PetCard(
+                      border: Border.all(
+                        color: species == kind
+                            ? PetColors.purple
+                            : Colors.transparent,
+                        width: 2,
                       ),
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? '이름을 입력해주세요.' : null,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 105,
+                            child: PetPhoto(
+                              pet: PetPreviewController()..species = kind,
+                              height: 120,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  kind == 'cat' ? '고양이' : '강아지',
+                                  style: petText(16, color: PetColors.muted),
+                                ),
+                                Text(
+                                  kind == 'cat' ? '이름을 지어 주세요' : '콩이',
+                                  style: petText(24),
+                                ),
+                                Text(
+                                  kind == 'cat'
+                                      ? '느긋하고 호기심 많은 새 친구예요.'
+                                      : '다정한 강아지와 하루를 함께해요.',
+                                  style: petText(
+                                    16,
+                                    color: PetColors.secondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            species == kind
+                                ? Icons.check_circle
+                                : Icons.circle_outlined,
+                            color: species == kind
+                                ? PetColors.purple
+                                : PetColors.muted,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final n in ['콩이', '보리', '몽실이', '복실이'])
-                        ActionChip(
-                          label: Text(
-                            n,
-                            style: petText(16, color: PetColors.blue),
+                ),
+              Text(
+                '한 계정에 한 마리와 함께해요. 선택 후에도 P와 활동 기록은 유지돼요.',
+                style: petText(15, color: PetColors.muted),
+              ),
+            ] else ...[
+              PetSpeech(
+                complete ? '이제 우리 가족이에요!' : '이름을 지어 주세요!',
+                color: PetColors.purple,
+              ),
+              PetPhoto(
+                pet: complete ? pet : selected,
+                height: 250,
+                mood: complete ? 'happy' : null,
+              ),
+              PetCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      complete ? '${pet.name}, 반가워요!' : '어떻게 부를까요?',
+                      style: petText(26),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!complete)
+                      Form(
+                        key: form,
+                        child: TextFormField(
+                          controller: name,
+                          maxLength: 6,
+                          style: petText(24),
+                          decoration: const InputDecoration(
+                            hintText: '이름을 지어 주세요',
                           ),
-                          onPressed: () => setState(() => name.text = n),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return '이름을 입력해주세요.';
+                            }
+                            if (v.trim().runes.length > 6) {
+                              return '6자 이내로 입력해주세요.';
+                            }
+                            if (!RegExp(r'^[가-힣a-zA-Z0-9 ]+$')
+                                .hasMatch(v.trim())) {
+                              return '한글·영문·숫자만 사용할 수 있어요.';
+                            }
+                            return null;
+                          },
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '추천 이름을 누르면 바로 입력돼요',
-                    style: petText(14, color: PetColors.muted),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          if (pet.isPreview)
-            Text(
-              '디자인 미리보기 · 실제 포인트와 신청은 변경되지 않아요',
-              style: petText(14, color: PetColors.muted),
-            ),
-        ],
+                      ),
+                    if (!complete)
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final n
+                              in species == 'cat'
+                                  ? ['나비', '구름', '모모', '별이']
+                                  : ['콩이', '보리', '몽실이', '복실이'])
+                            ActionChip(
+                              label: Text(n),
+                              onPressed: () => setState(() => name.text = n),
+                            ),
+                        ],
+                      ),
+                    Text(
+                      '이름은 성장 기록에서 바꿀 수 있어요.',
+                      style: petText(16, color: PetColors.secondary),
+                    ),
+                  ],
+                ),
+              ),
+              if (!complete)
+                TextButton(
+                  onPressed: () => setState(() => naming = false),
+                  child: const Text('친구 다시 고르기'),
+                ),
+            ],
+            if (pet.isPreview)
+              Text(
+                '디자인 미리보기 · 실제 포인트는 변경되지 않아요',
+                style: petText(14, color: PetColors.muted),
+              ),
+          ],
+        ),
       ),
     );
   }

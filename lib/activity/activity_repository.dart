@@ -30,43 +30,55 @@ class ActivityRepository {
   final SupabaseClient? _client;
   SupabaseClient get client => _client ?? Supabase.instance.client;
   String get userId => client.auth.currentUser!.id;
+
+  /// Home/profile need the core summary, not the full program catalogue.
+  Future<ActivityData> homeSummary() async => Map<String, dynamic>.from(
+    await client.rpc('activity_home').timeout(const Duration(seconds: 10))
+        as Map,
+  );
+
   Future<ActivityData> home() async {
-    final data = Map<String, dynamic>.from(
-      await client.rpc('activity_home').timeout(const Duration(seconds: 10))
-          as Map,
-    );
-    try {
-      data['benefits'] = await client
-          .from('activity_benefits')
-          .select()
-          .eq('user_id', userId)
-          .order('expires_at', ascending: false)
-          .timeout(const Duration(seconds: 6));
-    } catch (_) {
-      // Keep the main response usable if the optional history request fails.
-      data['benefits_unavailable'] = true;
-    }
-    try {
-      data['mission_rewards'] = await client
-          .from('pet_history')
-          .select('reference,points,experience,created_at')
-          .eq('user_id', userId)
-          .like('reference', 'program-mission:%')
-          .timeout(const Duration(seconds: 6));
-    } catch (_) {
-      data['mission_rewards_unavailable'] = true;
-    }
-    try {
-      data['welfare_programs'] = await ActivityWelfareCatalog(client)
-          .load(
-            data['preferences'] == null
-                ? null
-                : Map<String, dynamic>.from(data['preferences']),
-          )
-          .timeout(const Duration(seconds: 10));
-    } catch (_) {
-      data['welfare_unavailable'] = true;
-    }
+    final data = await homeSummary();
+    await Future.wait([
+      () async {
+        try {
+          data['benefits'] = await client
+              .from('activity_benefits')
+              .select()
+              .eq('user_id', userId)
+              .order('expires_at', ascending: false)
+              .timeout(const Duration(seconds: 6));
+        } catch (_) {
+          // Keep the main response usable if the optional history request fails.
+          data['benefits_unavailable'] = true;
+        }
+      }(),
+      () async {
+        try {
+          data['mission_rewards'] = await client
+              .from('pet_history')
+              .select('reference,points,experience,created_at')
+              .eq('user_id', userId)
+              .like('reference', 'program-mission:%')
+              .timeout(const Duration(seconds: 6));
+        } catch (_) {
+          data['mission_rewards_unavailable'] = true;
+        }
+      }(),
+      () async {
+        try {
+          data['welfare_programs'] = await ActivityWelfareCatalog(client)
+              .load(
+                data['preferences'] == null
+                    ? null
+                    : Map<String, dynamic>.from(data['preferences']),
+              )
+              .timeout(const Duration(seconds: 10));
+        } catch (_) {
+          data['welfare_unavailable'] = true;
+        }
+      }(),
+    ]);
     return data;
   }
 

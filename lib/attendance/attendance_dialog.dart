@@ -1,8 +1,11 @@
+import '../core/points.dart';
+
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
 import 'attendance_controller.dart';
 import 'attendance_repository.dart';
+import 'attendance_ads.dart';
 
 /// "매일매일 출석체크" popup. Closing it never records attendance; only the
 /// stamp button does (server-side, once per KST day).
@@ -15,7 +18,8 @@ Future<void> showAttendanceDialog(
 );
 
 class AttendanceDialog extends StatefulWidget {
-  const AttendanceDialog({super.key, required this.controller});
+  const AttendanceDialog({super.key, required this.controller, this.ads});
+  final AttendanceAds? ads;
   final AttendanceController controller;
 
   @override
@@ -27,6 +31,56 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
   DateTime? _month;
   Future<List<AttendanceDay>>? _days;
   bool _busy = false;
+  bool _adBusy = false;
+  AttendanceAdOffer? _offer;
+  AttendanceAdResult? _adResult;
+  int _testViews = 0;
+  String? _adDay;
+  late final ads = widget.ads ?? AttendanceAds();
+  Future<void> _loadAdOffer() async {
+    final status = controller.status;
+    if (status == null) return;
+    try {
+      final offer = await ads.offer(
+        streak: status.streak,
+        attended: status.attendedToday,
+      );
+      if (mounted) {
+        setState(() {
+          if (_adDay != '${status.today}') {
+            _testViews = 0;
+            _adDay = '${status.today}';
+          }
+          _offer = offer;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _offer = null);
+    }
+  }
+
+  Future<void> _watchAd() async {
+    if (_adBusy || _offer == null) return;
+    setState(() {
+      _adBusy = true;
+      _adResult = null;
+    });
+    try {
+      final result = await ads.watch();
+      if (!mounted) return;
+      setState(() {
+        _adResult = result;
+        if (ads.testing && result == AttendanceAdResult.completed) _testViews++;
+      });
+      if (!ads.testing) await controller.refresh();
+      await _loadAdOffer();
+    } catch (_) {
+      if (mounted) setState(() => _adResult = AttendanceAdResult.unavailable);
+    } finally {
+      if (mounted) setState(() => _adBusy = false);
+    }
+  }
+
   bool _loadingStatus = false;
   String? _message;
   bool _messageIsError = false;
@@ -34,6 +88,7 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
   @override
   void initState() {
     super.initState();
+    _loadAdOffer();
     if (controller.status == null) {
       _reloadStatus();
     } else {
@@ -46,7 +101,10 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
     final status = await controller.refresh();
     if (!mounted) return;
     setState(() => _loadingStatus = false);
-    if (status != null) _showMonth(_month ?? status.today);
+    if (status != null) {
+      _showMonth(_month ?? status.today);
+      await _loadAdOffer();
+    }
   }
 
   void _showMonth(DateTime month) {
@@ -75,7 +133,7 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
       if (status?.attendedToday == true) {
         _message =
             '연결이 잠시 끊겼지만 오늘 출석은 정상 처리됐어요.'
-            '${status!.todayPoints == null ? '' : ' (${status.todayPoints}포인트)'}';
+            '${status!.todayPoints == null ? '' : ' (${pointAmount(status.todayPoints)}포인트)'}';
         _messageIsError = false;
       } else {
         _message = '출석을 처리하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.';
@@ -86,78 +144,243 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
     setState(() => _busy = false);
     final today = controller.status?.today;
     if (today != null) _showMonth(today);
+    await _loadAdOffer();
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (context, _) {
-            final status = controller.status;
-            return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              child: Column(
+    return PopScope(
+      canPop: !_adBusy,
+      child: Dialog(
+        backgroundColor: const Color(0xFFF4F9FC),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 480,
+            maxHeight: MediaQuery.sizeOf(context).height * .9,
+          ),
+          child: ListenableBuilder(
+            listenable: controller,
+            builder: (context, _) {
+              final status = controller.status;
+              return Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    '매일매일 출석체크',
-                    textAlign: TextAlign.center,
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (status == null)
-                    _StatusError(
-                      loading: _loadingStatus,
-                      onRetry: _reloadStatus,
-                    )
-                  else ...[
-                    _Summary(status: status),
-                    const SizedBox(height: 16),
-                    _MonthHeader(
-                      month: _month!,
-                      onPrevious: () =>
-                          _showMonth(DateTime(_month!.year, _month!.month - 1)),
-                      onNext: () =>
-                          _showMonth(DateTime(_month!.year, _month!.month + 1)),
-                    ),
-                    const SizedBox(height: 8),
-                    FutureBuilder<List<AttendanceDay>>(
-                      future: _days,
-                      builder: (context, s) => AttendanceCalendar(
-                        month: _month!,
-                        today: status.today,
-                        days: s.data ?? const [],
-                        upcoming: upcomingMilestones(status),
-                        onTapToday: status.attendedToday || _busy
-                            ? null
-                            : _stamp,
-                        loading: s.connectionState != ConnectionState.done,
-                        failed: s.hasError,
-                        onRetry: () => _showMonth(_month!),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '출석체크',
+                                  style: textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: '닫기',
+                                onPressed: _adBusy
+                                    ? null
+                                    : () => Navigator.pop(context),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (status == null)
+                            _StatusError(
+                              loading: _loadingStatus,
+                              onRetry: _reloadStatus,
+                            )
+                          else ...[
+                            _Summary(status: status),
+                            const SizedBox(height: 16),
+                            _MonthHeader(
+                              month: _month!,
+                              onPrevious: () => _showMonth(
+                                DateTime(_month!.year, _month!.month - 1),
+                              ),
+                              onNext: () => _showMonth(
+                                DateTime(_month!.year, _month!.month + 1),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            FutureBuilder<List<AttendanceDay>>(
+                              future: _days,
+                              builder: (context, s) => AttendanceCalendar(
+                                month: _month!,
+                                today: status.today,
+                                days: s.data ?? const [],
+                                upcoming: upcomingMilestones(status),
+                                onTapToday: status.attendedToday || _busy
+                                    ? null
+                                    : _stamp,
+                                loading:
+                                    s.connectionState != ConnectionState.done,
+                                failed: s.hasError,
+                                onRetry: () => _showMonth(_month!),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ..._stampSection(status),
+                            const SizedBox(height: 10),
+                            if (status.attendedToday)
+                              _adCard()
+                            else
+                              const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Text(
+                                  'ⓘ 출석하면 광고 보너스가 열려요',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    ..._stampSection(status),
-                  ],
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('닫기'),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _adBusy
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: const Text('닫기'),
+                      ),
+                    ),
                   ),
                 ],
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _adCard() {
+    final remaining =
+        ((_offer?.remaining ?? 2) - (ads.testing ? _testViews : 0)).clamp(0, 2);
+    final done = remaining == 0 && _offer?.enabled == true;
+    final title = _adBusy
+        ? '광고 준비 중'
+        : done
+        ? '오늘은 다 받았어요'
+        : switch (_adResult) {
+            AttendanceAdResult.completed =>
+              ads.testing
+                  ? '테스트 시청 완료'
+                  : '+${pointAmount(_offer?.points ?? 20)}P 받았어요',
+            AttendanceAdResult.cancelled => '끝까지 봐야 받아요',
+            AttendanceAdResult.unavailable => '지금은 광고가 없어요',
+            AttendanceAdResult.pending => '보상을 확인하고 있어요',
+            _ => '광고 보고 +${pointAmount(_offer?.points ?? 20)}P',
+          };
+    final subtitle = _adBusy
+        ? '잠시만 기다려 주세요'
+        : done
+        ? '내일 다시 만나요'
+        : _adResult == AttendanceAdResult.cancelled
+        ? '포인트는 그대로예요'
+        : _adResult == AttendanceAdResult.unavailable
+        ? '잠시 뒤 다시 시도해 주세요'
+        : '원할 때만 · 오늘 $remaining번';
+    return Container(
+      key: const ValueKey('attendance-ad-card'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE2F2FB), Color(0xFFE8EEFC)],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (_adBusy)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton(
+                  onPressed: done
+                      ? null
+                      : _offer == null
+                      ? _loadAdOffer
+                      : _offer!.enabled
+                      ? _watchAd
+                      : null,
+                  child: Text(
+                    done
+                        ? '내일'
+                        : _offer == null
+                        ? '다시'
+                        : '▶ 보기',
+                  ),
+                ),
+            ],
+          ),
+          if (ads.testing)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                '테스트 광고 · 실제 포인트는 지급되지 않아요',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -182,7 +405,16 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Icon(status.attendedToday ? Icons.check_circle : Icons.approval),
-      label: Text(status.attendedToday ? '오늘 출석 완료!' : '출석도장 찍기'),
+      label: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 10,
+        children: [
+          Text(status.attendedToday ? '오늘 출석 완료!' : '출석하기'),
+          Text(
+            '+${pointAmount(status.attendedToday ? status.todayPoints ?? 1 : attendanceMilestonePoints[status.streak + 1] ?? attendanceBasePoints)}P',
+          ),
+        ],
+      ),
     ),
   ];
 }
@@ -195,7 +427,7 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.bodyLarge?.copyWith(
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: FontWeight.w700,
       color: AppColors.textPrimary,
     );
@@ -204,39 +436,66 @@ class _Summary extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.tint,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFD2EDF8), Color(0xFFE1E6FE)],
+        ),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Line 1: streak and points side by side (wraps on narrow phones).
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 14,
+          Row(
             children: [
-              Text(
-                status.streak > 0
-                    ? '🔥 ${status.streak}일 연속 출석 달성!'
-                    : '🔥 연속 출석을 시작해요',
-                style: style,
+              const Icon(
+                Icons.local_fire_department_rounded,
+                color: AppColors.primary,
               ),
-              Text(
-                '🪙 ${status.balance} P',
-                style: style?.copyWith(color: AppColors.blueText),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  status.streak > 0 ? '${status.streak}일째 연속' : '오늘 출석해요',
+                  style: style,
+                ),
               ),
+              Text('${pointAmount(status.balance)} P', style: style),
             ],
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (var i = 1; i <= 7; i++)
+                Expanded(
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: status.streak >= i
+                            ? AppColors.primary
+                            : Colors.white,
+                        child: Icon(
+                          i == 7 ? Icons.star_rounded : Icons.pets_rounded,
+                          size: 15,
+                          color: status.streak >= i
+                              ? Colors.white
+                              : i == 7
+                              ? Colors.orange
+                              : const Color(0xFFD4E1EA),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
           // Line 2: next star day.
           if (next != null) ...[
             const SizedBox(height: 6),
             Text(
               next.stampsNeeded == 1 && !status.attendedToday
-                  ? '오늘 출석하면 ⭐ ${next.streak}일 연속 달성! '
-                        '(${next.points}포인트)'
-                  : '앞으로 ${next.stampsNeeded}번 더 출석하면 '
-                        '${next.date.month}월 ${next.date.day}일에 '
-                        '⭐ ${next.streak}일 연속 달성! (${next.points}포인트)',
+                  ? '오늘 ${next.streak}일 연속 달성 · ${pointAmount(next.points)}P'
+                  : '${next.streak}일 연속까지 ${next.stampsNeeded}일 · ${pointAmount(next.points)}P',
               textAlign: TextAlign.center,
               style: style?.copyWith(color: AppColors.rewardText),
             ),
@@ -438,7 +697,7 @@ class _DayCell extends StatelessWidget {
         ? '$day일, 계속 출석하면 ${upcoming!.streak}일 연속 달성 예정'
         : '$day일';
     final cell = Container(
-      height: 60,
+      height: 44,
       margin: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: milestone
@@ -469,7 +728,7 @@ class _DayCell extends StatelessWidget {
             if (milestone)
               const Icon(Icons.star, size: 20, color: AppColors.rewardText)
             else if (attended)
-              const Icon(Icons.check_circle, size: 20, color: AppColors.primary)
+              const Icon(Icons.pets_rounded, size: 20, color: AppColors.primary)
             else if (future)
               const Icon(
                 Icons.star_border,

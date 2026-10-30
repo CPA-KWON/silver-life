@@ -1,3 +1,5 @@
+import '../core/points.dart';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,7 +28,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfileState extends State<ProfilePage> {
   late Future<Map<String, dynamic>> data = load();
   late Future<ActivityData> agency =
-      (widget.activityRepository ?? ActivityRepository()).home();
+      (widget.activityRepository ?? ActivityRepository()).homeSummary();
   late Future<Map<String, dynamic>?> access = loadAccess();
   Future<Map<String, dynamic>?> loadAccess() async {
     try {
@@ -77,7 +79,8 @@ class _ProfileState extends State<ProfilePage> {
       setState(() {
         data = load();
         access = loadAccess();
-        agency = (widget.activityRepository ?? ActivityRepository()).home();
+        agency = (widget.activityRepository ?? ActivityRepository())
+            .homeSummary();
       });
     }
   }
@@ -184,7 +187,9 @@ class _ProfileState extends State<ProfilePage> {
                       Column(
                         children: [
                           Text(
-                            '${AttendanceScope.maybeOf(c)?.status?.balance ?? '—'}',
+                            pointAmount(
+                              AttendanceScope.maybeOf(c)?.status?.balance,
+                            ),
                             style: petText(23, color: PetColors.orange),
                           ),
                           Text(
@@ -293,7 +298,7 @@ class _ProfileState extends State<ProfilePage> {
                           agency =
                               (widget.activityRepository ??
                                       ActivityRepository())
-                                  .home();
+                                  .homeSummary();
                         }),
                         child: const Text('기관 권한 확인 다시 시도'),
                       );

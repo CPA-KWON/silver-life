@@ -81,13 +81,13 @@ void main() {
           .toList();
       expect(
         calls.any(
-          (u) => u.queryParameters['facilities.region_sigungu'] == 'eq.강남구',
+          (u) => u.queryParameters['facilities.region_sigungu'] == 'eq.동작구',
         ),
         true,
       );
       expect(
         calls.any(
-          (u) => u.queryParameters['profiles.region_sigungu'] == 'eq.강남구',
+          (u) => u.queryParameters['profiles.region_sigungu'] == 'eq.동작구',
         ),
         true,
       );

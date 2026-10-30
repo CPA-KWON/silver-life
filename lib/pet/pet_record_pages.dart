@@ -1,4 +1,9 @@
+import '../core/points.dart';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
+import 'pet_onboarding.dart';
 
 import 'pet_design.dart';
 import 'pet_preview_controller.dart';
@@ -294,7 +299,7 @@ class PetRecordsPage extends StatelessWidget {
                         ),
                         if (pet.logs[i].points > 0)
                           PetPill(
-                            '+ ${pet.logs[i].points} P',
+                            '+ ${pointAmount(pet.logs[i].points)} P',
                             color: PetColors.yellow,
                             ink: const Color(0xFF916100),
                           ),
@@ -336,10 +341,30 @@ class PetRecordsPage extends StatelessWidget {
                 ),
               ),
             ],
+            TextButton(
+              onPressed: () => petDialog(
+                c,
+                title: '반려동물 정보',
+                message:
+                    '${pet.name} · ${pet.isCat ? '고양이' : '강아지'} · ${pet.stageName}\n입양 후 ${pet.daysTogether}일째 함께하고 있어요.\n반려동물 종류가 늘어나도 기존 성장·포인트·옷과 기록은 유지돼요.',
+              ),
+              child: const Text('반려동물 정보'),
+            ),
             if (pet.isPreview)
               TextButton(
                 onPressed: () => tools(c),
                 child: const Text('디자인 미리보기 도구'),
+              ),
+            if (kDebugMode && !pet.isPreview)
+              TextButton(
+                onPressed: () => Navigator.of(c).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PetAdoptionPage(
+                      pet: PetPreviewController()..ready = true,
+                    ),
+                  ),
+                ),
+                child: const Text('확장 목업 미리보기 · 실제 데이터 변경 없음'),
               ),
             const SizedBox(height: 24),
           ],

@@ -28,9 +28,15 @@ class MainActivity : FlutterActivity() {
                         "accuracy" to (if(same && prefs.contains("accuracy")) prefs.getFloat("accuracy",0f).toDouble() else null),
                         "location_at" to (if(same) prefs.getLong("location_at",0) else 0)))
                 }
-                "start", "pause", "resume", "stop" -> {
+                "start", "pause", "resume", "stop", "configure" -> {
                     val action = call.method
                     val intent = Intent(this, PetWalkService::class.java).setAction(action)
+                    if (action == "configure") {
+                        val owner = call.argument<String>("owner") ?: ""
+                        if (prefs.getString("owner", "") != owner) { result.success(null); return@setMethodCallHandler }
+                    }
+                    intent.putExtra("return_at", (call.argument<Number>("return_at")?.toLong() ?: 0L))
+                    intent.putExtra("pet_name", call.argument<String>("pet_name") ?: "반려동물")
                     if (action == "start") {
                         val hasActivity = Build.VERSION.SDK_INT < 29 || checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
                         val hasLocation = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

@@ -1,7 +1,10 @@
+import '../core/points.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Streak day → total points paid that day (see supabase/attendance_points.sql).
-const attendanceMilestonePoints = {7: 3, 14: 5, 30: 10};
+const attendanceBasePoints = 5;
+const attendanceMilestonePoints = {7: 15, 14: 25, 30: 50};
 final attendanceMilestones = attendanceMilestonePoints.keys.toSet();
 
 /// The attendance date is the KST calendar date decided by the server
@@ -67,8 +70,8 @@ class AttendanceDay {
 /// Success text shown after a stamp, by the streak the server returned.
 String attendanceRewardMessage(int streak, int points) =>
     attendanceMilestones.contains(streak)
-    ? '🎉 $streak일 연속 출석 달성! $points포인트 획득!'
-    : '출석 완료! $points포인트를 획득했어요!';
+    ? '🎉 $streak일 연속 출석 달성! ${pointAmount(points)}포인트 획득!'
+    : '출석 완료! ${pointAmount(points)}포인트를 획득했어요!';
 
 /// A future day that pays a streak reward if the user stamps every day.
 class UpcomingMilestone {

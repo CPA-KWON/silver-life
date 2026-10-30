@@ -26,8 +26,8 @@ await test('fresh status has nothing attended',()=>as(user,async()=>{const s=(aw
 await test('client check-in uses server KST date once',()=>as(user,async()=>{
   const first=(await q('select attendance_check_in() r'))[0].r;
   const second=(await q('select attendance_check_in() r'))[0].r;
-  assert.equal(first.already,false);assert.equal(first.points,1);
-  assert.equal(second.already,true);assert.equal(second.balance,1);
+  assert.equal(first.already,false);assert.equal(first.points,5);
+  assert.equal(second.already,true);assert.equal(second.balance,5);
   const kst=(await q(`select (now() at time zone 'Asia/Seoul')::date::text d`))[0].d;
   assert.equal(first.today,kst);
 }));
@@ -35,7 +35,7 @@ await db.exec(`delete from point_ledger;delete from attendance_days;delete from 
 const start='2026-01-01';
 await test('streak rewards replace base points on days 7, 14 and 30 across months',async()=>{
   const got=[];for(let i=0;i<31;i++)got.push((await checkIn(plus(start,i))).points);
-  const expected=got.map((_,i)=>({7:3,14:5,30:10})[i+1]??1);
+  const expected=got.map((_,i)=>({7:15,14:25,30:50})[i+1]??5);
   assert.deepEqual(got,expected);
   const w=await wallet();assert.equal(w.current_streak,31);
   const total=expected.reduce((a,b)=>a+b,0);assert.equal(w.balance,total);assert.equal(w.total_earned,total);
@@ -43,7 +43,7 @@ await test('streak rewards replace base points on days 7, 14 and 30 across month
   assert.equal((await q(`select sum(amount)::int s from point_ledger`))[0].s,total);
 });
 await test('missing a day resets the streak to 1',async()=>{
-  const r=await checkIn(plus(start,32));assert.equal(r.streak,1);assert.equal(r.points,1);
+  const r=await checkIn(plus(start,32));assert.equal(r.streak,1);assert.equal(r.points,5);
 });
 await test('status shows broken streak as 0 after a missed day',async()=>{
   const s=(await q(`select attendance_status_for('${user}','${plus(start,34)}') s`))[0].s;

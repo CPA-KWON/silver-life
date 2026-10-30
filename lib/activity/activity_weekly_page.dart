@@ -1,3 +1,5 @@
+import '../core/points.dart';
+
 import 'package:flutter/material.dart';
 
 import '../attendance/attendance_controller.dart';
@@ -29,7 +31,7 @@ class ActivityWeeklyMissionsPage extends StatelessWidget {
         action: '콩이 보러 가기',
         secondary: '닫기',
         rows: [
-          ('받은 포인트', '+${r.points} P'),
+          ('받은 포인트', '+${pointAmount(r.points)} P'),
           ('성장 경험치', '+${r.experience} EXP'),
         ],
       );
@@ -118,7 +120,7 @@ class ActivityWeeklyMissionsPage extends StatelessWidget {
                               runSpacing: 5,
                               children: [
                                 PetPill(
-                                  '+ $points P',
+                                  '+ ${pointAmount(points)} P',
                                   color: PetColors.yellow,
                                   ink: PetColors.orange,
                                 ),
@@ -308,7 +310,7 @@ class ActivityWeeklyMissionsPage extends StatelessWidget {
             ),
           )
         : PetPill(
-            i == 1 ? '+ 100 P' : '+ ${i == 0 ? 10 : 30} EXP',
+            i == 1 ? '+ 10,000 P' : '+ ${i == 0 ? 10 : 30} EXP',
             color: i == 1 ? PetColors.yellow : PetColors.lavender,
             ink: i == 1 ? PetColors.orange : PetColors.purple,
             fontSize: 13,

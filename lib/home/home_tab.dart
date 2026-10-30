@@ -5,12 +5,14 @@ import '../activity/activity_repository.dart';
 import '../activity/activity_hub_page.dart';
 import '../activity/activity_detail_page.dart';
 import '../activity/activity_widgets.dart';
+import '../activity/activity_design.dart' show ActivityButton;
 import '../attendance/attendance_controller.dart';
 import '../attendance/attendance_dialog.dart';
 import 'home_widgets.dart';
 import '../community/post_detail_page.dart';
 import '../community/community_page.dart';
 import '../core/meetup_category.dart';
+import '../core/neighborhood_region.dart';
 import '../facility/nearby_facilities_page.dart';
 import '../meetup/meetup_page.dart';
 import '../meetup/my_meetups_page.dart';
@@ -40,8 +42,10 @@ class HomeTab extends StatefulWidget {
     this.refreshListenable,
     this.noticeRepository,
     this.onAttendanceChanged,
+    this.regionResolver,
   });
   final ActivityRepository? activityRepository;
+  final NeighborhoodRegionResolver? regionResolver;
   final Future<void> Function()? onAttendanceChanged;
   final NoticeRepository? noticeRepository;
   final PetPreviewController? petPreview;
@@ -56,21 +60,34 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   late final repo = widget.activityRepository ?? ActivityRepository();
   late final notices = widget.noticeRepository ?? NoticeRepository();
-  late Future<HomeData> future = load();
+  Future<HomeData>? _pendingLoad;
+  DateTime? _loadedAt;
+  late Future<HomeData> future = _fetch();
+  Future<HomeData> _fetch() =>
+      _pendingLoad ??= load().whenComplete(() => _pendingLoad = null);
+  void _onTabReturn() {
+    if (_loadedAt == null ||
+        DateTime.now().difference(_loadedAt!) > const Duration(seconds: 30)) {
+      reload();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    widget.refreshListenable?.addListener(reload);
+    widget.refreshListenable?.addListener(_onTabReturn);
   }
 
   @override
   void dispose() {
-    widget.refreshListenable?.removeListener(reload);
+    widget.refreshListenable?.removeListener(_onTabReturn);
     super.dispose();
   }
 
   Future<HomeData> load() async {
     final client = Supabase.instance.client;
+    final regionFuture =
+        (widget.regionResolver ?? NeighborhoodRegionResolver.shared).resolve();
     final profile = await client
         .from('profiles')
         .select('nickname, region_sido, region_sigungu')
@@ -78,26 +95,33 @@ class _HomeTabState extends State<HomeTab> {
         .single()
         .timeout(const Duration(seconds: 10));
     final activity = repo
-        .home()
+        .homeSummary()
         .timeout(const Duration(seconds: 20))
         .then<ActivityData?>((v) => v, onError: (_) => null);
-    final news = loadNews(profile)
+    final region = await regionFuture;
+    final browsingRegion = <String, dynamic>{
+      'region_sido': region.sido,
+      'region_sigungu': region.sigungu,
+    };
+    final news = loadNews(browsingRegion)
         .timeout(const Duration(seconds: 12))
         .then<List<ActivityData>?>((v) => v, onError: (_) => null);
-    final meetups = loadMeetups(profile)
+    final meetups = loadMeetups(browsingRegion)
         .timeout(const Duration(seconds: 12))
         .then<List<ActivityData>?>((v) => v, onError: (_) => null);
     final official = notices
-        .feed()
+        .homeFeed()
         .timeout(const Duration(seconds: 12))
         .then<List<NoticeData>?>((v) => v, onError: (_) => null);
-    return (
+    final result = (
       nickname: profile['nickname'] as String,
       activity: await activity,
       meetups: await meetups,
       news: await news,
       notices: await official,
     );
+    _loadedAt = DateTime.now();
+    return result;
   }
 
   Future<List<ActivityData>> loadMeetups(Map<String, dynamic> profile) async {
@@ -158,7 +182,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> reload() async {
     if (!mounted) return;
-    final next = load();
+    final next = _fetch();
     setState(() {
       future = next;
     });
@@ -304,7 +328,7 @@ class _HomeTabState extends State<HomeTab> {
                 const SizedBox(height: 3),
                 Text(
                   official
-                      ? '기관 공지 · ${n['org_name']}'
+                      ? '${n['is_public_source'] == true ? '공개 공지' : '기관 공지'} · ${n['org_name']}'
                       : '지역 커뮤니티 · ${n['category']}',
                   style: petText(
                     14,
@@ -472,6 +496,44 @@ class _HomeTabState extends State<HomeTab> {
             onProfile: () => open(ProfilePage(activityRepository: repo)),
             onCalendar: attendanceCalendar,
           ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final columns = MediaQuery.textScalerOf(context).scale(1) > 1.4
+                    ? 1
+                    : 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final item in [
+                      (
+                        '프로그램 찾기',
+                        Icons.search_rounded,
+                        ActivitySection.programs,
+                      ),
+                      (
+                        '나의 활동',
+                        Icons.event_available_outlined,
+                        ActivitySection.mine,
+                      ),
+                    ])
+                      SizedBox(
+                        width: columns == 1 ? width : (width - 10) / 2,
+                        child: ActivityButton(
+                          item.$1,
+                          icon: item.$2,
+                          light: true,
+                          onTap: () => section(item.$3),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
           HomeAttendanceCard(
             onCalendar: attendanceCalendar,
             onStamped: widget.onAttendanceChanged,
@@ -520,6 +582,8 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           title('동네 소식'),
+          MyInstitutionNoticeCard(repository: notices, onChanged: reload),
+          const SizedBox(height: 12),
           HomeCard(
             padding: 18,
             child: Column(
@@ -612,7 +676,7 @@ class _HomeTabState extends State<HomeTab> {
           FutureBuilder<HomeData>(
             future: future,
             builder: (c, s) {
-              if (s.connectionState != ConnectionState.done) {
+              if (!s.hasData && s.connectionState != ConnectionState.done) {
                 return const Padding(
                   padding: EdgeInsets.all(32),
                   child: Center(child: CircularProgressIndicator()),

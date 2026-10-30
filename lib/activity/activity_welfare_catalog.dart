@@ -3,11 +3,16 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../facility/welfare_programs.dart';
+import '../core/public_source.dart';
+import '../facility/welfare_program_status.dart';
 
 /// Descriptive data is kept separate from RPC-enrollable activities. No fake
 /// dates, capacity availability, prices, enrollment IDs or rewards are created.
 String welfareActivityCategory(Map<String, dynamic> p) {
   String? classify(String text) {
+    if (['건강·운동', '문화·취미', '배움·디지털', '생활·기술', '지역·이야기'].contains(text)) {
+      return text;
+    }
     if (RegExp('운동|댄스|요가|호흡|체력|안마|진료|건강|복약|심리|마음|근력|마사지|워킹').hasMatch(text)) {
       return '건강·운동';
     }
@@ -40,6 +45,7 @@ Map<String, dynamic> welfareCatalogItem(
   final candidates = facilities
       .where(
         (f) =>
+            raw['location_is_offsite'] != true &&
             facilityNameMatches('${f['name']}', name) &&
             f['lat'] is num &&
             f['lng'] is num &&
@@ -79,16 +85,22 @@ Map<String, dynamic> welfareCatalogItem(
     'id': 'welfare:${raw['id']}',
     'source': 'welfare',
     'kind': 'activity',
+    'application_method': publicSourceUri(raw['source_url']) != null
+        ? 'external'
+        : null,
+    'source_url': raw['source_url'],
     'title': raw['title'],
     'description': raw['description'] ?? '',
     'category': welfareActivityCategory(raw),
     'source_category': raw['category'],
     'org_name': name,
-    'place_name': name,
+    'place_name': raw['location_is_offsite'] == true
+        ? raw['place'] ?? name
+        : name,
     'lat': lat,
     'lng': lng,
     'distance_km': distance,
-    'telephone': facility?['telephone'] ?? '',
+    'telephone': raw['contact_phone'] ?? facility?['telephone'] ?? '',
     'address': facility?['address'] ?? raw['place'] ?? '',
     'display_schedule': raw['schedule'] ?? raw['hours'] ?? '일정은 기관에 문의해 주세요',
     'display_fee':
@@ -105,7 +117,10 @@ Map<String, dynamic> welfareCatalogItem(
 class ActivityWelfareCatalog {
   ActivityWelfareCatalog(this.client);
   final SupabaseClient client;
-  Future<List<Map<String, dynamic>>> load(Map<String, dynamic>? pref) async {
+  Future<List<Map<String, dynamic>>> load(
+    Map<String, dynamic>? pref, {
+    bool includeClosed = false,
+  }) async {
     final raw = <Map<String, dynamic>>[];
     // Page the table; new centers/programs are not silently lost at the row cap.
     for (var offset = 0; ; offset += 500) {
@@ -140,7 +155,11 @@ class ActivityWelfareCatalog {
     } catch (e) {
       debugPrint('welfare facility coordinates unavailable: ${e.runtimeType}');
     }
-    return [for (final row in raw) welfareCatalogItem(row, facilities, pref)];
+    return [
+      for (final row in raw)
+        if (includeClosed || welfareProgramVisible(row))
+          welfareCatalogItem(row, facilities, pref),
+    ];
   }
 }
 
@@ -149,6 +168,11 @@ bool welfareMatchesPreferences(
   Map<String, dynamic> pref, {
   bool includeUnlocated = false,
 }) {
+  if (!welfareProgramVisible(
+    Map<String, dynamic>.from(p['raw_program'] as Map? ?? {}),
+  )) {
+    return false;
+  }
   if (!(pref['interests'] as List? ?? []).contains(p['category'])) return false;
   final distance = p['distance_km'] as num?;
   if (distance == null) return includeUnlocated;

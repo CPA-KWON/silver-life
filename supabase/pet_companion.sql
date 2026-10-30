@@ -231,7 +231,7 @@ begin
     if daily.ads>=2 then raise exception '오늘 광고 보상을 모두 받았어요.';end if;
     update public.pet_daily set ads=ads+1 where user_id=u and day=d;
     update public.pet_ad_sessions set consumed=true where id=ad.id;
-    ref:='ad:'||ad.id;kind:='ad';title:='광고 보상을 받았어요';delta:=30;
+    ref:='ad:'||ad.id;kind:='ad';title:='광고 보상을 받았어요';delta:=20;
    end if;
   else raise exception '지원하지 않는 작업이에요.';end case;
  end if;

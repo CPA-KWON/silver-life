@@ -1,10 +1,11 @@
+import '../core/points.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import 'pet_design.dart';
 import 'pet_preview_controller.dart';
-import 'pet_character.dart';
 import 'pet_care_pages.dart';
 import 'pet_growth_pages.dart';
 import 'pet_walk_page.dart';
@@ -54,11 +55,11 @@ class _PetHomeState extends State<PetHomePage> {
           context,
           title: '${food.name}을 살까요?',
           message: '사고 나면 바로 먹여줄 수 있어요.',
-          emblem: FoodDrawing(food.id),
+          emblem: FoodDrawing(food.id, isCat: pet.isCat),
           rows: [
-            ('가격', '${food.price}P'),
-            ('지금 포인트', '${petNumber(pet.points)}P'),
-            ('구매 후 남는 포인트', '${petNumber(pet.points - food.price)}P'),
+            ('가격', '${pointAmount(food.price)}P'),
+            ('지금 포인트', '${pointAmount(pet.points)}P'),
+            ('구매 후 남는 포인트', '${pointAmount(pet.points - food.price)}P'),
           ],
           action: '구매하기',
           secondary: '취소',
@@ -91,11 +92,15 @@ class _PetHomeState extends State<PetHomePage> {
         context,
         title: '${food.name}${food.id == 'food' ? '를' : '을'} 줬어요',
         message: '${pet.name}가 맛있게 먹었어요.',
-        emblem: FoodDrawing(food.id),
+        emblem: FoodDrawing(food.id, isCat: pet.isCat),
         rows: [
           ('배부름', '+${food.fullness}칸'),
           ('성장 경험치', '+${result.experience} EXP'),
-          if (food.id == 'sweet') ('남은 고구마 간식', '${pet.snacks['sweet'] ?? 0}개'),
+          if (food.id == 'sweet')
+            (
+              pet.isCat ? '남은 촉촉 참치' : '남은 고구마 간식',
+              '${pet.snacks['sweet'] ?? 0}개',
+            ),
         ],
       );
     } catch (e) {
@@ -125,39 +130,6 @@ class _PetHomeState extends State<PetHomePage> {
     }
   }
 
-  Future<void> rotate() => showModalBottomSheet<void>(
-    context: petModalContext(context),
-    useRootNavigator: false,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-    ),
-    builder: (c) => SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('좌우로 돌려보세요', style: petText(24)),
-          const SizedBox(height: 8),
-          Text(
-            '실제 입체 보기예요. 원본 이미지와 외형 차이가 있어요.',
-            style: petText(
-              16,
-              color: PetColors.secondary,
-              weight: FontWeight.w500,
-            ),
-          ),
-          PetCharacter(pet: widget.pet, height: 300),
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
-    ),
-  );
   @override
   Widget build(BuildContext c) => ListenableBuilder(
     listenable: widget.pet,
@@ -178,7 +150,16 @@ class _PetHomeState extends State<PetHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            PetHeader(pet.name ?? '콩이', pet: pet, stage: pet.stageName),
+            PetHeader(
+              pet.name ?? pet.defaultName,
+              pet: pet,
+              stage: pet.stageName,
+            ),
+            if (pet.isPreview)
+              Text(
+                '디자인 미리보기 · 실제 데이터는 변경되지 않아요',
+                style: petText(14, color: PetColors.muted),
+              ),
             const SizedBox(height: 12),
             PetSpeech(bubble),
             LayoutBuilder(
@@ -271,6 +252,8 @@ class _PetHomeState extends State<PetHomePage> {
                     children: [
                       PetPhoto(
                         pet: pet,
+                        live3d: true,
+                        interactive: true,
                         mood:
                             phase ??
                             (greeting &&
@@ -299,6 +282,8 @@ class _PetHomeState extends State<PetHomePage> {
                         right: 36,
                         child: PetPhoto(
                           pet: pet,
+                          live3d: true,
+                          interactive: true,
                           mood:
                               phase ??
                               (greeting &&
@@ -339,21 +324,11 @@ class _PetHomeState extends State<PetHomePage> {
             ),
             if (phase == null)
               Center(
-                child: TextButton.icon(
-                  onPressed: rotate,
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    shape: const StadiumBorder(),
-                  ),
-                  icon: const Icon(Icons.rotate_right, size: 22),
-                  label: Text(
-                    '좌우로 돌리기',
-                    style: petText(16, color: PetColors.secondary),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    '캐릭터를 좌우로 밀어 돌려보세요',
+                    style: petText(15, color: PetColors.secondary),
                   ),
                 ),
               )

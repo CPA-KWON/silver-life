@@ -1,3 +1,5 @@
+import '../core/points.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -178,6 +180,15 @@ class _ActivityHubState extends State<ActivityHubPage> {
                 light: true,
                 icon: Icons.apps_outlined,
                 onTap: () => section(ActivitySection.programs),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () =>
+                    open(SavedProgramsPage(repository: widget.repository)),
+                icon: const Icon(Icons.favorite_border_rounded),
+                label: const Text('관심 프로그램'),
               ),
             ),
             const SizedBox(height: 14),

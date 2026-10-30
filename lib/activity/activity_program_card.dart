@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../pet/pet_design.dart';
 import 'activity_design.dart';
 import 'activity_repository.dart';
+import '../core/public_source.dart';
 
 Color activityCategoryColor(String? category) => switch (category) {
   '건강·운동' => const Color(0xFF26915C),
@@ -202,8 +203,10 @@ class ActivityListingCard extends StatelessWidget {
                 ink: color,
                 fontSize: 13,
               ),
-              const PetPill(
-                '전화·방문 신청',
+              PetPill(
+                publicSourceUri(p['source_url']) != null
+                    ? '기관 홈페이지 신청'
+                    : '전화·방문 신청',
                 color: PetColors.mint,
                 ink: PetColors.green,
                 fontSize: 13,
@@ -219,6 +222,11 @@ class ActivityListingCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _line(Icons.calendar_month_outlined, '${p['display_schedule']}'),
+          if ((p['raw_program'] as Map?)?['registration_ends_on'] != null)
+            _line(
+              Icons.event_available,
+              '접수 ${p['raw_program']['registration_ends_on']}까지 · 잔여석 원문 확인',
+            ),
           if ((p['raw_program'] as Map?)?['target'] != null)
             _line(Icons.people_outline, '${p['raw_program']['target']}'),
           if (p['distance_km'] is num)

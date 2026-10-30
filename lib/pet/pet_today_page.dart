@@ -1,3 +1,5 @@
+import '../core/points.dart';
+
 import 'package:flutter/material.dart';
 
 import '../activity/activity_hub_page.dart';
@@ -59,9 +61,9 @@ class _TodayState extends State<PetTodayPage> {
           size: 42,
         ),
         rows: [
-          ('받은 포인트', '+ ${result.points} P'),
+          ('받은 포인트', '+ ${pointAmount(result.points)} P'),
           ('성장 경험치', '+ ${result.experience} EXP'),
-          ('지금 포인트', '${petNumber(pet.points)}P'),
+          ('지금 포인트', '${pointAmount(pet.points)}P'),
         ],
         action: '콩이에게 돌아가기',
         secondary: '다른 활동 보기',
@@ -103,8 +105,8 @@ class _TodayState extends State<PetTodayPage> {
             color: PetColors.purple,
           ),
           rows: [
-            ('광고 보상', '+${result.points}P'),
-            ('지금 포인트', '${petNumber(widget.pet.points)}P'),
+            ('광고 보상', '+${pointAmount(result.points)}P'),
+            ('지금 포인트', '${pointAmount(widget.pet.points)}P'),
           ],
         );
       }
@@ -217,7 +219,7 @@ class _TodayState extends State<PetTodayPage> {
                                   runSpacing: 5,
                                   children: [
                                     PetPill(
-                                      '+ ${pet.todayPoints} P',
+                                      '+ ${pointAmount(pet.todayPoints)} P',
                                       color: PetColors.yellow,
                                       ink: const Color(0xFF946100),
                                     ),
@@ -396,58 +398,60 @@ class _TodayState extends State<PetTodayPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text('광고 보상', style: petText(22)),
-                        Text(
-                          '원할 때만 · 오늘 ${2 - pet.ads}회 남음',
-                          style: petText(14, color: PetColors.muted),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    PetCard(
-                      padding: 16,
-                      child: Row(
+                    if (pet.isPreview || pet.adsEnabled) ...[
+                      Wrap(
+                        spacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          _badge(
-                            Icons.play_arrow_rounded,
-                            PetColors.yellow,
-                            PetColors.orange,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('짧은 광고 보기', style: petText(19)),
-                                const SizedBox(height: 5),
-                                const PetPill(
-                                  '+ 30 P',
-                                  color: PetColors.yellow,
-                                  ink: Color(0xFF946100),
-                                ),
-                              ],
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: adLoading || pet.ads >= 2 ? null : ad,
-                            child: Text(
-                              adLoading
-                                  ? '준비 중'
-                                  : pet.ads >= 2
-                                  ? '내일 다시'
-                                  : pet.pendingAd != null
-                                  ? '보상 받기'
-                                  : '보기',
-                              style: petText(17, color: PetColors.blue),
-                            ),
+                          Text('광고 보상', style: petText(22)),
+                          Text(
+                            '원할 때만 · 오늘 ${2 - pet.ads}회 남음',
+                            style: petText(14, color: PetColors.muted),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      PetCard(
+                        padding: 16,
+                        child: Row(
+                          children: [
+                            _badge(
+                              Icons.play_arrow_rounded,
+                              PetColors.yellow,
+                              PetColors.orange,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('짧은 광고 보기', style: petText(19)),
+                                  const SizedBox(height: 5),
+                                  const PetPill(
+                                    '+ 2,000 P',
+                                    color: PetColors.yellow,
+                                    ink: Color(0xFF946100),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: adLoading || pet.ads >= 2 ? null : ad,
+                              child: Text(
+                                adLoading
+                                    ? '준비 중'
+                                    : pet.ads >= 2
+                                    ? '내일 다시'
+                                    : pet.pendingAd != null
+                                    ? '보상 받기'
+                                    : '보기',
+                                style: petText(17, color: PetColors.blue),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                   if (pet.isPreview)
                     Padding(
@@ -488,7 +492,7 @@ class _TodayState extends State<PetTodayPage> {
           ? reward('mission_reward', {'stage': i + 1})
           : petDialog(
               context,
-              title: ['출석 3일', '모임 1회 참여', '프로그램 1회 참여'][i],
+              title: ['출석 3일', '함께 활동 1회 참여', '프로그램 1회 참여'][i],
               message:
                   '${m['progress'] ?? 0}/${m['target'] ?? [3, 1, 1][i]} 완료했어요. 실제 출석과 기관의 참여 완료 기록으로 확인해요.',
             ),
@@ -523,7 +527,7 @@ class _TodayState extends State<PetTodayPage> {
               done
                   ? '받음'
                   : i == 1
-                  ? '+ 100 P'
+                  ? '+ 10,000 P'
                   : '+ ${i == 0 ? 10 : 30} EXP',
               color: done
                   ? const Color(0xFFECF1F3)
@@ -577,7 +581,7 @@ class _TodayState extends State<PetTodayPage> {
                 runSpacing: 5,
                 children: [
                   PetPill(
-                    '+ 200 P',
+                    '+ 20,000 P',
                     color: PetColors.yellow,
                     ink: Color(0xFF946100),
                   ),
