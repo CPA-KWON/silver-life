@@ -1,0 +1,75 @@
+name: Build APK
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+
+      - name: Make env file
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          NAVER_MAP_CLIENT_ID: ${{ secrets.NAVER_MAP_CLIENT_ID }}
+        run: |
+          printf '{"SUPABASE_URL":"%s","SUPABASE_ANON_KEY":"%s","NAVER_MAP_CLIENT_ID":"%s"}' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$NAVER_MAP_CLIENT_ID" > .env.json
+
+      - run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --debug --target-platform android-x64 --dart-define-from-file=.env.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: silver-life-bluestacks-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+
+  flutter-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-pub lib test
+
+      - name: Test
+        run: flutter test --no-pub --concurrency=1
+
+  database-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install --no-save @electric-sql/pglite
+
+      - name: Friends DB test
+        env:
+          PGLITE_MODULE: ${{ github.workspace }}/node_modules/@electric-sql/pglite/dist/index.js
+        run: node test/friends_database_test.mjs

@@ -3,6 +3,14 @@
 > 이 파일은 Claude Code가 작업을 시작할 때마다 자동으로 읽는 안내서입니다.
 > 프로젝트 폴더 맨 위(pubspec.yaml 파일과 같은 위치)에 두세요.
 
+## 2026-10-30 친구 추가 + 친구 체크인 공유 (코드 작성, 운영 SQL 미실행)
+
+- 사용자 요청: 친구를 추가하고, 친구가 지도의 시설 상세에서 체크인하면 다른 친구들이 볼 수 있게. 공개 방식은 사용자가 "내 체크인 공개 스위치"(2번)로 선택. 스위치 기본값은 켜짐(수락된 친구에게만).
+- `supabase/friends.sql` 신규: `friendships`, `friend_settings` 표(앱 직접 접근 불가, 함수로만) + `friend_request/respond/remove/list/share_get/share_set`, `friends_presence()`. 기존 `profiles`·`checkins` 본인만 읽기 정책은 그대로이며 함수가 수락된 친구 + 공개 켠 사람 + 최근 3시간 + 차단 아님만 돌려줌. 선행 SQL: schema, facilities_schema, integration_security, neighborhood_mockups(user_blocks), facility_mockups(facility_check_in).
+- 앱: `lib/social/friends_repository.dart`, `friends_page.dart`. 진입은 내 정보 > 내 활동 > 친구. 시설 체크인 확인창에 "친구에게 시설 이름이 보일 수 있어요" 안내 추가. 체크인 저장 방식(facility_check_in)은 변경 없음.
+- 검증: `test/friends_database_test.mjs`(PGlite 20개 통과). `test/friends_page_test.dart`는 작성만 했고 Flutter가 없는 환경이라 실행하지 못함 → 팀 PC에서 `flutter test`, `flutter analyze` 필요.
+- 운영 반영 전 필요: Supabase SQL Editor에서 friends.sql 실행. 실행 전 앱은 "친구 기능을 준비 중이에요"를 보여줌. 홈 화면 진입 카드·친구 실시간 알림·푸시는 아직 없음(체크인 읽기 정책 때문에 실시간은 일부러 쓰지 않음).
+
 ## 2026-10-29 추가·3차 목업 운영 설정 반영
 
 - docs/mockup_release_20261029.md가 최신 상태. 추가/3차 화면·사진·모임 이력·기관 인증·공지·시설 안내 설정을 운영 Supabase에 트랜잭션으로 적용했다. 과거 checkpoint의 미적용 표시는 당시 기록.
@@ -184,6 +192,8 @@ lib/ 밖의 중요한 파일
 | `point_wallets` | 포인트 지갑 (`attendance_points.sql`) | user_id, balance(보유), total_earned(누적 획득), last_attended_on, current_streak, updated_at |
 | `attendance_days` | 날짜별 출석 이력 | user_id, attended_on(한국 날짜), streak, points — 사람·날짜당 1줄 |
 | `point_ledger` | 포인트 변동 내역 | id, user_id, amount, reason(현재 attendance만), ref_date — 나중에 다른 보상·사용을 reason으로 확장 |
+| `friendships` | 친구 관계 (`friends.sql`) | id, requester_id, addressee_id, status(pending/accepted), created_at, responded_at — 한 쌍당 1줄(방향 무관). 앱은 직접 읽기·쓰기 불가, `friend_*` 함수로만 사용. 탈퇴 시 cascade |
+| `friend_settings` | 내 체크인을 친구에게 보일지 | user_id, share_presence(기본 true), updated_at — 앱은 `friend_share_get/set`으로만 사용 |
 
 - `posts.category` 값은 `자유게시판`, `건강정보`, `나눔·도움요청`, `동네모임` 4가지만 허용됩니다(DB에서 막음).
 - 회원 탈퇴는 `delete_my_account()`(`supabase/account_deletion.sql`)가 `auth.users`의 본인 줄만 지우고, 나머지 표는 on delete cascade로 같이 지워진다. 예외로 `institution_notices.created_by`는 on delete set null(공지는 남고 작성자만 비움). **새 표에 사용자 칸을 만들 땐 반드시 `on delete cascade`(또는 set null)를 붙일 것** — 안 붙이면 탈퇴가 막힌다.
