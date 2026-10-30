@@ -105,6 +105,10 @@ class FakeFriendsRepository extends FriendsRepository {
 void main() {
   final now = DateTime(2026, 10, 30, 13, 0);
   Future<FakeFriendsRepository> open(WidgetTester t) async {
+    // 목록은 보이는 부분만 그려서, 세로로 긴 화면을 써야 맨 아래 항목도 찾을 수 있다.
+    t.view.physicalSize = const Size(900, 5000);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
     final repo = FakeFriendsRepository();
     await mount(t, FriendsPage(repository: repo, now: () => now));
     return repo;
