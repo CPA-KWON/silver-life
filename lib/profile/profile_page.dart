@@ -7,6 +7,7 @@ import '../activity/activity_hub_page.dart';
 import '../activity/activity_agency_page.dart';
 import '../attendance/attendance_controller.dart';
 import '../facility/nearby_facilities_page.dart';
+import '../meetup/meetup_flowers.dart';
 import 'account_settings_page.dart';
 import 'institution_access_page.dart';
 import '../activity/saved_programs_page.dart';
@@ -237,6 +238,12 @@ class _ProfileState extends State<ProfilePage> {
                         '참여한 모임',
                         () => open(const MyMeetupsPage()),
                         color: PetColors.green,
+                      ),
+                      item(
+                        Icons.local_florist_outlined,
+                        '받은 꽃',
+                        () => open(const MyFlowersPage()),
+                        color: PetColors.pink,
                       ),
                       item(
                         Icons.favorite_border,

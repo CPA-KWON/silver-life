@@ -14,6 +14,10 @@ class FakeBackend {
   final meetupJoined = <String>{};
   int meetupOthers = 0;
   int meetupMax = 10;
+  // 고마워요 꽃: 내 포인트, 내가 보낸 '모임|받는사람', 받은 꽃 목록.
+  int flowerBalance = 3;
+  final flowersSent = <String>{};
+  final myFlowers = <Map<String, dynamic>>[];
   int accountDeletes = 0;
   int postWrites = 0, commentWrites = 0, favoriteWrites = 0, checkinWrites = 0;
   final requests = <Uri>[];
@@ -124,6 +128,9 @@ class FakeBackend {
     meetupJoined.clear();
     meetupOthers = 0;
     meetupMax = 10;
+    flowerBalance = 3;
+    flowersSent.clear();
+    myFlowers.clear();
     accountDeletes = 0;
   }
 
@@ -147,7 +154,10 @@ class FakeBackend {
       }
       return response(session);
     }
-    if (name.startsWith('meetup_') || name == 'my_meetups') {
+    if (name.startsWith('meetup_') ||
+        name == 'my_meetups' ||
+        name == 'my_flowers' ||
+        name == 'send_meetup_flower') {
       final body =
           (request.body.isEmpty ? null : jsonDecode(request.body)) as Map? ??
           {};
@@ -177,8 +187,30 @@ class FakeBackend {
                 'max_participants': meetupMax,
               },
           ]);
+        case 'my_flowers':
+          return response(myFlowers);
+        case 'send_meetup_flower':
+          if (flowerBalance < 1) return fail('포인트가 부족해요');
+          flowerBalance--;
+          flowersSent.add('$postId|${body['p_to']}');
+          return response({'balance': flowerBalance});
         case 'meetup_participation':
           if (meetup == null) return fail('모임을 찾을 수 없어요.');
+          Map<String, dynamic> flowerFields(String id, bool me) {
+            final sent = flowersSent.contains('$postId|$id');
+            final can =
+                joinedTo(meetup) &&
+                isPast(meetup) &&
+                meetup['meetup_cancelled'] != true &&
+                !me &&
+                !sent;
+            return {
+              'flowers': sent ? 1 : 0,
+              'flower_sent': sent,
+              'can_send_flower': can,
+              'user_id': can ? id : null,
+            };
+          }
           return response({
             'max_participants': meetupMax,
             'count': countOf(meetup),
@@ -190,14 +222,21 @@ class FakeBackend {
                 'nickname': isHost(meetup) ? profile['nickname'] : '모임장',
                 'is_host': true,
                 'is_me': isHost(meetup),
+                ...flowerFields('host', isHost(meetup)),
               },
               for (var i = 0; i < meetupOthers; i++)
-                {'nickname': '이웃$i', 'is_host': false, 'is_me': false},
+                {
+                  'nickname': '이웃$i',
+                  'is_host': false,
+                  'is_me': false,
+                  ...flowerFields('neighbor$i', false),
+                },
               if (!isHost(meetup) && joinedTo(meetup))
                 {
                   'nickname': profile['nickname'],
                   'is_host': false,
                   'is_me': true,
+                  ...flowerFields(user, true),
                 },
             ],
           });
