@@ -1336,7 +1336,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
       title: leaving ? '체크인을 취소할까요?' : '지금 이 시설에 계신가요?',
       message: leaving
           ? '현재 방문 표시를 지워요.'
-          : '시설 200m 안에서 현재 위치를 확인해요. 체크인은 3시간 뒤 자동으로 종료돼요.',
+          : '시설 200m 안에서 현재 위치를 확인해요. 체크인은 3시간 뒤 자동으로 종료돼요.\n친구로 수락된 분에게 이 시설 이름이 보일 수 있어요. 내 정보 > 친구에서 끌 수 있어요.',
       action: leaving ? '체크인 취소' : '체크인하기',
       icon: Icons.location_on_outlined,
     )) {

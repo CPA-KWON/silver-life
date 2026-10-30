@@ -8,6 +8,7 @@ import '../core/meetup_category.dart';
 import '../core/report.dart';
 import '../core/time_ago.dart';
 import '../activity/activity_map_page.dart';
+import '../meetup/meetup_flowers.dart';
 import '../meetup/new_meetup_page.dart';
 import '../social/neighborhood_feed.dart';
 import '../social/neighborhood_repository.dart';
@@ -574,36 +575,39 @@ class _PostState extends State<PostDetailPage> {
                           ? '확인 필요'
                           : '${p['member_count']}/${p['max_participants'] ?? 10}명',
                     ),
-                    ActivityCard(
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          if (p['participants'] is List)
-                            for (final r in p['participants'])
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  NeighborAvatar(
-                                    '${r['nickname']}',
-                                    radius: 18,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    "${r['nickname']}${r['is_host'] == true
-                                        ? ' (모임장)'
-                                        : r['is_me'] == true
-                                        ? ' (나)'
-                                        : ''}",
-                                    style: petText(16),
-                                  ),
-                                ],
-                              )
-                          else
-                            Text('참여 현황을 확인할 수 없어요', style: petText(16)),
-                        ],
+                    if (started && p['meetup_cancelled'] != true)
+                      MeetupFlowersCard(postId: widget.postId)
+                    else
+                      ActivityCard(
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            if (p['participants'] is List)
+                              for (final r in p['participants'])
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    NeighborAvatar(
+                                      '${r['nickname']}',
+                                      radius: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "${r['nickname']}${r['is_host'] == true
+                                          ? ' (모임장)'
+                                          : r['is_me'] == true
+                                          ? ' (나)'
+                                          : ''}",
+                                      style: petText(16),
+                                    ),
+                                  ],
+                                )
+                            else
+                              Text('참여 현황을 확인할 수 없어요', style: petText(16)),
+                          ],
+                        ),
                       ),
-                    ),
                   ] else
                     ActivityCard(
                       child: Column(
