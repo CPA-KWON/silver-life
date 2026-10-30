@@ -8,10 +8,10 @@ typedef FriendData = Map<String, dynamic>;
 /// 서버 함수만 부릅니다. 그래서 친구가 아닌 사람의 체크인은 어떤 경우에도
 /// 앱으로 내려오지 않습니다.
 class FriendsRepository {
-  FriendsRepository({SupabaseClient? client}) : _client = client;
-  final SupabaseClient? _client;
+  FriendsRepository({SupabaseClient? client}) : _injectedClient = client;
+  final SupabaseClient? _injectedClient;
   // 테스트에서 가짜 저장소를 쓸 때 Supabase 초기화 없이도 만들 수 있게 늦게 가져옵니다.
-  SupabaseClient get client => _client ?? Supabase.instance.client;
+  SupabaseClient get client => _injectedClient ?? Supabase.instance.client;
 
   List<FriendData> _rows(dynamic data) => [
     for (final row in data as List) Map<String, dynamic>.from(row as Map),
