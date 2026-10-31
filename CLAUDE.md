@@ -3,6 +3,14 @@
 > 이 파일은 Claude Code가 작업을 시작할 때마다 자동으로 읽는 안내서입니다.
 > 프로젝트 폴더 맨 위(pubspec.yaml 파일과 같은 위치)에 두세요.
 
+## 2026-10-31 구글 플레이 심사 대비 (최신)
+
+- 출시 빌드 스위치: `lib/core/release_flags.dart`. 출시 빌드에서 유료 구매(`ENABLE_PAID_ITEMS`로 켬), 운영 광고 단위 없는 광고 버튼, 준비 중 기능을 숨긴다. 테스트용 앱에서는 보인다.
+- 산책은 앱 화면이 켜져 있을 때만 기록(`PetWalkTracker.kt`). 다시 켜는 방법은 `docs/pet_walk_background.md`.
+- 출시 빌드는 코드 줄이기(R8) 때문에 테스트용 앱에 없던 오류가 날 수 있다(시작 시 멈춤을 `android/app/proguard-rules.pro`로 수정). **기능을 바꾸면 출시 빌드도 실행해 볼 것.**
+- 운영 SQL 실행 완료: `terms_consent.sql`, `user_reports.sql`, `friend_privacy_default.sql`. `friends.sql`, `pet_companion.sql`을 다시 실행하면 안 된다(친구 공개 기본값과 포인트 사유 `flower`가 되돌아간다).
+- 제출 전 남은 일: 팀 서명 키로 AAB 빌드(지금 PC에 키 없음), 출시 빌드의 지도·사진·반려동물 화면과 실물 폰 걸음 수 확인, `AD_ID` 권한 결정, 알림 스위치 실제 동작 확인, 약관·방침 법률 검토, 개인정보처리방침 공개 주소. 답변표는 `docs/play_console_answers.md`.
+
 ## 2026-10-31 '내 복지관' 목업 반영 + 최신 main(친구·꽃) 통합 (최신)
 
 - 디자이너 목업 `~/Downloads/내복지관_목업`(B01–B35)대로 구현. 공통 부품 `lib/notices/notice_design.dart`, 화면 `notice_pages.dart`(공지 상세·소식 목록·홈 카드·복지관 고르기). 기관 담당자용 공지 관리/작성 화면은 그대로.
@@ -197,6 +205,8 @@ lib/ 밖의 중요한 파일
 | `reports` | 게시글·모임·댓글 신고 | id, reporter_id, post_id 또는 comment_id(둘 중 하나만), reason(욕설·비방/광고/사기 의심/기타), created_at — 같은 사람이 같은 대상 1번만 |
 | `meetup_participants` | 동네모임 참여자 (`meetup_participation.sql`) | post_id, user_id, joined_at — 모임장은 모임 만들 때 자동 포함. 앱은 직접 읽기·쓰기 불가, `meetup_join`/`meetup_leave`/`meetup_participation`/`my_meetups` 함수로만 사용. 닉네임은 public_profiles에서만 |
 | `meetup_flowers` | 고마워요 꽃 (`flower_gift.sql`) | post_id, sender_id, recipient_id, created_at — 모임·보낸 사람·받는 사람당 1번. 앱은 직접 읽기·쓰기 불가, `send_meetup_flower`/`my_flowers`/`meetup_participation` 함수로만 사용. 꽃 1송이에 보내는 사람 서버 1단위(앱 표시 100P) 차감(`point_ledger` reason `flower`), 상대에게 포인트는 가지 않음. 모임 글·계정이 지워지면 꽃 기록도 지워지고 환불 없음 |
+| `user_consents` | 약관·개인정보 동의 기록 (`terms_consent.sql`) | user_id, document(terms/privacy), version, agreed_at — 가입 시 트리거가 기록, 기존 회원은 첫 글·댓글·모임 때 `accept_terms`. 앱은 함수로만 사용 |
+| `user_reports` | 사용자 신고 (`user_reports.sql`) | reporter_id, reported_id, reason — 한 사람당 1번. 자동 조치 없음. 팀은 대시보드 `user_report_summary`에서 확인. 앱은 `report_user`(닉네임)로만 사용 |
 | `welfare_programs` | 복지관 정기 프로그램 (안내용, 신청은 전화·방문) | facility_name, title, category, schedule, target, fee, capacity 등 — 원본 표 `welfare_programs (sangdo)`, `welfare_programs (heuksuk)`, `welfare_program_dongjak`(칸 이름이 달라 SQL에서 변환, 어르신께 잘못 안내될 수 있는 19줄과 heuksuk 3번은 SQL에서 id로 제외), 새 시설용 `welfare_programs (others)`(`시설명` 칸 필수, 양식 `docs/welfare_programs_template.csv`)에서 `supabase/welfare_programs.sql`로 동기화(추가·수정·삭제 반영, 기존 id 유지). 로그인한 사람만 읽기. 시설 상세 화면이 시설 **이름**으로 연결(띄어쓰기·"어르신"·"노인"·"시립" 등은 빼고 비교) |
 | `point_wallets` | 포인트 지갑 (`attendance_points.sql`) | user_id, balance(보유), total_earned(누적 획득), last_attended_on, current_streak, updated_at |
 | `attendance_days` | 날짜별 출석 이력 | user_id, attended_on(한국 날짜), streak, points — 사람·날짜당 1줄 |
