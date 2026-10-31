@@ -6,6 +6,7 @@ import '../facility/facility_search_page.dart';
 import '../facility/facility_flow.dart';
 import '../facility/naver_local_search.dart';
 import '../core/meetup_category.dart';
+import '../core/terms_gate.dart';
 import 'meetup_place_sheet.dart';
 import '../ui/neighborhood_design.dart';
 import '../app_theme.dart';
@@ -151,6 +152,8 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
           .showSnackBar(const SnackBar(content: Text('미래의 모임 시간을 선택해주세요.')));
       return;
     }
+    if (!_isEditing && !await ensureTermsAccepted(context)) return;
+    if (!mounted) return;
     setState(() => _isSaving = true);
     try {
       final client = Supabase.instance.client;

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../ui/neighborhood_design.dart';
 import '../core/meetup_category.dart';
 import '../core/report.dart';
+import '../core/terms_gate.dart';
 import '../core/time_ago.dart';
 import '../activity/activity_map_page.dart';
 import '../meetup/meetup_flowers.dart';
@@ -192,6 +193,7 @@ class _PostState extends State<PostDetailPage> {
     final text = comment.text.trim();
     if (text.isEmpty || sending) return;
     if (text.length > 1000) return;
+    if (!await ensureTermsAccepted(context) || !mounted) return;
     if (failedComment != text) draftId = newId();
     draftId ??= newId();
     setState(() => sending = true);

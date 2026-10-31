@@ -1,3 +1,4 @@
+import '../core/terms_gate.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -198,6 +199,8 @@ class _NewPostState extends State<NewPostPage> {
       await activityFailure(context, title: '게시판을 골라 주세요');
       return;
     }
+    if (!editing && !await ensureTermsAccepted(context)) return;
+    if (!mounted) return;
     setState(() => busy = true);
     try {
       for (final p in photos) {

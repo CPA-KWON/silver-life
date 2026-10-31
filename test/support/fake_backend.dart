@@ -9,6 +9,8 @@ class FakeBackend {
   static const user = '00000000-0000-0000-0000-000000000001';
   bool failProfile = false, failFavorites = false, failPosts = false;
   bool failAccountDelete = false;
+  bool termsAccepted = true;
+  Map? signupData;
   // 동네모임 참여: 테스트 사용자가 참여한(모임장이 아닌) 모임 id와,
   // 모임마다 이미 참여한 다른 사람 수.
   final meetupJoined = <String>{};
@@ -133,6 +135,8 @@ class FakeBackend {
     checkinWrites = 0;
     profile['nickname'] = '한결';
     failAccountDelete = false;
+    termsAccepted = true;
+    signupData = null;
     meetupJoined.clear();
     meetupOthers = 0;
     meetupMax = 10;
@@ -154,6 +158,7 @@ class FakeBackend {
     if (request.url.path.startsWith('/auth/')) {
       if (name == 'logout') return response({});
       final body = request.body.isEmpty ? {} : jsonDecode(request.body) as Map;
+      if (name == 'signup') signupData = body['data'] as Map?;
       if (body['password'] == 'wrong-password') {
         return response({
           'msg': 'Invalid login credentials',
@@ -260,6 +265,11 @@ class FakeBackend {
           meetupJoined.remove(postId);
           return response('');
       }
+    }
+    if (name == 'terms_accepted') return response(termsAccepted);
+    if (name == 'accept_terms') {
+      termsAccepted = true;
+      return response('');
     }
     if (name == 'delete_my_account') {
       if (failAccountDelete) {

@@ -15,6 +15,7 @@ import 'institution_access_page.dart';
 import '../activity/saved_programs_page.dart';
 import 'my_post_list_page.dart';
 import 'privacy_policy_page.dart';
+import 'terms_page.dart';
 import 'extra_settings_pages.dart';
 import 'sign_out.dart';
 import '../meetup/my_meetups_page.dart';
@@ -298,7 +299,12 @@ class _ProfileState extends State<ProfilePage> {
                       ),
                       item(
                         Icons.privacy_tip_outlined,
-                        '이용약관·개인정보',
+                        '이용약관',
+                        () => open(const TermsPage()),
+                      ),
+                      item(
+                        Icons.privacy_tip_outlined,
+                        '개인정보 처리방침',
                         () => open(const PrivacyPolicyPage()),
                       ),
                     ],

@@ -432,6 +432,8 @@ void main() {
     }
     await tap(t, find.text('중복확인'));
     expect(find.text('사용 가능한 이메일입니다.'), findsWidgets);
+    await tap(t, find.text('[필수] 이용약관에 동의해요'));
+    await tap(t, find.text('[필수] 개인정보 처리방침에 동의해요'));
     await tap(t, find.text('가입하기'));
     expect(backend.requests.any((u) => u.path.endsWith('/signup')), true);
     await finish(t);
@@ -543,7 +545,7 @@ void main() {
       '내가 쓴 글·댓글',
       '내가 만든 모임',
       '회원정보 관리',
-      '이용약관·개인정보',
+      '이용약관',
       '나의 활동',
       '즐겨찾는 시설',
     ]) {

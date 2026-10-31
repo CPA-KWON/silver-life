@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/korea_regions.dart';
 import '../core/region_picker.dart';
+import '../profile/privacy_policy_page.dart';
+import '../profile/terms_page.dart';
 import '../app_theme.dart';
 import '../ui/design_widgets.dart';
 
@@ -30,6 +32,8 @@ class _SignupPageState extends State<SignupPage> {
   String _sido = kKoreaRegions.keys.first;
   String _sigungu = kKoreaRegions.values.first.first;
   bool _isLoading = false;
+  bool _agreedTerms = false;
+  bool _agreedPrivacy = false;
   bool _isCheckingEmail = false;
   // The email address that _emailAvailable's result applies to — any edit
   // to the email field after a check invalidates it, so a stale "사용 가능"
@@ -83,6 +87,10 @@ class _SignupPageState extends State<SignupPage> {
       _showMessage('이메일 중복확인을 먼저 진행해주세요.');
       return;
     }
+    if (!_agreedTerms || !_agreedPrivacy) {
+      _showMessage('이용약관과 개인정보 처리방침에 모두 동의해 주세요.');
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -96,6 +104,7 @@ class _SignupPageState extends State<SignupPage> {
           'region_sido': _sido,
           'region_sigungu': _sigungu,
           'birth_year': int.parse(_birthYearController.text.trim()),
+          'terms_version': kTermsVersion,
         },
       );
 
@@ -336,6 +345,26 @@ class _SignupPageState extends State<SignupPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  SectionCard(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      children: [
+                        _ConsentRow(
+                          label: '[필수] 이용약관에 동의해요',
+                          value: _agreedTerms,
+                          onChanged: (v) => setState(() => _agreedTerms = v),
+                          page: const TermsPage(),
+                        ),
+                        _ConsentRow(
+                          label: '[필수] 개인정보 처리방침에 동의해요',
+                          value: _agreedPrivacy,
+                          onChanged: (v) => setState(() => _agreedPrivacy = v),
+                          page: const PrivacyPolicyPage(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _isLoading ? null : _signup,
                     child: _isLoading
@@ -354,4 +383,39 @@ class _SignupPageState extends State<SignupPage> {
       ),
     );
   }
+}
+
+class _ConsentRow extends StatelessWidget {
+  const _ConsentRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.page,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Widget page;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: CheckboxListTile(
+          value: value,
+          onChanged: (v) => onChanged(v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: const EdgeInsets.only(left: 8),
+          title: Text(label, style: const TextStyle(fontSize: 18)),
+        ),
+      ),
+      TextButton(
+        style: TextButton.styleFrom(minimumSize: const Size(56, 56)),
+        onPressed: () =>
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => page)),
+        child: const Text('보기'),
+      ),
+    ],
+  );
 }
