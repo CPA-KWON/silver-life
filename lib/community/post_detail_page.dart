@@ -587,14 +587,14 @@ class _PostState extends State<PostDetailPage> {
                           children: [
                             if (p['participants'] is List)
                               for (final r in p['participants'])
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                Wrap(
+                                  spacing: 6,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     NeighborAvatar(
                                       '${r['nickname']}',
                                       radius: 18,
                                     ),
-                                    const SizedBox(width: 6),
                                     Text(
                                       "${r['nickname']}${r['is_host'] == true
                                           ? ' (모임장)'
@@ -603,6 +603,10 @@ class _PostState extends State<PostDetailPage> {
                                           : ''}",
                                       style: petText(16),
                                     ),
+                                    if (ReportUserButton.canReport(r))
+                                      ReportUserButton(
+                                        nickname: '${r['nickname']}',
+                                      ),
                                   ],
                                 )
                             else

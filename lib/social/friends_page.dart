@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../activity/activity_widgets.dart' show activityMessage;
+import '../core/report.dart';
 import '../core/time_ago.dart';
 import '../ui/neighborhood_design.dart';
 import 'friends_repository.dart';
@@ -90,21 +91,16 @@ class _FriendsPageState extends State<FriendsPage> {
       activityMessage(context, '친구의 닉네임을 입력해 주세요');
       return;
     }
-    await run(
-      () async {
-        final result = await repo.request(name);
-        nickname.clear();
-        if (mounted) {
-          activityMessage(
-            context,
-            result == 'accepted'
-                ? '$name 님과 친구가 됐어요'
-                : '$name 님에게 친구 요청을 보냈어요',
-          );
-        }
-      },
-      failure: '친구 요청을 보내지 못했어요',
-    );
+    await run(() async {
+      final result = await repo.request(name);
+      nickname.clear();
+      if (mounted) {
+        activityMessage(
+          context,
+          result == 'accepted' ? '$name 님과 친구가 됐어요' : '$name 님에게 친구 요청을 보냈어요',
+        );
+      }
+    }, failure: '친구 요청을 보내지 못했어요');
   }
 
   Future<void> unfriend(FriendData p) async {
@@ -147,9 +143,10 @@ class _FriendsPageState extends State<FriendsPage> {
     }
   }
 
-  String region(FriendData p) => [p['region_sido'], p['region_sigungu']]
-      .where((v) => v != null && '$v'.trim().isNotEmpty)
-      .join(' ');
+  String region(FriendData p) => [
+    p['region_sido'],
+    p['region_sigungu'],
+  ].where((v) => v != null && '$v'.trim().isNotEmpty).join(' ');
 
   String when(FriendData p) {
     final at = DateTime.tryParse('${p['checked_in_at']}')?.toLocal();
@@ -228,6 +225,11 @@ class _FriendsPageState extends State<FriendsPage> {
               ],
             ],
           ),
+          if (ReportUserButton.canReport(p))
+            Align(
+              alignment: Alignment.centerRight,
+              child: ReportUserButton(nickname: '${p['nickname']}'),
+            ),
         ],
       ),
     ),

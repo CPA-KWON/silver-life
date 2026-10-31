@@ -10,6 +10,7 @@ class FakeBackend {
   bool failProfile = false, failFavorites = false, failPosts = false;
   bool failAccountDelete = false;
   bool termsAccepted = true;
+  final userReports = <String>[];
   Map? signupData;
   // 동네모임 참여: 테스트 사용자가 참여한(모임장이 아닌) 모임 id와,
   // 모임마다 이미 참여한 다른 사람 수.
@@ -137,6 +138,7 @@ class FakeBackend {
     failAccountDelete = false;
     termsAccepted = true;
     signupData = null;
+    userReports.clear();
     meetupJoined.clear();
     meetupOthers = 0;
     meetupMax = 10;
@@ -267,6 +269,15 @@ class FakeBackend {
       }
     }
     if (name == 'terms_accepted') return response(termsAccepted);
+    if (name == 'report_user') {
+      final body = jsonDecode(request.body) as Map;
+      final who = body['p_nickname'];
+      if (userReports.any((r) => r.startsWith('$who|'))) {
+        return response({'message': 'duplicate', 'code': '23505'}, status: 409);
+      }
+      userReports.add('$who|${body['p_reason']}');
+      return response('');
+    }
     if (name == 'accept_terms') {
       termsAccepted = true;
       return response('');

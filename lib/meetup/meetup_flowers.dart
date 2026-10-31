@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../attendance/attendance_controller.dart';
 import '../core/points.dart';
+import '../core/report.dart';
 import '../ui/neighborhood_design.dart';
 
 /// 꽃 한 송이 가격(서버 단위). send_meetup_flower가 차감하는 값과 같게 유지한다.
@@ -148,6 +149,8 @@ class _MeetupFlowersCardState extends State<MeetupFlowersCard> {
                 Text('보냈어요', style: petText(18, color: PetColors.green)),
               ],
             ),
+          if (ReportUserButton.canReport(person))
+            ReportUserButton(nickname: '${person['nickname']}'),
         ],
       ),
     );

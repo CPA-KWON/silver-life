@@ -130,6 +130,10 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('people in the friends page can be reported', (t) async {
+    await open(t);
+    expect(find.text('사용자 신고하기'), findsWidgets);
+  });
   testWidgets('accepting a request moves it into my friends', (t) async {
     final repo = await open(t);
     await tap(t, find.text('수락'));
