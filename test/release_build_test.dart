@@ -6,11 +6,15 @@ import 'package:silver_life/attendance/attendance_controller.dart';
 import 'package:silver_life/attendance/attendance_dialog.dart';
 import 'package:silver_life/core/release_flags.dart';
 import 'package:silver_life/pet/pet_ads_service.dart';
+import 'package:silver_life/pet/pet_onboarding.dart';
+import 'package:silver_life/profile/account_settings_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:silver_life/pet/pet_today_page.dart';
 import 'package:silver_life/pet/pet_preview_controller.dart';
 import 'package:silver_life/pet/pet_shop_page.dart';
 
 import 'support/fake_attendance_repository.dart';
+import 'support/fake_backend.dart';
 import 'support/widget_actions.dart';
 
 /// 출시 빌드에서 숨겨야 하는 것들. 테스트는 테스트용 빌드로 돌기 때문에
@@ -19,6 +23,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() => debugTreatAsReleaseBuild = null);
+  final backend = FakeBackend();
+  setUpAll(backend.initialize);
+  tearDownAll(() => Supabase.instance.dispose());
 
   Future<void> openShop(WidgetTester t) async {
     t.view.physicalSize = const Size(900, 6000);
@@ -122,6 +129,57 @@ void main() {
     testWidgets('pet ad reward stays in a test build', (t) async {
       await openToday(t);
       expect(find.text('짧은 광고 보기'), findsOneWidget);
+      await finish(t);
+    });
+  });
+
+  group('not-ready features', () {
+    Future<void> openAccount(WidgetTester t) async {
+      t.view.physicalSize = const Size(900, 4000);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      backend.reset();
+      await backend.signIn();
+      await mount(t, const AccountSettingsPage());
+    }
+
+    testWidgets('release build hides phone verification until it is on', (
+      t,
+    ) async {
+      debugTreatAsReleaseBuild = true;
+      await openAccount(t);
+      expect(find.text('휴대폰 번호'), findsNothing);
+      expect(find.textContaining('준비'), findsNothing);
+      // 나머지 회원정보는 그대로 쓸 수 있다.
+      expect(find.text('회원 탈퇴'), findsOneWidget);
+      await finish(t);
+    });
+
+    testWidgets('test build keeps phone verification', (t) async {
+      await openAccount(t);
+      expect(find.text('휴대폰 번호'), findsWidgets);
+      await finish(t);
+    });
+
+    testWidgets('release build has no design preview or setup wording', (
+      t,
+    ) async {
+      debugTreatAsReleaseBuild = true;
+      final pet = PetPreviewController();
+      addTearDown(pet.dispose);
+      await mount(t, PetConnectionPage(pet: pet));
+      expect(find.text('디자인 미리보기 열기'), findsNothing);
+      expect(find.textContaining('준비'), findsNothing);
+      expect(find.textContaining('서버 설정'), findsNothing);
+      expect(find.text('다시 연결하기'), findsOneWidget);
+      await finish(t);
+    });
+
+    testWidgets('test build keeps the design preview', (t) async {
+      final pet = PetPreviewController();
+      addTearDown(pet.dispose);
+      await mount(t, PetConnectionPage(pet: pet));
+      expect(find.text('디자인 미리보기 열기'), findsOneWidget);
       await finish(t);
     });
   });

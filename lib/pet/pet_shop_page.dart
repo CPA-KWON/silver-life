@@ -361,6 +361,11 @@ class _ShopState extends State<PetShopPage> {
           [...legacy, ...PetItem.all]
               .where(
                 (i) =>
+                    // 서버 준비 전인 새 아이템은 눌러도 살 수 없으니 출시 빌드에서 뺀다.
+                    (!isReleaseBuild ||
+                        pet.isPreview ||
+                        pet.expansionEnabled ||
+                        PetItem.find(i.id) == null) &&
                     (paidItemsVisible ||
                         !i.premium ||
                         pet.owned.contains(i.id)) &&
@@ -451,7 +456,7 @@ class _ShopState extends State<PetShopPage> {
                   child: Text(billing.message!, style: petText(17)),
                 ),
               ),
-            if (!pet.isPreview && !pet.expansionEnabled)
+            if (!isReleaseBuild && !pet.isPreview && !pet.expansionEnabled)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text('새 아이템은 서버 설정 후 구매할 수 있어요.'),

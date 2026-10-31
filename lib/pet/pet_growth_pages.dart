@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/release_flags.dart';
 import 'pet_design.dart';
 import 'pet_preview_controller.dart';
 
@@ -125,15 +126,17 @@ class _GrowthState extends State<PetGrowthPage> {
                                             ? '또렷한 줄무늬와 긴 꼬리, 듬직한 몸'
                                             : '차분한 눈썹과 긴 귀, 듬직한 몸'),
                                 ),
-                                const SizedBox(height: 8),
-                                _change(
-                                  2,
-                                  pet.stage == 1
-                                      ? (pet.isCat
-                                            ? '베레모와 연두 우비를 입혀볼 수 있어요'
-                                            : '산책 챙모자와 노란 우비가 열렸어요')
-                                      : '성체 전용 산책 코스는 준비 중이에요',
-                                ),
+                                if (pet.stage == 1 || !isReleaseBuild) ...[
+                                  const SizedBox(height: 8),
+                                  _change(
+                                    2,
+                                    pet.stage == 1
+                                        ? (pet.isCat
+                                              ? '베레모와 연두 우비를 입혀볼 수 있어요'
+                                              : '산책 챙모자와 노란 우비가 열렸어요')
+                                        : '성체 전용 산책 코스는 준비 중이에요',
+                                  ),
+                                ],
                               ],
                             ),
                           ),

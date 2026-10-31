@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../attendance/attendance_controller.dart';
+import '../core/release_flags.dart';
 
 import 'pet_design.dart';
 import 'pet_preview_controller.dart';
@@ -415,10 +416,13 @@ class PetConnectionPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('서버 연결을 준비하고 있어요', style: petText(24)),
+                Text(
+                  isReleaseBuild ? '반려동물을 불러오지 못했어요' : '서버 연결을 준비하고 있어요',
+                  style: petText(24),
+                ),
                 const SizedBox(height: 12),
                 Text(
-                  '반려동물 상태와 포인트를 안전하게 저장하려면 서버 설정이 필요해요. 기존 출석·포인트는 그대로 보호하고 있어요.',
+                  isReleaseBuild ? '인터넷 연결을 확인한 뒤 다시 시도해 주세요.' : '반려동물 상태와 포인트를 안전하게 저장하려면 서버 설정이 필요해요. 기존 출석·포인트는 그대로 보호하고 있어요.',
                   style: petText(
                     18,
                     color: PetColors.secondary,
@@ -444,19 +448,21 @@ class PetConnectionPage extends StatelessWidget {
                           }
                         },
                 ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    final demo = PetPreviewController()..ready = true;
-                    Navigator.push(
-                      c,
-                      MaterialPageRoute<void>(
-                        builder: (_) => PetAdoptionPage(pet: demo),
-                      ),
-                    );
-                  },
-                  child: const Text('디자인 미리보기 열기'),
-                ),
+                if (!isReleaseBuild) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () {
+                      final demo = PetPreviewController()..ready = true;
+                      Navigator.push(
+                        c,
+                        MaterialPageRoute<void>(
+                          builder: (_) => PetAdoptionPage(pet: demo),
+                        ),
+                      );
+                    },
+                    child: const Text('디자인 미리보기 열기'),
+                  ),
+                ],
               ],
             ),
           ),

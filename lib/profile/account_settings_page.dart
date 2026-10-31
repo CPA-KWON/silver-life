@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../ui/neighborhood_design.dart';
 import '../core/region_picker.dart';
+import '../core/release_flags.dart';
 import '../social/social_form_widgets.dart';
 import '../social/social_media.dart';
 import 'sign_out.dart';
@@ -406,78 +407,87 @@ class _AccountState extends State<AccountSettingsPage> {
                         ),
                       ),
                     ),
-                    SocialFormCard(
-                      '휴대폰 번호',
-                      step: 3,
-                      color: PetColors.blue,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (verified && !editingPhone) ...[
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF2F6FA),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: const Color(0xFFD5E1EA),
+                    // 문자 발송이 켜지기 전에는 출시 빌드에서 카드 자체를 숨긴다.
+                    if (!isReleaseBuild || phoneEnabled == true)
+                      SocialFormCard(
+                        '휴대폰 번호',
+                        step: 3,
+                        color: PetColors.blue,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (verified && !editingPhone) ...[
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF2F6FA),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFD5E1EA),
+                                  ),
+                                ),
+                                child: Wrap(
+                                  spacing: 12,
+                                  children: [
+                                    Text(
+                                      displayMobilePhone(
+                                        phone.text,
+                                        mask: true,
+                                      ),
+                                      style: petText(18),
+                                    ),
+                                    Text(
+                                      '✓ 인증됨',
+                                      style: petText(
+                                        15,
+                                        color: PetColors.green,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Wrap(
-                                spacing: 12,
-                                children: [
-                                  Text(
-                                    displayMobilePhone(phone.text, mask: true),
-                                    style: petText(18),
-                                  ),
-                                  Text(
-                                    '✓ 인증됨',
-                                    style: petText(15, color: PetColors.green),
-                                  ),
-                                ],
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton(
+                                  onPressed: sending || busy
+                                      ? null
+                                      : () =>
+                                            setState(() => editingPhone = true),
+                                  child: const Text('번호 바꾸기'),
+                                ),
                               ),
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                onPressed: sending || busy
+                            ] else ...[
+                              TextField(
+                                controller: phone,
+                                enabled: !sending && !busy,
+                                keyboardType: TextInputType.phone,
+                                decoration: const InputDecoration(
+                                  labelText: '휴대폰 번호',
+                                  hintText: '010-1234-5678',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              ActivityButton(
+                                sending
+                                    ? '전송 중…'
+                                    : phoneEnabled == false
+                                    ? '휴대폰 인증 준비 중'
+                                    : '인증번호 받기',
+                                onTap: sending || busy || phoneEnabled == false
                                     ? null
-                                    : () => setState(() => editingPhone = true),
-                                child: const Text('번호 바꾸기'),
+                                    : sendCode,
                               ),
-                            ),
-                          ] else ...[
-                            TextField(
-                              controller: phone,
-                              enabled: !sending && !busy,
-                              keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                labelText: '휴대폰 번호',
-                                hintText: '010-1234-5678',
+                              const SizedBox(height: 8),
+                              Text(
+                                phoneEnabled == false
+                                    ? '휴대폰 인증을 준비하고 있어요. 다른 회원정보는 수정할 수 있어요.'
+                                    : '인증을 마친 번호만 저장돼요.',
+                                style: petText(14, color: PetColors.secondary),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            ActivityButton(
-                              sending
-                                  ? '전송 중…'
-                                  : phoneEnabled == false
-                                  ? '휴대폰 인증 준비 중'
-                                  : '인증번호 받기',
-                              onTap: sending || busy || phoneEnabled == false
-                                  ? null
-                                  : sendCode,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              phoneEnabled == false
-                                  ? '휴대폰 인증을 준비하고 있어요. 다른 회원정보는 수정할 수 있어요.'
-                                  : '인증을 마친 번호만 저장돼요.',
-                              style: petText(14, color: PetColors.secondary),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 12),
                     TextButton(
                       onPressed: () => confirmAccountSignOut(c),
