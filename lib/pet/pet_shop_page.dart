@@ -1,4 +1,5 @@
 import '../core/points.dart';
+import '../core/release_flags.dart';
 
 import 'package:flutter/material.dart';
 
@@ -33,9 +34,11 @@ class _ShopState extends State<PetShopPage> {
     if (!widget.pet.isPreview && !widget.pet.expansionEnabled) {
       widget.pet.load();
     }
-    billing.initialize(
-      PetItem.all.where((i) => i.premium).map((i) => i.productId).toSet(),
-    );
+    if (paidItemsVisible) {
+      billing.initialize(
+        PetItem.all.where((i) => i.premium).map((i) => i.productId).toSet(),
+      );
+    }
   }
 
   @override
@@ -358,6 +361,9 @@ class _ShopState extends State<PetShopPage> {
           [...legacy, ...PetItem.all]
               .where(
                 (i) =>
+                    (paidItemsVisible ||
+                        !i.premium ||
+                        pet.owned.contains(i.id)) &&
                     (section != '내 옷장' || pet.owned.contains(i.id)) &&
                     (source == '전체' || i.source == source) &&
                     (category == '전체' ||
@@ -425,10 +431,10 @@ class _ShopState extends State<PetShopPage> {
                 spacing: 6,
                 runSpacing: 4,
                 children: [
-                  for (final entry in const {
+                  for (final entry in {
                     '전체': '전체',
                     'points': 'P 아이템',
-                    'play': '특별 구매',
+                    if (paidItemsVisible) 'play': '특별 구매',
                     'activity': '활동 선물',
                   }.entries)
                     FilterChip(
@@ -553,12 +559,17 @@ class _ShopState extends State<PetShopPage> {
                         setState(() => preview = {});
                       }),
               ),
-            TextButton(
-              onPressed: billing.available ? () => act(billing.restore) : null,
-              child: const Text('구매한 아이템 다시 확인'),
-            ),
+            if (paidItemsVisible)
+              TextButton(
+                onPressed: billing.available
+                    ? () => act(billing.restore)
+                    : null,
+                child: const Text('구매한 아이템 다시 확인'),
+              ),
             Text(
-              'P 아이템과 Google Play 구매를 구분해요. 기본 돌봄과 산책은 무료예요.',
+              paidItemsVisible
+                  ? 'P 아이템과 Google Play 구매를 구분해요. 기본 돌봄과 산책은 무료예요.'
+                  : '기본 돌봄과 산책은 무료예요.',
               style: petText(15, color: PetColors.muted),
             ),
           ],
