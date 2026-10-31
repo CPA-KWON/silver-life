@@ -233,7 +233,9 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                             const SizedBox(height: 16),
                             ..._stampSection(status),
                             const SizedBox(height: 10),
-                            if (status.attendedToday)
+                            if (!ads.visible)
+                              const SizedBox.shrink()
+                            else if (status.attendedToday)
                               _adCard()
                             else
                               const Padding(

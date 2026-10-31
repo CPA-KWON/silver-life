@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../core/release_flags.dart';
 import 'pet_preview_controller.dart';
 
 class PetAdsService {
@@ -10,6 +11,7 @@ class PetAdsService {
   static bool get configured =>
       defaultTargetPlatform == TargetPlatform.android &&
       (kDebugMode || productionUnit.isNotEmpty);
+  static bool get visible => rewardedAdVisible(productionUnit);
   static Future<PetOutcome> watch(PetPreviewController pet) async {
     if (pet.ads >= 2) throw StateError('오늘 광고 보상을 모두 받았어요. 내일 다시 만나요.');
     if (!configured) throw StateError('광고 계정을 연결하고 있어요. 잠시 후 다시 확인해주세요.');

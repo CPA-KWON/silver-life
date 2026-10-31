@@ -13,3 +13,8 @@ bool get isReleaseBuild => debugTreatAsReleaseBuild ?? kReleaseMode;
 const kPaidItemsEnabled = bool.fromEnvironment('ENABLE_PAID_ITEMS');
 
 bool get paidItemsVisible => !isReleaseBuild || kPaidItemsEnabled;
+
+/// 광고 버튼은 운영 광고 단위가 빌드에 들어 있을 때만 보여 준다. 없으면
+/// "이용할 수 없어요" 안내 대신 버튼 자체가 없다. 테스트용 빌드는 테스트 광고를 쓴다.
+bool rewardedAdVisible(String productionUnit) =>
+    !isReleaseBuild || productionUnit.isNotEmpty;

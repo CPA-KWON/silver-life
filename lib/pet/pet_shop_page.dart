@@ -259,7 +259,7 @@ class _ShopState extends State<PetShopPage> {
               style: petText(18),
             ),
             const SizedBox(height: 16),
-            if (pet.adsEnabled && pet.ads < 2)
+            if (PetAdsService.visible && pet.adsEnabled && pet.ads < 2)
               PetPrimary(
                 '광고 보고 2,000P 받기',
                 onTap: () {

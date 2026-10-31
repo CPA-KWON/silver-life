@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/release_flags.dart';
+
 class AttendanceAdOffer {
   const AttendanceAdOffer({
     required this.points,
@@ -27,6 +29,10 @@ class AttendanceAds {
     defaultValue: false,
   );
   bool get testing => !live;
+
+  /// 출시 빌드는 운영 단위와 live 설정이 모두 있어야 한다. live가 없으면 테스트
+  /// 광고로 동작하므로 실제 이용자에게 보여 주면 안 된다.
+  bool get visible => rewardedAdVisible(live ? unit : '');
   SupabaseClient get client => supabase ?? Supabase.instance.client;
   Future<AttendanceAdOffer> offer({
     required int streak,

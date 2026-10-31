@@ -398,7 +398,8 @@ class _TodayState extends State<PetTodayPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    if (pet.isPreview || pet.adsEnabled) ...[
+                    if (PetAdsService.visible &&
+                        (pet.isPreview || pet.adsEnabled)) ...[
                       Wrap(
                         spacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
