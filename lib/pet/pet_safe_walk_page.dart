@@ -18,6 +18,8 @@ import 'pet_walk_settings.dart';
 import 'pet_design.dart';
 import 'pet_care_pages.dart';
 
+const kPetWalkForegroundNotice = '앱을 켜 둔 동안만 걸음이 기록돼요. 화면을 끄거나 앱을 닫으면 기록이 멈춰요.';
+
 class PetWalkPage extends StatefulWidget {
   const PetWalkPage({super.key, required this.pet});
   final PetPreviewController pet;
@@ -186,7 +188,8 @@ class _SafeWalkState extends State<PetWalkPage> with WidgetsBindingObserver {
       }
       eligible = widget.pet.activeWalk?['eligible'] == true;
       if (mounted) setState(() {});
-      if (!overdueShown &&
+      if (kPetWalkBackground &&
+          !overdueShown &&
           settings.returnAt != null &&
           DateTime.now().isAfter(settings.returnAt!)) {
         overdueShown = true;
@@ -761,7 +764,8 @@ class _SafeWalkState extends State<PetWalkPage> with WidgetsBindingObserver {
                   style: petText(16, color: PetColors.blue),
                 ),
               ),
-            if (settings.returnAt != null &&
+            if (kPetWalkBackground &&
+                settings.returnAt != null &&
                 DateTime.now().isAfter(settings.returnAt!))
               PetCard(
                 color: PetColors.yellow,
@@ -957,19 +961,27 @@ class _SafeWalkState extends State<PetWalkPage> with WidgetsBindingObserver {
                         : '${settings.name} · ${settings.phone}',
                     contact,
                   ),
-                  row(
-                    Icons.schedule,
-                    '귀가 예정 시간',
-                    settings.returnAt == null
-                        ? '정하지 않았어요'
-                        : '${settings.returnAt!.hour}:${settings.returnAt!.minute.toString().padLeft(2, '0')}',
-                    returnTime,
-                  ),
+                  if (kPetWalkBackground)
+                    row(
+                      Icons.schedule,
+                      '귀가 예정 시간',
+                      settings.returnAt == null
+                          ? '정하지 않았어요'
+                          : '${settings.returnAt!.hour}:${settings.returnAt!.minute.toString().padLeft(2, '0')}',
+                      returnTime,
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            if (!notificationAllowed)
+            if (!kPetWalkBackground) ...[
+              PetCard(
+                color: PetColors.yellow,
+                child: Text(kPetWalkForegroundNotice, style: petText(18)),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (kPetWalkBackground && !notificationAllowed)
               PetCard(
                 color: PetColors.yellow,
                 child: Text(

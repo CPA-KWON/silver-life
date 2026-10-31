@@ -102,6 +102,9 @@ void main() {
       final pet = PetPreviewController()..adopt('콩이');
       addTearDown(pet.dispose);
       await mount(t, PetWalkPage(pet: pet));
+      // 첫 출시: 앱을 켜 둔 동안만 기록한다고 알리고 복귀 시간 설정은 숨긴다.
+      expect(find.text(kPetWalkForegroundNotice), findsOneWidget);
+      expect(find.text('귀가 예정 시간'), findsNothing);
       await tap(t, find.text('연락처를 등록해요'));
       await t.enterText(find.byType(TextFormField).first, '가족');
       await visible(t, find.byType(TextFormField).last);
