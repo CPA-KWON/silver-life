@@ -25,7 +25,8 @@ class _FriendsPageState extends State<FriendsPage> {
   late Future<_FriendsData> data = load();
   final nickname = TextEditingController();
   bool busy = false;
-  bool share = true;
+  bool share = false;
+  bool asking = false;
 
   @override
   void dispose() {
@@ -40,10 +41,50 @@ class _FriendsPageState extends State<FriendsPage> {
       repo.shareEnabled(),
     ]);
     share = r[2] as bool;
-    return (
-      presence: r[0] as List<FriendData>,
-      people: r[1] as List<FriendData>,
-    );
+    final people = r[1] as List<FriendData>;
+    if (people.any((p) => p['relation'] == 'friend')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => askShareOnce());
+    }
+    return (presence: r[0] as List<FriendData>, people: people);
+  }
+
+  /// 친구가 처음 생겼을 때 한 번 묻는다. 기본은 안 보임이라 답하기 전에는
+  /// 체크인이 공개되지 않는다. 물어보지 못했으면 다음에 다시 묻는다.
+  Future<void> askShareOnce() async {
+    if (asking || !mounted) return;
+    asking = true;
+    try {
+      if (await repo.shareAsked() || !mounted) return;
+      final answer = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => AlertDialog(
+          title: const Text('체크인 장소를 친구에게 보여줄까요?'),
+          content: const Text(
+            '보여 주면 친구로 수락된 분에게만, 내가 체크인한 시설 이름과 시간이 3시간 동안 보여요. '
+            '이 화면의 스위치로 언제든 바꿀 수 있어요.',
+            style: TextStyle(fontSize: 18, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('보여 주지 않기'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('보여 주기'),
+            ),
+          ],
+        ),
+      );
+      if (answer == null) return;
+      await repo.setShare(answer);
+      if (mounted) setState(() => share = answer);
+    } catch (_) {
+      // 답을 저장하지 못해도 기본값이 안 보임이라 안전하다. 다음에 다시 묻는다.
+    } finally {
+      asking = false;
+    }
   }
 
   Future<void> reload() async {

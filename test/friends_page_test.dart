@@ -53,7 +53,9 @@ class FakeFriendsRepository extends FriendsRepository {
   @override
   Future<List<FriendData>> list() async {
     if (failList != null) throw failList!;
-    return [for (final p in people) {...p}];
+    return [
+      for (final p in people) {...p},
+    ];
   }
 
   @override
@@ -63,6 +65,10 @@ class FakeFriendsRepository extends FriendsRepository {
 
   @override
   Future<bool> shareEnabled() async => share;
+
+  bool asked = true;
+  @override
+  Future<bool> shareAsked() async => asked;
 
   @override
   Future<String> request(String nickname) async {
@@ -99,37 +105,69 @@ class FakeFriendsRepository extends FriendsRepository {
   Future<void> setShare(bool value) async {
     calls.add('share:$value');
     share = value;
+    asked = true;
   }
 }
 
 void main() {
   final now = DateTime(2026, 10, 30, 13, 0);
-  Future<FakeFriendsRepository> open(WidgetTester t) async {
+  Future<FakeFriendsRepository> open(
+    WidgetTester t, {
+    bool asked = true,
+    bool share = true,
+  }) async {
     // 목록은 보이는 부분만 그려서, 세로로 긴 화면을 써야 맨 아래 항목도 찾을 수 있다.
     t.view.physicalSize = const Size(900, 5000);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
-    final repo = FakeFriendsRepository();
+    final repo = FakeFriendsRepository()
+      ..asked = asked
+      ..share = share;
     await mount(t, FriendsPage(repository: repo, now: () => now));
     return repo;
   }
 
-  testWidgets('shows where friends are now, requests, friends and sent requests', (
-    t,
-  ) async {
-    await open(t);
-    expect(find.text('친구는 지금 어디에?'), findsOneWidget);
-    expect(find.text('한울 님'), findsOneWidget);
-    expect(find.text('강남 경로당'), findsOneWidget);
-    expect(find.text('20분 전 체크인'), findsOneWidget);
-    expect(find.text('받은 친구 요청'), findsOneWidget);
-    expect(find.text('새벽'), findsOneWidget);
-    expect(find.text('내 친구'), findsOneWidget);
-    expect(find.text('보낸 친구 요청'), findsOneWidget);
-    expect(find.text('보름'), findsOneWidget);
-    expect(t.takeException(), isNull);
-  });
+  testWidgets(
+    'shows where friends are now, requests, friends and sent requests',
+    (t) async {
+      await open(t);
+      expect(find.text('친구는 지금 어디에?'), findsOneWidget);
+      expect(find.text('한울 님'), findsOneWidget);
+      expect(find.text('강남 경로당'), findsOneWidget);
+      expect(find.text('20분 전 체크인'), findsOneWidget);
+      expect(find.text('받은 친구 요청'), findsOneWidget);
+      expect(find.text('새벽'), findsOneWidget);
+      expect(find.text('내 친구'), findsOneWidget);
+      expect(find.text('보낸 친구 요청'), findsOneWidget);
+      expect(find.text('보름'), findsOneWidget);
+      expect(t.takeException(), isNull);
+    },
+  );
 
+  testWidgets('first friend asks once whether to show check-ins', (t) async {
+    final repo = await open(t, asked: false, share: false);
+    expect(find.text('체크인 장소를 친구에게 보여줄까요?'), findsOneWidget);
+    expect(repo.calls.where((c) => c.startsWith('share:')), isEmpty);
+    await tap(t, find.text('보여 주기'));
+    expect(repo.calls, contains('share:true'));
+    expect(repo.share, isTrue);
+    expect(find.text('체크인 장소를 친구에게 보여줄까요?'), findsNothing);
+    expect(t.widget<SwitchListTile>(find.byType(SwitchListTile)).value, isTrue);
+  });
+  testWidgets('saying no keeps check-ins hidden and is remembered', (t) async {
+    final repo = await open(t, asked: false, share: false);
+    await tap(t, find.text('보여 주지 않기'));
+    expect(repo.calls, contains('share:false'));
+    expect(repo.asked, isTrue);
+    expect(
+      t.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+      isFalse,
+    );
+  });
+  testWidgets('someone already asked is not asked again', (t) async {
+    await open(t, asked: true, share: false);
+    expect(find.text('체크인 장소를 친구에게 보여줄까요?'), findsNothing);
+  });
   testWidgets('people in the friends page can be reported', (t) async {
     await open(t);
     expect(find.text('사용자 신고하기'), findsWidgets);
@@ -233,11 +271,7 @@ void main() {
 
   testWidgets('works with large text', (t) async {
     final repo = FakeFriendsRepository();
-    await mount(
-      t,
-      FriendsPage(repository: repo, now: () => now),
-      scale: 1.6,
-    );
+    await mount(t, FriendsPage(repository: repo, now: () => now), scale: 1.6);
     expect(t.takeException(), isNull);
   });
 }

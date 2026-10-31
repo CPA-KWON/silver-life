@@ -18,7 +18,8 @@ class FriendsRepository {
   ];
 
   /// 내 친구와 요청 목록. `relation`: friend(친구) / incoming(받은 요청) / outgoing(보낸 요청)
-  Future<List<FriendData>> list() async => _rows(await client.rpc('friend_list'));
+  Future<List<FriendData>> list() async =>
+      _rows(await client.rpc('friend_list'));
 
   /// 지금(최근 3시간) 시설에 체크인한 수락된 친구들. 상대가 공개를 끈 사람은 빠집니다.
   Future<List<FriendData>> presence() async =>
@@ -40,9 +41,13 @@ class FriendsRepository {
     await client.rpc('friend_remove', params: {'p_friendship': friendshipId});
   }
 
-  /// 내 체크인을 친구에게 보여줄지(기본: 보임)
+  /// 내 체크인을 친구에게 보여줄지(기본: 안 보임)
   Future<bool> shareEnabled() async =>
-      (await client.rpc('friend_share_get')) != false;
+      (await client.rpc('friend_share_get')) == true;
+
+  /// 처음 친구를 맺을 때 공개 여부를 이미 물어봤는지
+  Future<bool> shareAsked() async =>
+      (await client.rpc('friend_share_asked')) == true;
 
   Future<void> setShare(bool value) async {
     await client.rpc('friend_share_set', params: {'p_share': value});
