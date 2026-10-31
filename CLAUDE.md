@@ -196,7 +196,7 @@ lib/ 밖의 중요한 파일
 | `checkins` | "나 여기 있음" 체크인 | id, user_id, facility_id, checked_in_at — 한 사람당 시설별 1개, 앱에서 3시간 지나면 안 셈 |
 | `reports` | 게시글·모임·댓글 신고 | id, reporter_id, post_id 또는 comment_id(둘 중 하나만), reason(욕설·비방/광고/사기 의심/기타), created_at — 같은 사람이 같은 대상 1번만 |
 | `meetup_participants` | 동네모임 참여자 (`meetup_participation.sql`) | post_id, user_id, joined_at — 모임장은 모임 만들 때 자동 포함. 앱은 직접 읽기·쓰기 불가, `meetup_join`/`meetup_leave`/`meetup_participation`/`my_meetups` 함수로만 사용. 닉네임은 public_profiles에서만 |
-| `meetup_flowers` | 고마워요 꽃 (`flower_gift.sql`) | post_id, sender_id, recipient_id, created_at — 모임·보낸 사람·받는 사람당 1번. 앱은 직접 읽기·쓰기 불가, `send_meetup_flower`/`my_flowers`/`meetup_participation` 함수로만 사용. 꽃 1송이에 보내는 사람 1P 차감(`point_ledger` reason `flower`), 상대에게 포인트는 가지 않음. 모임 글·계정이 지워지면 꽃 기록도 지워지고 환불 없음 |
+| `meetup_flowers` | 고마워요 꽃 (`flower_gift.sql`) | post_id, sender_id, recipient_id, created_at — 모임·보낸 사람·받는 사람당 1번. 앱은 직접 읽기·쓰기 불가, `send_meetup_flower`/`my_flowers`/`meetup_participation` 함수로만 사용. 꽃 1송이에 보내는 사람 서버 1단위(앱 표시 100P) 차감(`point_ledger` reason `flower`), 상대에게 포인트는 가지 않음. 모임 글·계정이 지워지면 꽃 기록도 지워지고 환불 없음 |
 | `welfare_programs` | 복지관 정기 프로그램 (안내용, 신청은 전화·방문) | facility_name, title, category, schedule, target, fee, capacity 등 — 원본 표 `welfare_programs (sangdo)`, `welfare_programs (heuksuk)`, `welfare_program_dongjak`(칸 이름이 달라 SQL에서 변환, 어르신께 잘못 안내될 수 있는 19줄과 heuksuk 3번은 SQL에서 id로 제외), 새 시설용 `welfare_programs (others)`(`시설명` 칸 필수, 양식 `docs/welfare_programs_template.csv`)에서 `supabase/welfare_programs.sql`로 동기화(추가·수정·삭제 반영, 기존 id 유지). 로그인한 사람만 읽기. 시설 상세 화면이 시설 **이름**으로 연결(띄어쓰기·"어르신"·"노인"·"시립" 등은 빼고 비교) |
 | `point_wallets` | 포인트 지갑 (`attendance_points.sql`) | user_id, balance(보유), total_earned(누적 획득), last_attended_on, current_streak, updated_at |
 | `attendance_days` | 날짜별 출석 이력 | user_id, attended_on(한국 날짜), streak, points — 사람·날짜당 1줄 |
@@ -234,7 +234,7 @@ lib/ 밖의 중요한 파일
 - 동네모임 만들기·수정, 시설을 모임 장소로 지정, 예정/지난 모임
 - 홈(다가오는 모임, 최근 글), 내 정보, 내 글 관리, 개인정보처리방침
 - 게시글·모임·댓글 신고하기(사유 4가지, 중복 신고 불가, 3건 이상 숨김)
-- 고마워요 꽃: 지난 모임 참여자에게 꽃 보내기(1P), 받은 꽃 수 표시, 내 정보 "받은 꽃"
+- 고마워요 꽃: 지난 모임 참여자에게 꽃 보내기(앱 표시 100P, 서버 1단위), 받은 꽃 수 표시, 내 정보 "받은 꽃"
 - 동네모임 참여하기·취소, 참여자 닉네임 목록, 최대 인원(2~30명), 모집 마감, 내 정보 "참여한 모임"
 - 회원 탈퇴(내 정보 > 회원정보 관리 > 회원 탈퇴, 경고 2번 → DB 함수 `delete_my_account`가 본인 계정만 삭제 → 로그인 화면). 구글 플레이용 안내 페이지 `docs/account-deletion.html`
 - 출석체크(하루 1번 출석도장, 연속 출석 보상, 월별 달력)와 포인트 배지(모든 탭 상단 오른쪽 🪙 P)

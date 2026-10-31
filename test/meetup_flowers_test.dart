@@ -30,7 +30,7 @@ void main() {
     backend.meetupJoined.add('meetup');
   }
 
-  const send = '꽃 보내기 (1P)';
+  const send = '꽃 보내기 (100P)';
 
   // 모임 상세에서 참여자 카드는 화면 아래쪽에 있어 스크롤해야 만들어진다.
   Future<void> openDetail(WidgetTester t) async {
@@ -55,7 +55,7 @@ void main() {
     expect(find.text('받은 꽃 0송이'), findsNWidgets(3));
 
     await tap(t, find.text(send).last);
-    expect(find.textContaining('1P가 차감돼요'), findsOneWidget);
+    expect(find.textContaining('100P가 차감돼요'), findsOneWidget);
     await tap(t, find.text('취소'));
     expect(backend.flowersSent, isEmpty);
     expect(backend.flowerBalance, 3);

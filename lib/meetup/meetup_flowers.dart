@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../attendance/attendance_controller.dart';
+import '../core/points.dart';
 import '../ui/neighborhood_design.dart';
+
+/// 꽃 한 송이 가격(서버 단위). send_meetup_flower가 차감하는 값과 같게 유지한다.
+const kFlowerCost = 1;
 
 const kFlowerErrorMessage = '처리하지 못했어요. 다시 시도해 주세요.';
 
@@ -19,7 +23,7 @@ Future<List<Map<String, dynamic>>> _loadParticipants(String postId) async {
   ];
 }
 
-/// Participant list with "받은 꽃 ○송이" and a 1P "꽃 보내기" button next to
+/// Participant list with "받은 꽃 ○송이" and a "꽃 보내기" button next to
 /// everyone the signed-in user may still thank. The server decides who that is
 /// and enforces every rule again when a flower is sent.
 class MeetupFlowersCard extends StatefulWidget {
@@ -49,7 +53,7 @@ class _MeetupFlowersCardState extends State<MeetupFlowersCard> {
       builder: (dialog) => AlertDialog(
         title: const Text('고마워요 꽃을 보낼까요?'),
         content: Text(
-          '${person['nickname']}님에게 꽃 한 송이를 보내요.\n내 포인트 1P가 차감돼요.',
+          '${person['nickname']}님에게 꽃 한 송이를 보내요.\n내 포인트 ${pointAmount(kFlowerCost)}P가 차감돼요.',
           style: const TextStyle(fontSize: 18, height: 1.5),
         ),
         actions: [
@@ -133,7 +137,7 @@ class _MeetupFlowersCardState extends State<MeetupFlowersCard> {
               style: FilledButton.styleFrom(minimumSize: const Size(0, 56)),
               onPressed: _busy ? null : () => _send(person),
               icon: const Icon(Icons.local_florist_outlined),
-              label: const Text('꽃 보내기 (1P)'),
+              label: Text('꽃 보내기 (${pointAmount(kFlowerCost)}P)'),
             )
           else if (person['flower_sent'] == true)
             Row(
