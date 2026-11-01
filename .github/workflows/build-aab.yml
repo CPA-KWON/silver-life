@@ -1,0 +1,59 @@
+name: Build Release AAB
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$RUNNER_TEMP/upload-keystore.jks" "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
+
+      - name: Make env file
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          NAVER_MAP_CLIENT_ID: ${{ secrets.NAVER_MAP_CLIENT_ID }}
+        run: |
+          printf '{"SUPABASE_URL":"%s","SUPABASE_ANON_KEY":"%s","NAVER_MAP_CLIENT_ID":"%s"}' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$NAVER_MAP_CLIENT_ID" > .env.json
+
+      - run: flutter pub get
+
+      - name: Build AAB (for Play Console)
+        run: flutter build appbundle --release --dart-define-from-file=.env.json
+
+      - name: Build APK (to test the release build in BlueStacks)
+        run: flutter build apk --release --split-per-abi --dart-define-from-file=.env.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: silver-life-release
+          path: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
+          retention-days: 7
+
+      - name: Remove signing files
+        if: always()
+        run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks"
