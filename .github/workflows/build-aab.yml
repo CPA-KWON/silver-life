@@ -38,8 +38,7 @@ jobs:
           PET_UNIT: ${{ secrets.PET_REWARDED_AD_UNIT }}
           ATT_UNIT: ${{ secrets.ATTENDANCE_REWARDED_AD_UNIT }}
         run: |
-          printf '{"SUPABASE_URL":"%s","SUPABASE_ANON_KEY":"%s","NAVER_MAP_CLIENT_ID":"%s","PET_REWARDED_AD_UNIT":"%s","ATTENDANCE_REWARDED_AD_UNIT":"%s","ATTENDANCE_ADS_LIVE":true}' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$NAVER_MAP_CLIENT_ID" "$PET_UNIT" "$ATT_UNIT" > .env.json
-
+          printf '{"SUPABASE_URL":"%s","SUPABASE_ANON_KEY":"%s","NAVER_MAP_CLIENT_ID":"%s"}' "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$NAVER_MAP_CLIENT_ID" > .env.json
       - run: flutter pub get
 
       - name: Build AAB (for Play Console)
