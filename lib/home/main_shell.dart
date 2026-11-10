@@ -88,6 +88,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+        _attendance.onUsePoints = _openPet;
     _petPreview.addListener(_refreshPoints);
     unawaited(_petPreview.load());
     final owner = Supabase.instance.client.auth.currentUser?.id;
