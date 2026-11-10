@@ -254,14 +254,35 @@ class _AttendanceDialogState extends State<AttendanceDialog> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: _adBusy
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        child: const Text('닫기'),
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (controller.onUsePoints != null) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _adBusy
+                                  ? null
+                                  : () {
+                                      final go = controller.onUsePoints;
+                                      Navigator.of(context).pop();
+                                      go?.call();
+                                    },
+                              child: const Text('포인트 사용하러 가기'),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _adBusy
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            child: const Text('닫기'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
