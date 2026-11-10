@@ -10,6 +10,8 @@ class AttendanceController extends ChangeNotifier {
 
   final AttendanceRepository repository;
   AttendanceStatus? status;
+    /// 출석 창의 "포인트 사용하러 가기" 버튼이 부르는 동작이에요. 앱 홈에서 연결해요.
+  VoidCallback? onUsePoints;
   bool _disposed = false;
   Future<AttendanceStatus?>? _refreshing;
   int _revision = 0;
