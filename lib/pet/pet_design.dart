@@ -147,7 +147,7 @@ class PetPoints extends StatelessWidget {
           content: Text(
             pet.isPreview
                 ? '목업을 확인하는 임시 데이터예요. 실제 포인트·기관 신청에는 영향을 주지 않아요.'
-                : '기존 출석 지갑과 같은 실제 포인트예요. 사용과 보상은 서버에서 처리해요.',
+                : '출석으로 모은 포인트와 같은 포인트예요. 콩이에게 줄 물건을 살 때 쓰고, 활동하면 보상으로 받아요.',
           ),
           actions: [
             TextButton(
