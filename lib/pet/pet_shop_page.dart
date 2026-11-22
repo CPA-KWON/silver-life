@@ -104,7 +104,14 @@ class _ShopState extends State<PetShopPage> {
           final owned = pet.owned.contains(item.id),
               product = billing.products[item.productId];
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            // useSafeArea only clears the top; keep "미리보기 취소" above the
+            // phone's bottom navigation/gesture bar too.
+            padding: EdgeInsets.fromLTRB(
+              24,
+              24,
+              24,
+              24 + MediaQuery.viewPaddingOf(c).bottom,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
