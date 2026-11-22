@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../ui/neighborhood_design.dart';
 import '../activity/activity_widgets.dart' show ActivityInfo;
-import '../attendance/point_badge.dart';
 import '../core/comment_count.dart';
 import '../core/region_scope.dart';
 import '../core/neighborhood_region.dart';
@@ -196,17 +195,16 @@ class _FeedState extends State<NeighborhoodFeed> {
     back: false,
     subtitle: widget.meetup ? '이웃과 함께하는 동네 모임' : '우리 동네 이웃들의 이야기',
     tint: widget.meetup ? neighborhoodMint : neighborhoodLavender,
-    actions: widget.meetup
-        ? [
-            TextButton.icon(
-              onPressed: () =>
-                  open(const MyPostListPage(title: '내가 만든 모임', isMeetup: true)),
-              icon: const Icon(Icons.people_outline),
-              label: const Text('내 모임'),
-            ),
-            const _Wallet(),
-          ]
-        : const [],
+    // Title line keeps only the point badge (as on every tab); "내 모임"
+    // sits on the subtitle line so the balance is never cut off.
+    subtitleAction: widget.meetup
+        ? TextButton.icon(
+            onPressed: () =>
+                open(const MyPostListPage(title: '내가 만든 모임', isMeetup: true)),
+            icon: const Icon(Icons.people_outline),
+            label: const Text('내 모임'),
+          )
+        : null,
     floating: FloatingActionButton.extended(
       onPressed: compose,
       icon: Icon(widget.meetup ? Icons.add : Icons.edit_outlined),
@@ -569,9 +567,3 @@ class _FeedState extends State<NeighborhoodFeed> {
   }
 }
 
-class _Wallet extends StatelessWidget {
-  const _Wallet();
-  @override
-  Widget build(BuildContext c) =>
-      const SizedBox(width: 100, child: PointBadge());
-}

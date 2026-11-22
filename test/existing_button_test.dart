@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:silver_life/activity/activity_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -628,6 +629,33 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets('meetup tab shows the whole point balance on a narrow phone', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(360, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final c = AttendanceController()
+      ..status = AttendanceStatus(
+        today: DateTime(2026, 11, 22),
+        attendedToday: true,
+        streak: 1,
+        balance: 1234,
+        totalEarned: 1234,
+        todayPoints: 1,
+      );
+    addTearDown(c.dispose);
+    await mount(
+      t,
+      AttendanceScope(controller: c, child: const MeetupPage()),
+      scale: 1.3,
+    );
+    final balance = t.renderObject<RenderParagraph>(find.text('123,400 P'));
+    expect(balance.didExceedMaxLines, isFalse);
+    expect(t.takeException(), isNull);
+    expect(find.text('내 모임'), findsOneWidget);
+    await finish(t);
+  });
   testWidgets(
     'meetup creation validates required date/place and preserves full capacity range',
     (t) async {

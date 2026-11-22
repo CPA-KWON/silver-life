@@ -20,11 +20,16 @@ class NeighborhoodScreen extends StatelessWidget {
     this.back = true,
     this.onBack,
     this.actions = const [],
+    this.subtitleAction,
     this.bottom,
     this.floating,
   });
   final String title;
   final String? subtitle;
+
+  /// Shown at the end of the subtitle line, leaving the title line to the
+  /// title and the point badge so neither gets squeezed on narrow phones.
+  final Widget? subtitleAction;
   final Widget child;
   final Color tint;
   final bool back;
@@ -85,7 +90,20 @@ class NeighborhoodScreen extends StatelessWidget {
                       if (actions.isEmpty) const PointBadge(),
                     ],
                   ),
-                  if (subtitle != null) ...[
+                  if (subtitle != null && subtitleAction != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            subtitle!,
+                            style: petText(18, color: PetColors.secondary),
+                          ),
+                        ),
+                        subtitleAction!,
+                      ],
+                    ),
+                  ] else if (subtitle != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       subtitle!,
