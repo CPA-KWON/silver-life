@@ -22,6 +22,7 @@ import 'package:silver_life/meetup/new_meetup_page.dart';
 import 'package:silver_life/profile/profile_page.dart';
 import 'package:silver_life/facility/facility_search_page.dart';
 import 'package:silver_life/facility/facility_flow.dart';
+import 'package:silver_life/facility/facility_result_widgets.dart';
 import 'package:silver_life/core/phone_call.dart';
 import 'package:silver_life/core/region_picker.dart';
 import 'package:silver_life/core/korea_regions.dart';
@@ -206,9 +207,41 @@ void main() {
       expect(find.text('지도에서 보기').hitTestable(), findsOneWidget);
       await tap(t, find.text('지도에서 보기'));
       expect(find.text('지도 주변 시설 25곳'), findsOneWidget);
+      // Folding leaves only the title so the map gets the room back.
+      await tap(t, find.text('접기'));
+      expect(find.text('지도 주변 시설 25곳'), findsOneWidget);
+      expect(find.byType(FacilityResultTile), findsNothing);
+      expect(find.text('목록으로 보기 ›'), findsNothing);
+      await tap(t, find.text('펼치기'));
+      expect(find.byType(FacilityResultTile), findsNWidgets(2));
+      expect(find.text('목록으로 보기 ›'), findsOneWidget);
       await finish(t);
     },
   );
+  testWidgets('compact map search bar fits a narrow phone at double text', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(360, 780);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final key = GlobalKey<FacilitySearchPageState>();
+    await mount(
+      t,
+      FacilitySearchPage(
+        key: key,
+        mapPlaceholder: const ColoredBox(color: Colors.blue),
+        enableRealtime: false,
+      ),
+      scale: 2,
+    );
+    key.currentState!.showFacilities(List.filled(3, testPlace));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(find.text('전체'), findsOneWidget);
+    await tap(t, find.text('접기'));
+    expect(t.takeException(), isNull);
+    await finish(t);
+  });
   testWidgets('home profile entry and activity shortcut return to summary', (
     t,
   ) async {

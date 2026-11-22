@@ -252,6 +252,8 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
       _userMoved = false,
       _initialSearch = false;
   bool _mapFailed = false;
+  // The "지도 주변 시설" panel folded down to its title so more map shows.
+  bool _resultsCollapsed = false;
   int _mapGeneration = 0;
   Timer? _mapWaitTimer;
   String? _subcategory;
@@ -413,6 +415,7 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
     _savedPlaces = null;
     _partialResults = false;
     _listMode = false;
+    _resultsCollapsed = false;
     _userMoved = false;
     _initialSearch = false;
     _highlighted = null;
@@ -665,7 +668,7 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
             (_controller == null && widget.mapPlaceholder == null),
         onSubmitted: _submitTextSearch,
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 6),
       _CategoryBar(
         categories: const ['전체', ...kFacilityCategories],
         selected: _category,
@@ -674,8 +677,8 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
             (_controller == null && widget.mapPlaceholder == null),
         onSelected: _selectCategory,
       ),
+      // No extra gap: each bar's own 1dp edge leaves 2dp between the rows.
       if (_category == '병원') ...[
-        const SizedBox(height: 10),
         _CategoryBar(
           categories: kHospitalSubcategories,
           selected: _subcategory,
@@ -742,8 +745,16 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
   );
   Widget _resultPanel() {
     final r = _preview;
+    // 40dp text buttons instead of the app-wide 56dp, so the panel's title
+    // and "목록으로 보기" rows don't leave tall empty bands over the map.
+    final compact = TextButton.styleFrom(
+      minimumSize: const Size(48, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
     return ActivityCard(
-      padding: 14,
+      padding: 12,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -757,12 +768,14 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
                 ),
               ),
               if (r == null)
-                TextButton(
-                  onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    setState(() => _listMode = true);
-                  },
-                  child: const Text('목록으로 보기 ›'),
+                TextButton.icon(
+                  style: compact,
+                  onPressed: () =>
+                      setState(() => _resultsCollapsed = !_resultsCollapsed),
+                  icon: Icon(
+                    _resultsCollapsed ? Icons.expand_less : Icons.expand_more,
+                  ),
+                  label: Text(_resultsCollapsed ? '펼치기' : '접기'),
                 )
               else
                 IconButton(
@@ -772,19 +785,32 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
                 ),
             ],
           ),
-          if (_partialResults)
+          // A little room between the title and the facilities under it.
+          if (r == null && !_resultsCollapsed) const SizedBox(height: 6),
+          if (_partialResults && !(r == null && _resultsCollapsed))
             Text(
               '일부 시설 정보가 늦어지고 있어요. 다시 검색해 주세요.',
               style: petText(13, color: PetColors.orange),
             ),
-          if (r == null) ...[
+          if (r == null && !_resultsCollapsed) ...[
             for (final item in _results.take(2))
               FacilityResultTile(
                 result: item,
                 position: _userPosition,
                 onTap: () => _chooseResult(item),
               ),
-          ] else ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                style: compact,
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  setState(() => _listMode = true);
+                },
+                child: const Text('목록으로 보기 ›'),
+              ),
+            ),
+          ] else if (r != null) ...[
             Text(r.address, style: petText(15, color: PetColors.secondary)),
             const SizedBox(height: 8),
             Row(
@@ -1932,7 +1958,11 @@ class _SearchField extends StatelessWidget {
         boxShadow: _floatShadow,
       ),
       child: SizedBox(
-        height: 56,
+        // Grows with the phone's font size so large text is never cut off.
+        height: () {
+          final scaled = MediaQuery.textScalerOf(context).scale(18) * 1.3 + 14;
+          return scaled > 48 ? scaled : 48.0;
+        }(),
         child: TextField(
           controller: controller,
           enabled: !isSearching,
@@ -1951,7 +1981,7 @@ class _SearchField extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
             suffixIcon: Padding(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(5),
               child: Material(
                 color: AppColors.tint,
                 borderRadius: BorderRadius.circular(12),
@@ -1960,7 +1990,7 @@ class _SearchField extends StatelessWidget {
                   onTap: isSearching ? null : onSubmitted,
                   child: SizedBox(
                     width: 44,
-                    height: 44,
+                    height: 38,
                     child: Icon(
                       Icons.arrow_forward,
                       color: isSearching
@@ -2012,22 +2042,33 @@ class _CategoryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Compact so the map keeps more room: 36dp chips with the same 18sp
+    // labels, 2dp between rows; grows with the phone font size.
+    final scaled = MediaQuery.textScalerOf(context).scale(18) * 0.9 + 18;
     return SizedBox(
-      height: 52,
+      height: scaled > 38 ? scaled : 38,
       child: ListView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 1),
         children: [
           for (final category in categories)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 6),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
                   boxShadow: _floatShadow,
                 ),
                 child: ChoiceChip(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  // The filled blue chip already shows the choice.
+                  showCheckmark: false,
                   label: Text(category),
                   selected: selected == category,
                   onSelected: isSearching ? null : (_) => onSelected(category),

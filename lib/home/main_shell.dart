@@ -325,7 +325,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 Scaffold(
                   body: FacilitySearchPage(
                     key: _facilityKey,
-                    showHeader: true,
+                    // No title row: the search field sits at the very top so
+                    // the map keeps more room.
                     nearbyPageBuilder: (_) =>
                         NearbyFacilitiesPage(loader: widget.nearbyLoader),
                     isActive: active,
