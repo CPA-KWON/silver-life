@@ -30,10 +30,13 @@ Future<FacilitySearchBatch> searchFacilityCatalog({
     for (final type in types)
       () async {
         try {
-          return await (kLocallySourcedCategories.contains(type)
-                  ? localQuery
-                  : remoteQuery)(category: type, lat: lat, lng: lng)
-              .timeout(const Duration(seconds: 12));
+          // "근처 경로당" still reads our own 경로당 data.
+          final own = kLocallySourcedCategories.contains(nearbyTerm(type));
+          return await (own ? localQuery : remoteQuery)(
+            category: own ? nearbyTerm(type)! : type,
+            lat: lat,
+            lng: lng,
+          ).timeout(const Duration(seconds: 12));
         } catch (e) {
           firstError ??= e;
           return <FacilityResult>[];
@@ -52,8 +55,12 @@ Future<FacilitySearchBatch> searchFacilityCatalog({
         '${result.name.replaceAll(RegExp(r'\s+'), '')}:${result.lat.toStringAsFixed(4)},${result.lng.toStringAsFixed(4)}';
     unique.putIfAbsent(key, () => result);
   }
-  final rows = unique.values.toList()
-    ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+  // A typed name keeps the search's accuracy order; kinds of place go
+  // nearest first.
+  final rows = unique.values.toList();
+  if (category == '전체' || nearbyTerm(category) != null) {
+    rows.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+  }
   if (rows.isEmpty && firstError != null) throw firstError!;
   return FacilitySearchBatch(
     rows.take(100).toList(),

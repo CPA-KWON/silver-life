@@ -372,6 +372,7 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
       _postId = null;
       _pickedInPlace(null);
       _finishEditor(false);
+      _resetSearch();
     }
     final controller = _controller;
     _locationTracker.setActive(widget.isActive);
@@ -385,10 +386,46 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
         unawaited(_startInitialTracking());
       }
     } else {
-      _resumeTrackingMode = controller.locationTrackingMode;
+      // A search may have moved the camera off the user; follow them again
+      // on return when location was allowed.
+      if (_resumeTrackingMode != NLocationTrackingMode.none ||
+          controller.locationTrackingMode != NLocationTrackingMode.none) {
+        _resumeTrackingMode = NLocationTrackingMode.follow;
+      }
       controller.setLocationTrackingMode(NLocationTrackingMode.none);
     }
   }
+
+  // Leaving the tab starts the next visit fresh: no old markers, keyword,
+  // category or error, and the first-visit "전체" search runs again around
+  // the user. Bumping the version stops a search still in flight from
+  // bringing back markers or errors after the reset.
+  void _resetSearch() {
+    _searchVersion++;
+    _searchController.clear();
+    _category = '전체';
+    _subcategory = null;
+    _activeSearchTerm = null;
+    _searchError = null;
+    _showSearchHereButton = false;
+    _isSearching = false;
+    _results = [];
+    _savedPlaces = null;
+    _partialResults = false;
+    _listMode = false;
+    _userMoved = false;
+    _initialSearch = false;
+    _highlighted = null;
+    _highlightedCategory = null;
+    _controller
+        ?.clearOverlays(type: NOverlayType.marker)
+        .then((_) {}, onError: (Object _) {});
+  }
+
+  bool _stale(NaverMapController controller, int version) =>
+      !mounted ||
+      !identical(controller, _controller) ||
+      version != _searchVersion;
 
   Future<void> _startInitialTracking() async {
     final controller = _controller;
@@ -495,19 +532,11 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
       await controller
           .clearOverlays(type: NOverlayType.marker)
           .timeout(const Duration(seconds: 3));
-      if (!mounted ||
-          !identical(controller, _controller) ||
-          version != _searchVersion) {
-        return;
-      }
+      if (_stale(controller, version)) return;
       final position = await controller.getCameraPosition().timeout(
         const Duration(seconds: 3),
       );
-      if (!mounted ||
-          !identical(controller, _controller) ||
-          version != _searchVersion) {
-        return;
-      }
+      if (_stale(controller, version)) return;
       final lat = position.target.latitude;
       final lng = position.target.longitude;
       final batch = await searchFacilityCatalog(
@@ -531,14 +560,10 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
         }
       }());
 
-      if (!mounted ||
-          !identical(controller, _controller) ||
-          version != _searchVersion) {
-        return;
-      }
+      if (_stale(controller, version)) return;
       final markers = <NMarker>{};
       for (final result in results) {
-        if (!mounted || _controller != controller) return;
+        if (_stale(controller, version)) return;
         final marker = NMarker(
           id: '${result.lat},${result.lng},${result.name}',
           position: NLatLng(result.lat, result.lng),
@@ -561,21 +586,13 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
         markers.add(marker);
       }
 
-      if (!mounted ||
-          !identical(controller, _controller) ||
-          version != _searchVersion) {
-        return;
-      }
+      if (_stale(controller, version)) return;
       if (markers.isNotEmpty) {
         await controller
             .addOverlayAll(markers)
             .timeout(const Duration(seconds: 3));
       }
-      if (!mounted ||
-          !identical(controller, _controller) ||
-          version != _searchVersion) {
-        return;
-      }
+      if (_stale(controller, version)) return;
 
       if (results.isNotEmpty && mounted) {
         await controller
@@ -590,13 +607,17 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(content: Text('주변에서 "$searchTerm"를 찾지 못했습니다.')),
+            SnackBar(
+              content: Text(
+                nearbyTerm(searchTerm) == null
+                    ? '"$searchTerm"을(를) 찾지 못했어요. 이름을 다시 확인해 주세요.'
+                    : '주변 5km 안에서 "$searchTerm"을(를) 찾지 못했어요. 지도를 옮긴 뒤 "이 위치에서 검색"을 눌러 보세요.',
+              ),
+            ),
           );
       }
     } catch (error) {
-      if (mounted && version == _searchVersion) {
-        setState(() => _searchError = error);
-      }
+      if (!_stale(controller, version)) setState(() => _searchError = error);
     } finally {
       if (mounted && version == _searchVersion) {
         setState(() => _isSearching = false);
@@ -1105,6 +1126,11 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
   bool? _isFavorite;
   bool _isToggling = false;
 
+  /// What favorites and check-ins save: [FacilityDetailPage.result] itself,
+  /// or its NAVER match when the result is live-only Kakao data.
+  FacilityResult? _storable;
+  bool _notStorable = false;
+
   String? _facilityId;
   bool? _checkedIn;
   int? _checkinCount;
@@ -1195,6 +1221,18 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
       unawaited(Supabase.instance.client.removeChannel(oldChannel));
     }
     try {
+      if (_storable == null) {
+        try {
+          final storable = await findStorableFacility(widget.result);
+          if (!mounted || generation != _detailGeneration) return;
+          setState(() => _storable = storable);
+        } on FacilityNotStorableException {
+          if (mounted && generation == _detailGeneration) {
+            setState(() => _notStorable = true);
+          }
+          return;
+        }
+      }
       await Future.wait([
         _loadFavoriteStatus(generation),
         _initCheckins(generation),
@@ -1217,7 +1255,9 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
 
   Future<void> _loadGuide(int generation) async {
     try {
-      final id = widget.result.id ?? await ensureFacility(widget.result);
+      // Never save live-only Kakao data: use its NAVER match.
+      final storable = _storable!;
+      final id = storable.id ?? await ensureFacility(storable);
       final raw = await Supabase.instance.client
           .rpc('facility_guide', params: {'target_facility': id})
           .timeout(const Duration(seconds: 10));
@@ -1239,7 +1279,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
 
   Future<void> _initCheckins(int generation) async {
     final client = Supabase.instance.client;
-    final result = widget.result;
+    final result = _storable!;
 
     String facilityId;
     if (result.id != null) {
@@ -1427,8 +1467,8 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
         .from('favorites')
         .select('id')
         .eq('user_id', userId)
-        .eq('name', widget.result.name)
-        .eq('address', widget.result.address)
+        .eq('name', _storable!.name)
+        .eq('address', _storable!.address)
         .timeout(const Duration(seconds: 10));
     if (mounted && generation == _detailGeneration) {
       setState(() => _isFavorite = rows.isNotEmpty);
@@ -1440,7 +1480,7 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     setState(() => _isToggling = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser!.id;
-      final result = widget.result;
+      final result = _storable!;
       if (_isFavorite == true) {
         await Supabase.instance.client
             .from('favorites')
@@ -1584,6 +1624,11 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
           '시설 정보를 불러오지 못했어요. 다시 시도해 주세요.',
           action: '다시 시도',
           onAction: _loadingDetails ? null : _loadDetails,
+        ),
+      if (_notStorable)
+        const ActivityEmpty(
+          '이 시설은 즐겨찾기와 "나 여기 있음"을 쓸 수 없어요. '
+          '전화 걸기와 위치 확인은 그대로 할 수 있어요.',
         ),
       NeighborhoodHero(
         title: r.name,

@@ -111,6 +111,24 @@ void main() {
       geo.pending!.complete(null);
     }
   });
+
+  test('location button gets the last fix at once while standing', () async {
+    const events = EventChannel('NDefaultMyLocationTracker.locationStream');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockStreamHandler(
+          events,
+          MockStreamHandler.inline(onListen: (_, _) {}),
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(events, null),
+    );
+    geo.position = position(DateTime.now(), 20);
+    final tracker = SafeMapLocationTracker();
+    await tracker.startLocationService();
+    // The map resubscribes when the button switches noFollow -> follow.
+    expect(await tracker.locationStream.first, const NLatLng(37.5, 127));
+  });
 }
 
 Position position(DateTime timestamp, double accuracy) => Position(

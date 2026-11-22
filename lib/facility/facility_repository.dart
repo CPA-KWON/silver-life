@@ -4,8 +4,11 @@ import '../core/address_region.dart';
 import 'naver_local_search.dart';
 
 /// Reuses an existing place without allowing a visitor to overwrite its data.
-Future<String> ensureFacility(FacilityResult result) async {
-  if (result.id != null) return result.id!;
+/// Live-only (Kakao) places are swapped for their NAVER match first, since
+/// Kakao's terms forbid storing them.
+Future<String> ensureFacility(FacilityResult place) async {
+  if (place.id != null) return place.id!;
+  final result = await findStorableFacility(place);
   final (sido, sigungu) = parseRegionFromAddress(result.address);
   final id = await Supabase.instance.client
       .rpc(

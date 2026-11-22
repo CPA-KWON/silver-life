@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:silver_life/home/home_tab.dart';
@@ -59,4 +60,50 @@ void main() {
     expect(t.takeException(), isNull);
     await finish(t);
   });
+
+  for (final width in [320.0, 360.0]) {
+    for (final scale in [1.0, 1.3, 2.0]) {
+      testWidgets('menu labels fit at ${width}dp with ${scale}x text', (
+        t,
+      ) async {
+        await t.binding.setSurfaceSize(Size(width, 800));
+        addTearDown(() => t.binding.setSurfaceSize(null));
+        await mount(
+          t,
+          MainShell(activityRepository: FakeActivityRepository()),
+          scale: scale,
+        );
+        final bar = t.getRect(find.byType(NavigationBar));
+        for (final label in ['홈', '시설 찾기', '활동', '동네 모임', '커뮤니티']) {
+          final text = find.descendant(
+            of: find.byType(NavigationBar),
+            matching: find.text(label),
+          );
+          final paragraph = t.renderObject<RenderParagraph>(text.first);
+          // Nothing cut off: the label is as wide as its own text needs.
+          expect(
+            paragraph.getMaxIntrinsicWidth(double.infinity),
+            lessThanOrEqualTo(paragraph.size.width + 0.5),
+            reason: label,
+          );
+          final rect = t.getRect(text.first);
+          final slot = t.getRect(
+            find.ancestor(
+              of: text.first,
+              matching: find.byType(NavigationDestination),
+            ),
+          );
+          expect(rect.left - slot.left, greaterThanOrEqualTo(5), reason: label);
+          expect(
+            slot.right - rect.right,
+            greaterThanOrEqualTo(5),
+            reason: label,
+          );
+          expect(rect.right, lessThanOrEqualTo(bar.right - 5), reason: label);
+        }
+        expect(t.takeException(), isNull);
+        await finish(t);
+      });
+    }
+  }
 }
