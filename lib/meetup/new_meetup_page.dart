@@ -20,7 +20,12 @@ class NewMeetupPage extends StatefulWidget {
     this.existingPost,
     this.onFinished,
     this.facilityPicker,
+    this.initialFacility,
   });
+
+  /// Pre-fills the place of a new meetup, e.g. when started from a
+  /// facility's detail page. Ignored when editing [existingPost].
+  final FacilityResult? initialFacility;
 
   /// When set (id, title, content, event_at, facility), the page edits that
   /// meetup (UPDATE) instead of creating a new one (INSERT). `facility` is
@@ -71,6 +76,7 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   }
 
   FacilityResult? get _initialFacility {
+    if (widget.existingPost == null) return widget.initialFacility;
     final facility = widget.existingPost?['facility'] as Map<String, dynamic>?;
     if (facility == null) return null;
     return FacilityResult(

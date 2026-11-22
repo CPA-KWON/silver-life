@@ -323,6 +323,23 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
     return result.future;
   }
 
+  /// "이 시설에서 모임 만들기": the meetup form over the map with the place
+  /// filled in; the detail's meetup list reloads once one is created.
+  void _createMeetupInPlace(FacilityResult place) {
+    final result = Completer<bool?>();
+    setState(() {
+      _editResult = result;
+      _editor = NewMeetupPage(
+        initialFacility: place,
+        onFinished: _finishEditor,
+        facilityPicker: _pickInPlace,
+      );
+    });
+    result.future.then((changed) {
+      if (changed == true && mounted) setState(() => _detailVersion++);
+    });
+  }
+
   Future<FacilityResult?> _pickInPlace() {
     final result = Completer<FacilityResult?>();
     setState(() {
@@ -1041,6 +1058,7 @@ class FacilitySearchPageState extends State<FacilitySearchPage> {
                     onOpenPost: (id) => setState(() {
                       _postId = id;
                     }),
+                    onCreateMeetup: _createMeetupInPlace,
                     enableRealtime: widget.enableRealtime,
                     refreshVersion: _detailVersion,
                     showBackButton: widget.showDetailBackButton,
@@ -1126,8 +1144,12 @@ class FacilityDetailPage extends StatefulWidget {
     this.positionLoader = loadFacilityPosition,
     this.onOpenPrograms,
     this.onOpenProgram,
+    this.onCreateMeetup,
   });
 
+  /// Opens the meetup form with this facility as the place. Without it the
+  /// form is pushed as a route.
+  final ValueChanged<FacilityResult>? onCreateMeetup;
   final VoidCallback? onOpenPrograms;
   final ValueChanged<ActivityData>? onOpenProgram;
   final FacilityResult result;
@@ -1537,6 +1559,20 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
     }
   }
 
+  Future<void> _createMeetup() async {
+    // Prefer the saved form of the place (its NAVER match for Kakao data).
+    final place = _storable ?? widget.result;
+    if (widget.onCreateMeetup != null) {
+      widget.onCreateMeetup!(place);
+      return;
+    }
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => NewMeetupPage(initialFacility: place)),
+    );
+    if (created == true && mounted) await _loadDetails();
+  }
+
   void programs() {
     if (widget.onOpenPrograms != null) {
       widget.onOpenPrograms!();
@@ -1831,7 +1867,12 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
         if (_upcomingMeetups == null)
           const ActivityCard(child: LinearProgressIndicator())
         else if (_upcomingMeetups!.isEmpty)
-          const ActivityEmpty('예정된 모임이 없어요', message: '동네 모임에서 새 모임을 찾아보세요.')
+          ActivityEmpty(
+            '예정된 모임이 없어요',
+            message: _notStorable
+                ? '동네 모임에서 새 모임을 찾아보세요.'
+                : '이 시설에서 첫 모임을 만들어 보세요.',
+          )
         else
           ActivityCard(
             child: Column(
@@ -1862,6 +1903,16 @@ class _FacilityDetailPageState extends State<FacilityDetailPage> {
               ],
             ),
           ),
+        // Live-only Kakao data with no NAVER match can't be a meetup place.
+        if (!_notStorable) ...[
+          const SizedBox(height: 10),
+          ActivityButton(
+            '이 시설에서 모임 만들기',
+            icon: Icons.add,
+            color: PetColors.green,
+            onTap: _createMeetup,
+          ),
+        ],
       ],
     ];
     final body = SingleChildScrollView(

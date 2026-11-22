@@ -219,6 +219,32 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets('facility detail starts a meetup with the place filled in', (
+    t,
+  ) async {
+    final key = GlobalKey<FacilitySearchPageState>();
+    await mount(
+      t,
+      FacilitySearchPage(
+        key: key,
+        mapPlaceholder: const ColoredBox(color: Colors.blue),
+        enableRealtime: false,
+      ),
+    );
+    key.currentState!.showFacilities(const [testPlace], detail: true);
+    await t.pumpAndSettle();
+    await tap(t, find.text('이 시설에서 모임 만들기'));
+    expect(find.byType(NewMeetupPage), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(NewMeetupPage),
+        matching: find.text('테스트 복지관'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('장소를 골라 주세요'), findsNothing);
+    await finish(t);
+  });
   testWidgets('compact map search bar fits a narrow phone at double text', (
     t,
   ) async {
