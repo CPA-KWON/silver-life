@@ -69,6 +69,24 @@ Future<void> tap(WidgetTester t, Finder f) async {
   await t.pumpAndSettle();
 }
 
+/// Chooses a meetup start time with its 오전/오후, 시 and 분 select boxes.
+Future<void> pickMeetupTime(
+  WidgetTester t,
+  String period,
+  String hour,
+  String minute,
+) async {
+  for (final (key, label) in [
+    ('meetup-period', period),
+    ('meetup-hour', hour),
+    ('meetup-minute', minute),
+  ]) {
+    await tap(t, find.byKey(Key(key)));
+    await t.tap(find.text(label).last);
+    await t.pumpAndSettle();
+  }
+}
+
 Future<void> fill(WidgetTester t, String label, String value) async {
   final f = find.byWidgetPredicate(
     (w) => w is TextField && w.decoration?.labelText == label,

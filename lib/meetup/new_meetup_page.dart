@@ -55,9 +55,21 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   late int _duration = widget.existingPost?['duration_minutes'] ?? 60;
 
   late DateTime? _eventDate = _initialEventAt?.toLocal();
-  late TimeOfDay? _eventTime = _initialEventAt == null
+  // Picked with three select boxes: 오전/오후, 1–12시, 10-minute steps.
+  late final TimeOfDay? _initialTime = _initialEventAt == null
       ? null
       : TimeOfDay.fromDateTime(_initialEventAt!.toLocal());
+  late bool? _isPm = _initialTime == null ? null : _initialTime.hour >= 12;
+  late int? _hour12 = _initialTime == null
+      ? null
+      : (_initialTime.hour % 12 == 0 ? 12 : _initialTime.hour % 12);
+  late int? _minute = _initialTime?.minute;
+
+  /// Null until 오전/오후, 시 and 분 are all chosen.
+  TimeOfDay? get _eventTime =>
+      _isPm == null || _hour12 == null || _minute == null
+      ? null
+      : TimeOfDay(hour: _hour12! % 12 + (_isPm! ? 12 : 0), minute: _minute!);
   late FacilityResult? _eventFacility = _initialFacility;
 
   void _finish(bool changed) {
@@ -101,11 +113,6 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
   Future<void> _pickDate() async {
     final picked = await pickSocialDate(context, _eventDate);
     if (mounted && picked != null) setState(() => _eventDate = picked);
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await pickSocialTime(context, _eventTime);
-    if (mounted && picked != null) setState(() => _eventTime = picked);
   }
 
   Future<void> _pickFacility() async {
@@ -276,14 +283,14 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
                     hasValue: _eventDate != null,
                     onTap: _pickDate,
                   ),
-                  _PickerRow(
-                    icon: Icons.schedule,
-                    label: '시간',
-                    value: _eventTime == null
-                        ? '시작 시간을 골라 주세요'
-                        : _eventTime!.format(context),
-                    hasValue: _eventTime != null,
-                    onTap: _pickTime,
+                  _TimeSelects(
+                    isPm: _isPm,
+                    hour: _hour12,
+                    minute: _minute,
+                    enabled: !_isSaving,
+                    onPeriod: (v) => setState(() => _isPm = v),
+                    onHour: (v) => setState(() => _hour12 = v),
+                    onMinute: (v) => setState(() => _minute = v),
                   ),
                   _PickerRow(
                     icon: Icons.place_outlined,
@@ -329,6 +336,7 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
             SocialFormCard(
               '다른 인원 고르기',
               child: DropdownButtonFormField<int>(
+                key: const Key('meetup-capacity'),
                 initialValue: _capacity,
                 decoration: const InputDecoration(labelText: '최대 인원'),
                 items: [
@@ -398,6 +406,116 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
       ),
     ),
   );
+}
+
+/// Start time as three select boxes side by side (stacked when the screen is
+/// narrow or the text is enlarged): 오전/오후, 1–12시, 0–50분 in 10-minute
+/// steps. An edited meetup's odd minute (e.g. 15분) stays selectable.
+class _TimeSelects extends StatelessWidget {
+  const _TimeSelects({
+    required this.isPm,
+    required this.hour,
+    required this.minute,
+    required this.enabled,
+    required this.onPeriod,
+    required this.onHour,
+    required this.onMinute,
+  });
+
+  final bool? isPm;
+  final int? hour;
+  final int? minute;
+  final bool enabled;
+  final ValueChanged<bool?> onPeriod;
+  final ValueChanged<int?> onHour;
+  final ValueChanged<int?> onMinute;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final itemStyle = textTheme.bodyLarge?.copyWith(
+      fontSize: 18,
+      color: AppColors.textPrimary,
+    );
+    Widget select<T>(
+      String key,
+      String hint,
+      T? value,
+      List<(T, String)> options,
+      ValueChanged<T?> onChanged,
+    ) => DropdownButtonFormField<T>(
+      key: Key(key),
+      initialValue: value,
+      isExpanded: true,
+      style: itemStyle,
+      decoration: InputDecoration(labelText: hint),
+      items: [
+        for (final (v, label) in options)
+          DropdownMenuItem(value: v, child: Text(label)),
+      ],
+      onChanged: enabled ? onChanged : null,
+    );
+    final minutes = {0, 10, 20, 30, 40, 50, ?minute}.toList()..sort();
+    final boxes = [
+      select<bool>('meetup-period', '오전/오후', isPm, const [
+        (false, '오전'),
+        (true, '오후'),
+      ], onPeriod),
+      select<int>('meetup-hour', '시', hour, [
+        for (var h = 1; h <= 12; h++) (h, '$h시'),
+      ], onHour),
+      select<int>('meetup-minute', '분', minute, [
+        for (final m in minutes) (m, '$m분'),
+      ], onMinute),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconBadge(icon: Icons.schedule, size: 40),
+              const SizedBox(width: 12),
+              Text(
+                '시간',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (c, b) {
+              final stacked =
+                  b.maxWidth < 330 || MediaQuery.textScalerOf(c).scale(1) > 1.3;
+              if (stacked) {
+                return Column(
+                  children: [
+                    for (final (i, box) in boxes.indexed) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      box,
+                    ],
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  for (final (i, box) in boxes.indexed) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    Expanded(flex: i == 0 ? 5 : 4, child: box),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PickerRow extends StatelessWidget {

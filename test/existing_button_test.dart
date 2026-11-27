@@ -694,16 +694,58 @@ void main() {
       await tap(t, find.text('날짜를 골라 주세요'));
       await tap(t, find.text('내일'));
       await tap(t, find.text('이 날짜로 정하기'));
-      await tap(t, find.text('시작 시간을 골라 주세요'));
-      await tap(t, find.text('이 시간으로 정하기'));
+      await pickMeetupTime(t, '오후', '3시', '20분');
       await tap(t, find.text('장소를 골라 주세요'));
       await tap(t, find.text('지도에서 장소 찾기'));
-      await tap(t, find.byType(DropdownButtonFormField<int>));
+      await tap(t, find.byKey(const Key('meetup-capacity')));
       await tap(t, find.text('12명').last);
       await tap(t, find.widgetWithText(FilledButton, '모임 올리기'));
       expect(backend.postWrites, 1);
       expect(backend.posts.single['facility_id'], 'facility');
       expect(backend.posts.single['max_participants'], 12);
+      final at = DateTime.parse(backend.posts.single['event_at'] as String)
+          .toLocal();
+      expect((at.hour, at.minute), (15, 20));
+      await finish(t);
+    },
+  );
+  testWidgets(
+    'meetup time select boxes offer 10-minute steps and need all three',
+    (t) async {
+      await t.binding.setSurfaceSize(const Size(320, 1400));
+      addTearDown(() => t.binding.setSurfaceSize(null));
+      await mount(
+        t,
+        NewMeetupPage(facilityPicker: () async => testPlace),
+        scale: 2,
+      );
+      expect(t.takeException(), isNull);
+      await tap(t, find.byKey(const Key('meetup-minute')));
+      for (final m in ['0분', '10분', '20분', '30분', '40분', '50분']) {
+        expect(find.text(m), findsWidgets);
+      }
+      expect(find.text('5분'), findsNothing);
+      expect(find.text('15분'), findsNothing);
+      await t.tap(find.text('30분').last);
+      await t.pumpAndSettle();
+      // The selects themselves fit a narrow phone at 200% text.
+      expect(t.takeException(), isNull);
+      await mount(t, NewMeetupPage(facilityPicker: () async => testPlace));
+      await tap(t, find.byKey(const Key('meetup-minute')));
+      await t.tap(find.text('30분').last);
+      await t.pumpAndSettle();
+      await fill(t, '제목', '새 모임');
+      await fill(t, '내용', '같이 만나요');
+      await tap(t, find.text('날짜를 골라 주세요'));
+      await tap(t, find.text('내일'));
+      await tap(t, find.text('이 날짜로 정하기'));
+      await tap(t, find.text('장소를 골라 주세요'));
+      await tap(t, find.text('지도에서 장소 찾기'));
+      // 분 only — 오전/오후 and 시 still missing.
+      await tap(t, find.widgetWithText(FilledButton, '모임 올리기'));
+      expect(backend.postWrites, 0);
+      expect(find.text('모임 날짜·시간·장소를 모두 선택해주세요.'), findsOneWidget);
+      expect(t.takeException(), isNull);
       await finish(t);
     },
   );
@@ -737,8 +779,7 @@ void main() {
     await tap(t, find.text('날짜를 골라 주세요'));
     await tap(t, find.text('내일'));
     await tap(t, find.text('이 날짜로 정하기'));
-    await tap(t, find.text('시작 시간을 골라 주세요'));
-    await tap(t, find.text('이 시간으로 정하기'));
+    await pickMeetupTime(t, '오전', '9시', '0분');
     await fill(t, '제목', '경로당 모임');
     await fill(t, '내용', '같이 만나요');
     await tap(t, find.widgetWithText(FilledButton, '모임 올리기'));
