@@ -19,7 +19,14 @@ Future<PetFood?> showPetFoodPicker(
     borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
   ),
   builder: (c) => SingleChildScrollView(
-    padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+    // useSafeArea only clears the top; keep the "기본 사료 주기" button above
+    // the phone's bottom navigation/gesture bar too.
+    padding: EdgeInsets.fromLTRB(
+      18,
+      12,
+      18,
+      20 + MediaQuery.viewPaddingOf(c).bottom,
+    ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

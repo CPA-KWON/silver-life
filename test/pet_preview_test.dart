@@ -139,6 +139,28 @@ void main() {
       await finish(t);
     },
   );
+  testWidgets('food picker button stays above the phone home bar', (t) async {
+    t.view.physicalSize = const Size(1080, 2400);
+    t.view.devicePixelRatio = 3;
+    t.view.padding = const FakeViewPadding(bottom: 48 * 3);
+    t.view.viewPadding = const FakeViewPadding(bottom: 48 * 3);
+    addTearDown(t.view.reset);
+    final pet = PetPreviewController()..adopt('콩이');
+    addTearDown(pet.dispose);
+    await mount(t, still(PetHomePage(pet: pet)));
+    await tap(t, find.text('먹이 주기'));
+    final button = find.text('기본 사료 주기');
+    expect(button, findsOneWidget);
+    // Scroll the picker to its very end, where the button is the last thing.
+    await t.drag(
+      find.ancestor(of: button, matching: find.byType(SingleChildScrollView)),
+      const Offset(0, -3000),
+    );
+    await t.pumpAndSettle();
+    // 800 logical px tall screen, 48 px home bar at the bottom.
+    expect(t.getRect(button).bottom, lessThanOrEqualTo(800 - 48));
+    await finish(t);
+  });
   testWidgets('sign-out removes fullscreen pet routes as well as tab routes', (
     t,
   ) async {
