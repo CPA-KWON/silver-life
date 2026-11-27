@@ -94,6 +94,9 @@ class _ShopState extends State<PetShopPage> {
       ..removeWhere((id) => PetItem.slotFor(id) == item.slot)
       ..add(item.id);
     setState(() => preview = next);
+    // Set when "이 모습으로 입히기" closes the sheet: the save is still running
+    // then, so keep showing the chosen look instead of the old outfit.
+    var wearing = false;
     await showModalBottomSheet<void>(
       context: petModalContext(context),
       useRootNavigator: false,
@@ -173,10 +176,15 @@ class _ShopState extends State<PetShopPage> {
                       ? null
                       : () async {
                           if (owned) {
+                            wearing = true;
                             Navigator.pop(c);
                             await act(() async {
                               await pet.run('wear', {'items': next.toList()});
                             });
+                            // Saved (or failed): show what is actually worn.
+                            if (mounted) {
+                              setState(() => preview = Set.of(pet.worn));
+                            }
                             return;
                           }
                           if (item.premium) {
@@ -244,7 +252,7 @@ class _ShopState extends State<PetShopPage> {
         },
       ),
     );
-    if (mounted) setState(() => preview = Set.of(pet.worn));
+    if (mounted && !wearing) setState(() => preview = Set.of(pet.worn));
   }
 
   Future<void> insufficient(PetItem item) async {

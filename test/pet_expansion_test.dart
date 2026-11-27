@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:silver_life/pet/pet_preview_controller.dart';
 import 'package:silver_life/pet/pet_catalog.dart';
+import 'package:silver_life/pet/pet_design.dart';
+import 'package:silver_life/pet/pet_repository.dart';
 import 'package:silver_life/pet/pet_walk_settings.dart';
 import 'package:silver_life/pet/pet_shop_page.dart';
 import 'package:silver_life/pet/pet_safe_walk_page.dart';
@@ -96,6 +98,32 @@ void main() {
   );
 
   testWidgets(
+    'wearing from the preview sheet keeps the new look while the save runs',
+    (t) async {
+      final pet = _SlowWearPet();
+      await pet.run('adopt', {'name': '나비', 'species': 'cat'});
+      await pet.run('buy', {'item': 'cat_stripe_knit'});
+      addTearDown(pet.dispose);
+      await mount(t, PetShopPage(pet: pet));
+      Set<String>? shownOutfit() =>
+          t.widgetList<PetPhoto>(find.byType(PetPhoto)).first.outfit;
+      expect(shownOutfit(), isEmpty);
+      // Dog and cat both have a "줄무늬 니트"; the closet lists only owned ones.
+      await tap(t, find.text('내 옷장'));
+      await tap(t, find.text('줄무늬 니트'));
+      await t.tap(find.text('이 모습으로 입히기'));
+      // Sheet closed, server save still running: no jump back to the old look.
+      await t.pump(const Duration(milliseconds: 400));
+      expect(pet.worn, isEmpty);
+      expect(shownOutfit(), {'cat_stripe_knit'});
+      await t.pumpAndSettle(const Duration(seconds: 1));
+      expect(pet.worn, {'cat_stripe_knit'});
+      expect(shownOutfit(), {'cat_stripe_knit'});
+      await finish(t);
+    },
+  );
+
+  testWidgets(
     'walk contact registration validates a number and survives reopening',
     (t) async {
       SharedPreferences.setMockInitialValues({});
@@ -175,4 +203,16 @@ void main() {
       }
     }
   });
+}
+
+/// Preview pet whose "wear" answers late, like a real server round trip.
+class _SlowWearPet extends PetPreviewController {
+  _SlowWearPet() : super(initialPoints: 500);
+  @override
+  Future<PetOutcome> run(String action, [PetJson payload = const {}]) async {
+    if (action == 'wear') {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+    }
+    return super.run(action, payload);
+  }
 }
