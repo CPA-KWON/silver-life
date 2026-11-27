@@ -97,6 +97,34 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'wardrobe cards share one height and chip rows have room (x$scale)',
+      (t) async {
+        await t.binding.setSurfaceSize(const Size(400, 2400));
+        addTearDown(() => t.binding.setSurfaceSize(null));
+        final pet = PetPreviewController(initialPoints: 500)..adopt('콩이');
+        addTearDown(pet.dispose);
+        await mount(t, PetShopPage(pet: pet), scale: scale);
+        await tap(t, find.text('새 아이템'));
+        final cards = find.byWidgetPredicate(
+          (w) => w is PetCard && w.padding == 10,
+        );
+        final heights = {
+          for (final e in cards.evaluate())
+            (e.renderObject! as RenderBox).size.height.round(),
+        };
+        expect(cards.evaluate().length, greaterThan(3));
+        expect(heights, hasLength(1), reason: 'card heights: $heights');
+        final kindRow = t.getRect(find.widgetWithText(ChoiceChip, '의상'));
+        final sourceRow = t.getRect(find.widgetWithText(FilterChip, 'P 아이템'));
+        expect(sourceRow.top - kindRow.bottom, greaterThanOrEqualTo(12));
+        expect(t.takeException(), isNull);
+        await finish(t);
+      },
+    );
+  }
+
   testWidgets(
     'wearing from the preview sheet keeps the new look while the save runs',
     (t) async {

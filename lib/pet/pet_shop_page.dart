@@ -435,8 +435,10 @@ class _ShopState extends State<PetShopPage> {
               ],
             ),
             const SizedBox(height: 8),
+            // 종류 row, then 구하는 방법 row, each with room around it.
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
                 for (final label in ['전체', '의상', '장식'])
                   ChoiceChip(
@@ -446,10 +448,11 @@ class _ShopState extends State<PetShopPage> {
                   ),
               ],
             ),
-            if (section == '새 아이템')
+            if (section == '새 아이템') ...[
+              const SizedBox(height: 12),
               Wrap(
-                spacing: 6,
-                runSpacing: 4,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   for (final entry in {
                     '전체': '전체',
@@ -464,6 +467,8 @@ class _ShopState extends State<PetShopPage> {
                     ),
                 ],
               ),
+            ],
+            const SizedBox(height: 16),
             if (billing.message != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -491,6 +496,12 @@ class _ShopState extends State<PetShopPage> {
                     ? 2
                     : 3;
                 final width = (b.maxWidth - (cols - 1) * 10) / cols;
+                // Every card the same height: the name always takes two
+                // lines of room (petText line height 1.32), the status one.
+                final nameHeight =
+                    MediaQuery.textScalerOf(c).scale(15) * 1.32 * 2;
+                final statusHeight =
+                    MediaQuery.textScalerOf(c).scale(13) * 1.32;
                 return Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -519,42 +530,62 @@ class _ShopState extends State<PetShopPage> {
                                       'assets/pet/items/${item.id}.png',
                                       height: 80,
                                       fit: BoxFit.contain,
-                                      errorBuilder: (_, e, s) =>
-                                          const Icon(Icons.checkroom, size: 60),
+                                      errorBuilder: (_, e, s) => const SizedBox(
+                                        height: 80,
+                                        child: Icon(Icons.checkroom, size: 60),
+                                      ),
                                     ),
                                   const SizedBox(height: 8),
-                                  Text(
-                                    item.name,
-                                    textAlign: TextAlign.center,
-                                    style: petText(15),
+                                  SizedBox(
+                                    height: nameHeight,
+                                    child: Center(
+                                      child: Text(
+                                        item.name,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: petText(15),
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    !item.compatible(pet.species)
-                                        ? '다른 동물 전용'
-                                        : pet.worn.contains(item.id)
-                                        ? '착용 중'
-                                        : pet.owned.contains(item.id)
-                                        ? '보유'
-                                        : pet.stage < item.minStage
-                                        ? '성장기부터'
-                                        : item.activity
-                                        ? '활동 선물'
-                                        : item.premium
-                                        ? (pet.isPreview
-                                              ? '결제 미리보기'
-                                              : billing
-                                                        .products[item
-                                                            .productId]
-                                                        ?.price ??
-                                                    '판매 준비 중')
-                                        : '${pointAmount(item.price)}P',
-                                    textAlign: TextAlign.center,
-                                    style: petText(
-                                      13,
-                                      color: item.premium
-                                          ? PetColors.purple
-                                          : PetColors.blue,
+                                  // One line, shrunk to fit rather than
+                                  // wrapped, so a long price never makes a
+                                  // card taller.
+                                  SizedBox(
+                                    height: statusHeight,
+                                    child: Center(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          !item.compatible(pet.species)
+                                              ? '다른 동물 전용'
+                                              : pet.worn.contains(item.id)
+                                              ? '착용 중'
+                                              : pet.owned.contains(item.id)
+                                              ? '보유'
+                                              : pet.stage < item.minStage
+                                              ? '성장기부터'
+                                              : item.activity
+                                              ? '활동 선물'
+                                              : item.premium
+                                              ? (pet.isPreview
+                                                    ? '결제 미리보기'
+                                                    : billing
+                                                              .products[item
+                                                                  .productId]
+                                                              ?.price ??
+                                                          '판매 준비 중')
+                                              : '${pointAmount(item.price)}P',
+                                          textAlign: TextAlign.center,
+                                          style: petText(
+                                            13,
+                                            color: item.premium
+                                                ? PetColors.purple
+                                                : PetColors.blue,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
