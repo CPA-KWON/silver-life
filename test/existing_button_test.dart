@@ -698,7 +698,12 @@ void main() {
       await tap(t, find.text('장소를 골라 주세요'));
       await tap(t, find.text('지도에서 장소 찾기'));
       await tap(t, find.byKey(const Key('meetup-capacity')));
-      await tap(t, find.text('12명').last);
+      // 2–30명 opens height-limited and scrolls inside.
+      expect(
+        t.getSize(find.byType(Scrollable).last).height,
+        lessThanOrEqualTo(300),
+      );
+      await chooseFromOpenMenu(t, '12명');
       await tap(t, find.widgetWithText(FilledButton, '모임 올리기'));
       expect(backend.postWrites, 1);
       expect(backend.posts.single['facility_id'], 'facility');
@@ -731,6 +736,13 @@ void main() {
       // The selects themselves fit a narrow phone at 200% text.
       expect(t.takeException(), isNull);
       await mount(t, NewMeetupPage(facilityPicker: () async => testPlace));
+      // The 12-hour list opens height-limited and scrolls inside.
+      await tap(t, find.byKey(const Key('meetup-hour')));
+      expect(
+        t.getSize(find.byType(Scrollable).last).height,
+        lessThanOrEqualTo(300),
+      );
+      await chooseFromOpenMenu(t, '12시');
       await tap(t, find.byKey(const Key('meetup-minute')));
       await t.tap(find.text('30분').last);
       await t.pumpAndSettle();

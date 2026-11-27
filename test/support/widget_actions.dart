@@ -82,9 +82,21 @@ Future<void> pickMeetupTime(
     ('meetup-minute', minute),
   ]) {
     await tap(t, find.byKey(Key(key)));
-    await t.tap(find.text(label).last);
-    await t.pumpAndSettle();
+    await chooseFromOpenMenu(t, label);
   }
+}
+
+/// Picks [label] in the open select-box list. The list is height-limited and
+/// builds rows lazily, so scroll it from the top until the row exists.
+Future<void> chooseFromOpenMenu(WidgetTester t, String label) async {
+  final menu = find.byType(Scrollable).last;
+  final row = find.descendant(of: menu, matching: find.text(label));
+  t.state<ScrollableState>(menu).position.jumpTo(0);
+  await t.pumpAndSettle();
+  await t.scrollUntilVisible(row, 80, scrollable: menu, maxScrolls: 40);
+  await t.pumpAndSettle();
+  await t.tap(row);
+  await t.pumpAndSettle();
 }
 
 Future<void> fill(WidgetTester t, String label, String value) async {

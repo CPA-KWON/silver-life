@@ -338,6 +338,8 @@ class _NewMeetupPageState extends State<NewMeetupPage> {
               child: DropdownButtonFormField<int>(
                 key: const Key('meetup-capacity'),
                 initialValue: _capacity,
+                // Same height limit as the time selects; 2–30명 scrolls.
+                menuMaxHeight: 300,
                 decoration: const InputDecoration(labelText: '최대 인원'),
                 items: [
                   for (var n = 2; n <= 30; n++)
@@ -447,6 +449,9 @@ class _TimeSelects extends StatelessWidget {
       key: Key(key),
       initialValue: value,
       isExpanded: true,
+      // About five rows, then the list scrolls (the 12 hours otherwise
+      // open as a near full-screen list).
+      menuMaxHeight: 300,
       style: itemStyle,
       decoration: InputDecoration(labelText: hint),
       items: [
