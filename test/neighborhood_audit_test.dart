@@ -24,11 +24,7 @@ class FakeAds extends AttendanceAds {
   Future<AttendanceAdOffer> offer({
     required int streak,
     required bool attended,
-  }) async => AttendanceAdOffer(
-    points: 20,
-    remaining: 2,
-    enabled: attended,
-  );
+  }) async => AttendanceAdOffer(points: 20, remaining: 2, enabled: attended);
   @override
   Future<AttendanceAdResult> watch() async {
     calls++;
@@ -75,10 +71,12 @@ void main() {
     );
   });
   test(
-    'missing GPS and geocoder failure fall back without using profile region',
+    'with no saved 우리 동네, missing GPS and geocoder failure fall back',
     () async {
+      Future<NeighborhoodRegion?> none() async => null;
       final denied = NeighborhoodRegionResolver(
         positionLoader: () async => null,
+        savedRegion: none,
       );
       expect(await denied.resolve(), defaultNeighborhood);
       final gps = Position(
@@ -102,6 +100,7 @@ void main() {
         geocoder: (_, _) async => [
           const Placemark(administrativeArea: '서울특별시', locality: '강남구'),
         ],
+        savedRegion: none,
       );
       final rows = await Future.wait([resolver.resolve(), resolver.resolve()]);
       expect(rows.every((r) => r.sigungu == '강남구'), true);
@@ -109,10 +108,31 @@ void main() {
       final failed = NeighborhoodRegionResolver(
         positionLoader: () async => gps,
         geocoder: (_, _) async => throw StateError('offline'),
+        savedRegion: none,
       );
       expect(await failed.resolve(), defaultNeighborhood);
     },
   );
+  test('saved 우리 동네 wins over GPS and a new save applies at once', () async {
+    NeighborhoodRegion? saved = (sido: '서울특별시', sigungu: '금천구');
+    var gpsCalls = 0;
+    final resolver = NeighborhoodRegionResolver(
+      positionLoader: () async {
+        gpsCalls++;
+        return null;
+      },
+      savedRegion: () async => saved,
+    );
+    expect(await resolver.resolve(), (sido: '서울특별시', sigungu: '금천구'));
+    expect(gpsCalls, 0);
+    // Changed in 회원정보 관리: the very next lookup uses it, no stale cache.
+    saved = (sido: '부산광역시', sigungu: '해운대구');
+    expect(await resolver.resolve(), (sido: '부산광역시', sigungu: '해운대구'));
+    // Cleared or unreadable: back to location, then the default.
+    saved = null;
+    expect(await resolver.resolve(), defaultNeighborhood);
+    expect(gpsCalls, 1);
+  });
   testWidgets('date points and profile icon share a visual center', (t) async {
     await t.binding.setSurfaceSize(const Size(430, 960));
     addTearDown(() => t.binding.setSurfaceSize(null));

@@ -57,6 +57,23 @@ class _FeedState extends State<NeighborhoodFeed> {
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    NeighborhoodRegionResolver.changes.addListener(_onRegionSaved);
+  }
+
+  @override
+  void dispose() {
+    NeighborhoodRegionResolver.changes.removeListener(_onRegionSaved);
+    super.dispose();
+  }
+
+  // A new "우리 동네" was saved in 회원정보 관리: show that district now.
+  void _onRegionSaved() {
+    if (mounted) refresh(preserveResults: false);
+  }
+
+  @override
   void didUpdateWidget(NeighborhoodFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.active &&
@@ -566,4 +583,3 @@ class _FeedState extends State<NeighborhoodFeed> {
     );
   }
 }
-

@@ -76,18 +76,19 @@ void main() {
       expect(find.text('지역 커뮤니티 · 자유게시판'), findsOneWidget);
       // 남의 모임은 참여 전까지 "참여 예정"으로 표시하지 않는다.
       expect(find.text('참여 예정'), findsNothing);
+      // Browses the saved "우리 동네" (test profile: 서울특별시 강남구), not GPS.
       final calls = backend.requests
           .where((u) => u.path.endsWith('/posts'))
           .toList();
       expect(
         calls.any(
-          (u) => u.queryParameters['facilities.region_sigungu'] == 'eq.동작구',
+          (u) => u.queryParameters['facilities.region_sigungu'] == 'eq.강남구',
         ),
         true,
       );
       expect(
         calls.any(
-          (u) => u.queryParameters['profiles.region_sigungu'] == 'eq.동작구',
+          (u) => u.queryParameters['profiles.region_sigungu'] == 'eq.강남구',
         ),
         true,
       );

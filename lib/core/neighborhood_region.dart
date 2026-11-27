@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../facility/facility_distance.dart';
 import 'korea_regions.dart';
@@ -9,17 +10,33 @@ import 'korea_regions.dart';
 typedef NeighborhoodRegion = ({String sido, String sigungu});
 const defaultNeighborhood = (sido: '서울특별시', sigungu: '동작구');
 
-/// Browsing defaults only. Never writes a profile or supplies a GPS fix for
-/// distances, check-ins, walking rewards, or registered-resident eligibility.
+/// Reads the signed-in user's saved "우리 동네" (회원정보 관리), or null.
+typedef SavedRegionLoader = Future<NeighborhoodRegion?> Function();
+
+/// The district that home, 동네 모임, 커뮤니티 and 기관 공지 browse.
+///
+/// The user's saved "우리 동네" comes first, so changing it in 회원정보 관리
+/// changes every list. Only when none is saved (or it cannot be read) does it
+/// fall back to the phone's current location, then to [defaultNeighborhood].
+/// Browsing only: never writes a profile or supplies a GPS fix for distances,
+/// check-ins, walking rewards, or registered-resident eligibility.
 class NeighborhoodRegionResolver {
   NeighborhoodRegionResolver({
     this.positionLoader = loadFacilityPosition,
     Future<List<Placemark>> Function(double, double)? geocoder,
-  }) : geocoder = geocoder ?? _placemarks;
+    SavedRegionLoader? savedRegion,
+  }) : geocoder = geocoder ?? _placemarks,
+       savedRegion = savedRegion ?? loadSavedRegion;
 
   static final shared = NeighborhoodRegionResolver();
+
+  /// Bumped when the user saves a new "우리 동네", so open lists reload.
+  static final changes = ValueNotifier<int>(0);
+  static void notifyChanged() => changes.value++;
+
   final FacilityPositionLoader positionLoader;
   final Future<List<Placemark>> Function(double, double) geocoder;
+  final SavedRegionLoader savedRegion;
   Future<NeighborhoodRegion>? _pending;
   NeighborhoodRegion? _cached;
   DateTime? _until;
@@ -31,9 +48,34 @@ class NeighborhoodRegionResolver {
         locale: const Locale('ko', 'KR'),
       );
 
-  Future<NeighborhoodRegion> resolve() {
+  /// The saved profile district, if it is a known 시/도 + 시/군/구 pair.
+  static Future<NeighborhoodRegion?> loadSavedRegion() async {
+    try {
+      final client = Supabase.instance.client;
+      final id = client.auth.currentUser?.id;
+      if (id == null) return null;
+      final row = await client
+          .from('profiles')
+          .select('region_sido, region_sigungu')
+          .eq('id', id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 5));
+      final sido = row?['region_sido'] as String?;
+      final sigungu = row?['region_sigungu'] as String?;
+      if (sido == null || sigungu == null) return null;
+      if (!(kKoreaRegions[sido]?.contains(sigungu) ?? false)) return null;
+      return (sido: sido, sigungu: sigungu);
+    } catch (_) {
+      return null; // Offline or signed out: browse by location instead.
+    }
+  }
+
+  Future<NeighborhoodRegion> resolve() async {
+    // Read every time (one small row) so a just-saved district applies.
+    final saved = await savedRegion();
+    if (saved != null) return saved;
     if (_cached != null && DateTime.now().isBefore(_until!)) {
-      return Future.value(_cached);
+      return _cached!;
     }
     return _pending ??= _resolve().whenComplete(() => _pending = null);
   }

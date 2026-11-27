@@ -75,10 +75,13 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     widget.refreshListenable?.addListener(_onTabReturn);
+    // A new "우리 동네" from 회원정보 관리 changes 동네 소식 and 모임 here.
+    NeighborhoodRegionResolver.changes.addListener(reload);
   }
 
   @override
   void dispose() {
+    NeighborhoodRegionResolver.changes.removeListener(reload);
     widget.refreshListenable?.removeListener(_onTabReturn);
     super.dispose();
   }

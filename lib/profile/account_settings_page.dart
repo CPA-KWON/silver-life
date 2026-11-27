@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../ui/neighborhood_design.dart';
+import '../core/neighborhood_region.dart';
 import '../core/region_picker.dart';
 import '../core/release_flags.dart';
 import '../social/social_form_widgets.dart';
@@ -194,6 +195,8 @@ class _AccountState extends State<AccountSettingsPage> {
             'region_sigungu': sigungu,
           })
           .eq('id', c.auth.currentUser!.id);
+      // Home, 동네 모임 and 커뮤니티 browse this district: reload them now.
+      NeighborhoodRegionResolver.notifyChanged();
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('저장되었습니다.')));
